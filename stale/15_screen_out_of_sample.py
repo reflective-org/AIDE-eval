@@ -33,8 +33,9 @@ from report_layout import (Page, figure_page, PAGE_W, PAGE_H, SURFACE, INK,
                            INK2, MUTED, RULE, BLUE, ORANGE)
 
 OUT_J = os.path.join(C.OUTDIR, "15_screen_out_of_sample.json")
-OUT_P = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                     "docs", "AIDE_WACCM_screening_1970-1995.pdf")
+# Written beside this script, in stale/, not into docs/ - this figure is archived.
+OUT_P = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                     "AIDE_WACCM_screening_1970-1995.pdf")
 TRAIN, TEST = "1996-2014", "1970-1995"
 K = 3.0                                   # the agreed screening band, in sigma
 BLOCKS = [(1970, 1974), (1975, 1979), (1980, 1984), (1985, 1989), (1990, 1994)]

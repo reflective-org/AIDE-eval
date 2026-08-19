@@ -30,6 +30,11 @@ What that buys, and what it costs:
          why a period-matched comparison stays the better test for a rollout
          that overlaps CESM in time (D9).
 
+It also carries the tier thresholds, which is what 14 did against the split
+anchors: the per-year screening band at tier 1, and the mean tolerance, variance
+windows, count intervals and resolvability limits at tier 2. Every number in
+EVALUATION_PROTOCOL.md sections 1 and 3 is transcribed from this file.
+
 Reads output/07_period_split.json only - both segments, for their series.
 Output: output/16_anchors_45yr.json
 """
@@ -37,12 +42,16 @@ Output: output/16_anchors_45yr.json
 import json
 import os
 import numpy as np
+from scipy.stats import norm as _n, poisson as _p
 
 import aide_val_common as C
+
+_norm_sf, _pois_ppf = _n.sf, _p.ppf
 
 OUT = os.path.join(C.OUTDIR, "16_anchors_45yr.json")
 ANCHOR = (1970, 2014)
 K_SCREEN = 3.0                # tier-1 per-year band, in sigma (protocol section 1)
+SCREEN, FULL = 5, 35          # the two tier lengths the protocol scores at
 TAU_DAYS = 14.0               # DJF decorrelation time, for the daily sigma (D7)
 
 SERIES = [
@@ -148,6 +157,89 @@ def main():
         print(f"  {tag:17s} slope {M['slope']:+.3f} "
               f"[{M['ci95'][0]:+.3f}, {M['ci95'][1]:+.3f}]  r = {M['r']:+.2f}  "
               f"n = {M['n']}")
+
+    # ------------------------------------------------------------------- tiers
+    # The thresholds themselves, at the two lengths the protocol scores at. Tier 1
+    # gates individual years; only its mean row depends on the 5-year length.
+    res["tiers"] = {"screen_length": SCREEN, "full_length": FULL, "mean": {},
+                    "variance": {}, "trend": {}, "mechanism": {}}
+    print(f"\nTIER THRESHOLDS from this anchor - tier 1 at n = {SCREEN}, "
+          f"tier 2 at n = {FULL}")
+    print(f"{'diagnostic':16s} {'sigma':>8} {'t1 mean tol':>12} {'t2 mean tol':>12} "
+          f"{'t2 tol %mean':>13} {'branch at t2':>13}")
+    for key, ykey, unit in SERIES:
+        d = res["diagnostics"][key]
+        sig, mu = d["sigma_used"], d["mean"]
+        t1, t2 = C.bias_target(sig, SCREEN), C.bias_target(sig, FULL)
+        res["tiers"]["mean"][key] = dict(
+            units=unit, sigma=sig, anchor_mean=mu,
+            tier1_advisory_tolerance=float(t1),
+            tier1_advisory_in_sigma=float(t1 / sig),
+            tier2_tolerance=float(t2), tier2_in_sigma=float(t2 / sig),
+            tier2_pct_of_mean=float(100 * t2 / abs(mu)),
+            binding_branch=("0.5 sigma" if 0.5 * sig >= 1.96 * sig / np.sqrt(FULL)
+                            else "detection"))
+        m = res["tiers"]["mean"][key]
+        print(f"{key:16s} {sig:8.4f} {t1:12.4f} {t2:12.4f} "
+              f"{m['tier2_pct_of_mean']:12.1f}% {m['binding_branch']:>13}")
+        res["tiers"]["variance"][key] = dict(
+            interannual_ratio_window=list(C.ratio_window(FULL, d["n"])),
+            anchor_n=d["n"])
+
+    dd = res["daily_DJF_u60N"]
+    per_year = dd["effective_n"] / res["diagnostics"]["vortex_NH"]["n"]
+    res["tiers"]["variance"]["daily_DJF_u60N"] = dict(
+        ratio_window=list(C.ratio_window(FULL, res["diagnostics"]["vortex_NH"]["n"],
+                                         per_year)),
+        effective_samples_per_winter=float(per_year))
+    iw = res["tiers"]["variance"]["mass_flux"]["interannual_ratio_window"]
+    dw = res["tiers"]["variance"]["daily_DJF_u60N"]["ratio_window"]
+    print(f"\n  sigma ratio windows for a {FULL}-yr candidate: "
+          f"interannual {iw[0]:.2f}-{iw[1]:.2f}, daily DJF {dw[0]:.2f}-{dw[1]:.2f} "
+          f"({per_year:.1f} effective samples per winter)")
+
+    # False alarms: 6 diagnostics x 5 years is 30 simultaneous checks per screen.
+    n_chk = len(SERIES) * SCREEN
+    res["tiers"]["false_alarm"] = {"n_checks_per_screen": n_chk, "by_band": {}}
+    for k in (2.0, 2.5, 3.0, 3.5):
+        per = float(2 * _norm_sf(k))
+        res["tiers"]["false_alarm"]["by_band"][f"{k:.1f}"] = dict(
+            per_check=per, any_flag=float(1 - (1 - per) ** n_chk))
+    print(f"  a perfect Gaussian model trips the +/-{K_SCREEN:.0f} sigma gate on "
+          f"{100 * res['tiers']['false_alarm']['by_band']['3.0']['any_flag']:.1f}% "
+          f"of screening runs ({n_chk} checks each)")
+
+    lam = res["ssw_NH"]["rate_per_winter"]
+    res["tiers"]["ssw_count"] = {}
+    for tag, n in (("tier1", SCREEN), ("tier2", FULL)):
+        res["tiers"]["ssw_count"][tag] = dict(
+            winters=n, expected=float(lam * n),
+            interval=[int(_pois_ppf(0.025, lam * n)),
+                      int(_pois_ppf(0.975, lam * n))])
+        c = res["tiers"]["ssw_count"][tag]
+        print(f"  major NH SSW over {n:2d} winters: expect {c['expected']:5.1f}, "
+              f"accept {c['interval'][0]}-{c['interval'][1]}")
+
+    for key, ykey, unit in SERIES:
+        d = res["diagnostics"][key]
+        se = d["trend_se_per_decade"] * (d["n"] / FULL) ** 1.5
+        res["tiers"]["trend"][key] = dict(
+            units=unit + " per decade", trend=d["trend_per_decade"],
+            se_at_full=float(se),
+            resolvable_at_full=bool(abs(d["trend_per_decade"]) > 1.96 * se))
+        t = res["tiers"]["trend"][key]
+        print(f"  trend {key:16s} {d['trend_per_decade']:+.4f} +/- {1.96 * se:.4f} "
+              f"per decade at {FULL} yr  "
+              + ("resolvable" if t["resolvable_at_full"] else "NOT resolvable"))
+
+    for tag, M in res["mechanism"].items():
+        half = 0.5 * (M["ci95"][1] - M["ci95"][0])
+        h = half * np.sqrt(M["n"] / FULL)
+        res["tiers"]["mechanism"][tag] = dict(
+            slope=M["slope"], half_width_full=float(h),
+            resolvable_at_full=bool(abs(M["slope"]) > h))
+        print(f"  {tag:17s} slope {M['slope']:+.3f} +/-{h:.2f} at {FULL} yr  "
+              + ("resolvable" if abs(M["slope"]) > h else "NOT resolvable"))
 
     with open(OUT, "w") as f:
         json.dump(res, f, indent=2)

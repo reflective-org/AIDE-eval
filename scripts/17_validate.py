@@ -15,7 +15,7 @@ pass is weaker evidence than the corresponding failure. Real use is a candidate
 the anchor has never seen.
 
 Reads output/16_anchors_45yr.json and output/07_period_split.json.
-Output: output/17_validation.json and docs/validation_result.md
+Output: output/17_validation.json and validation_results/validation_result.md
 """
 
 import json
@@ -27,8 +27,9 @@ from scipy import stats
 import aide_val_common as C
 
 OUT_J = os.path.join(C.OUTDIR, "17_validation.json")
-OUT_M = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                     "docs", "validation_result.md")
+RESULTS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                       "validation_results")
+OUT_M = os.path.join(RESULTS, "validation_result.md")
 
 SERIES = [
     ("mass_flux", "_annual_years", "Mass flux, 70 hPa", "10^9 kg/s", 4),
@@ -41,6 +42,20 @@ SERIES = [
 MECHANISM = [("R1 wave->vortex", "heat_flux_100", "vortex_NH", "_djf_years"),
              ("R2 thermal wind", "polar_cap_T_NH", "vortex_NH", "_djf_years")]
 BLOCK = 5                     # tier-1 screening runs are 5 years long
+
+# Written by 18_validation_figures.py into the same directory as the report.
+FIGURES = [
+    ("tier1_screening.png",
+     "tier 1 — every candidate year against the ±3σ band, six diagnostics"),
+    ("tier2_mean.png",
+     "tier 2 mean — offset from the anchor against the ±0.5σ tolerance"),
+    ("tier2_variance.png",
+     "tier 2 variance — σ ratios against their 95% windows, interannual and daily"),
+    ("counts_and_relations.png",
+     "SSW count against its Poisson interval; R1 and R2 slopes against the anchor fit"),
+    ("trends.png",
+     "trends per decade, anchor against candidate, with what this n resolves"),
+]
 
 
 def candidate_series(ps, lo, hi):
@@ -384,6 +399,16 @@ def write_markdown(res, A):
       f"{A['band_self_consistency']['checks']} |")
     w(f"| Candidate inside anchor | "
       f"{'yes' if res['inside_anchor'] else 'no'} |")
+    w("")
+    w("## Evidence")
+    w("")
+    w("| Figure | Covers |")
+    w("|---|---|")
+    for fn, cap in FIGURES:
+        w(f"| [{fn}]({fn}) | {cap} |")
+    w("")
+    w("Figures are written by `scripts/18_validation_figures.py`, from the same two "
+      "JSON files as the tables above.")
     w("")
 
     with open(OUT_M, "w") as f:

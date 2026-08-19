@@ -83,3 +83,15 @@
 | Anchor carries the forced BDC trend | mass flux +0.1945 per decade, p = 2e-09 |
 | Anchor years outside their own band | 3 of 262 |
 | Candidate inside anchor | yes |
+
+## Evidence
+
+| Figure | Covers |
+|---|---|
+| [tier1_screening.png](tier1_screening.png) | tier 1 — every candidate year against the ±3σ band, six diagnostics |
+| [tier2_mean.png](tier2_mean.png) | tier 2 mean — offset from the anchor against the ±0.5σ tolerance |
+| [tier2_variance.png](tier2_variance.png) | tier 2 variance — σ ratios against their 95% windows, interannual and daily |
+| [counts_and_relations.png](counts_and_relations.png) | SSW count against its Poisson interval; R1 and R2 slopes against the anchor fit |
+| [trends.png](trends.png) | trends per decade, anchor against candidate, with what this n resolves |
+
+Figures are written by `scripts/18_validation_figures.py`, from the same two JSON files as the tables above.
