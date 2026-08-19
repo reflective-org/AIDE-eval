@@ -14,30 +14,38 @@ been done.
 | If you want | Read |
 |---|---|
 | The protocol — both tiers, every threshold, the reasoning | [docs/EVALUATION_PROTOCOL.md](docs/EVALUATION_PROTOCOL.md) |
-| Both tiers tried on CESM 1970–1995 | [docs/AIDE_WACCM_screening_1970-1995.pdf](docs/AIDE_WACCM_screening_1970-1995.pdf) (3 pp) |
+| A scored candidate, with figures | [validation_results/](validation_results/validation_result.md) |
+| How to score your own model | [docs/EVALUATION_PROTOCOL.md](docs/EVALUATION_PROTOCOL.md) §3.5, and §4 for the inputs |
 | Where the tolerances come from | [docs/EVALUATION_PROTOCOL.md](docs/EVALUATION_PROTOCOL.md) appendix A |
 | Why a choice was made | [docs/EVALUATION_PROTOCOL.md](docs/EVALUATION_PROTOCOL.md) appendix B |
 | What is knowingly not covered | [docs/EVALUATION_PROTOCOL.md](docs/EVALUATION_PROTOCOL.md) appendix C, §7 |
 | Settled data conventions and working rules | [CLAUDE.md](CLAUDE.md) |
 | The evidence for those conventions | `scripts/01*`, `logs/01*` |
-| The 10/20-year suite the protocol replaced | [docs/AIDE_WACCM_validation_targets.pdf](docs/AIDE_WACCM_validation_targets.pdf) (23 pp, frozen — see History) |
+| Superseded material, kept | [stale/](stale/README.md) |
 
 The protocol document is self-contained: every threshold, its derivation, the decisions
 behind it and the limitations on it are in that one file, and every number in it is
-transcribed from `output/14_evaluation_tiers.json` or `output/15_screen_out_of_sample.json`.
+transcribed from `output/16_anchors_45yr.json`.
 
 ## The two tiers
 
-**Tier 1 — 5-year screening.** Every individual year against a ±3σ band on the CESM
-1996–2014 mean, six diagnostics, plus an SSW count. A regression test: fast, quiet on a
-healthy model, loud on a broken one. Run against CESM 1970–1995 as five consecutive
-screening runs, 28 of 30 block verdicts pass; the two failures are both mass flux, both
-before 1980, and both are the forced BDC trend rather than a defect.
+Both tiers are anchored on **CESM 1970–2014, the whole record** — 44 annual years, 42 DJF
+and 45 JJA seasons — so the thresholds are fixed and model-agnostic rather than matched to a
+CESM sub-period.
 
-**Tier 2 — 35-year validation.** The rollout mean to ±0.5σ and the variance to a
-0.66–1.34 interannual σ ratio, anchored on 1980–2014. This is the actual scientific claim.
-Scored on CESM 1970–1994, four of six diagnostics pass the mean test and all six pass the
-variance test — the two mean failures are the upwelling pair, for the same trend reason.
+**Tier 1 — 5-year screening.** Every individual year against a ±3σ band on the anchor mean,
+six diagnostics, plus an SSW count of 0–7 over 5 winters. A regression test: fast, quiet on
+a healthy model, loud on a broken one.
+
+**Tier 2 — 35-year validation.** The rollout mean to ±0.5σ, the interannual σ ratio to
+0.68–1.32 and the daily DJF σ ratio to 0.88–1.12, plus the SSW count, the two mechanism
+slopes and the upwelling trend. This is the scientific claim.
+
+**What the anchor gives up.** Spanning the whole record leaves no CESM output held back to
+test the thresholds against, so §2 of the protocol cites the archived split-anchor runs in
+[stale/](stale/README.md) instead: on anchors that did not include the scored period, 28 of
+30 tier-1 block verdicts and 4 of 6 tier-2 mean tests pass, the failures being the upwelling
+pair and the forced BDC trend behind them. The method carries over; the numbers do not.
 
 ## The three results worth knowing
 
@@ -56,7 +64,7 @@ targets are period-matched, not absolute** — score a rollout against the CESM 
 covers, or detrend both sides.
 
 **3. The estimator spread is larger than the target.**
-The two standard routes to w̄* differ by **10.8%** on identical data, against a 1.1%
+The two standard routes to w̄* differ by **10.8%** on identical data, against the 1.1%
 mass-flux tolerance at tier 2. A threshold is therefore a statement about a *specific
 estimator*, valid only when model and truth pass through the same code path
 (`scripts/aide_val_common.py:tem_residual`) on the same grid.
@@ -70,12 +78,17 @@ Inputs are read-only CESM history files under `/data/cesm2.1.5_output/histSST`
 cd scripts
 PY=/home/ubuntu/atmospheric_scale/paradis_model/paradis_venv/bin/python
 $PY 02_reference_stats.py && $PY 02b_trends.py && $PY 07_period_split.py \
-  && $PY 14_evaluation_tiers.py && $PY 15_screen_out_of_sample.py
+  && $PY 16_anchors_45yr.py && $PY 17_validate.py 1996 2014 \
+  && $PY 18_validation_figures.py
 ```
 
-About five minutes in total. Order matters — later scripts read earlier JSON. `14` and `15`
-read only existing JSON and take seconds, so iterating on a threshold does not mean
-re-reading the tape.
+About five minutes in total. Order matters — later scripts read earlier JSON. `16`, `17` and
+`18` read only existing JSON and take seconds, so iterating on a threshold or scoring another
+candidate does not mean re-reading the tape.
+
+`17_validate.py` takes the candidate period as arguments. Candidate data enters through one
+function, `candidate_series`, which is what gets replaced when the candidate is a model
+rollout rather than a window of CESM's own record.
 
 `01_check_conventions.py`, `01b`, `01c` and `01d` sit outside the pipeline. They establish
 the four data conventions in [CLAUDE.md](CLAUDE.md) — that `VTHzm` is already an eddy flux,
@@ -91,9 +104,11 @@ the PDF is built with matplotlib's `PdfPages`.
 ```
 README.md            this file
 CLAUDE.md            working rules, settled data conventions, protocol constraints
-scripts/             02, 02b, 07, 14, 15 + aide_val_common.py, report_layout.py
+scripts/             02, 02b, 07, 16, 17, 18 + aide_val_common.py, report_layout.py
                      01, 01b, 01c, 01d — convention evidence, outside the pipeline
-docs/                the protocol, its figure, and the frozen 23 pp report
+docs/                the protocol
+validation_results/  a scored candidate: validation_result.md and five figures
+stale/               superseded material, kept — see stale/README.md
 output/              JSON results            — generated, gitignored
 logs/                stdout of every run     — generated, gitignored
 ```
@@ -115,13 +130,17 @@ The seasonal-cycle and daily-DJF-distribution plots went with it and are to be r
 against the tier protocol. The diagnostics they visualise are still computed, in
 `output/07_period_split.json`.
 
-Two items were kept:
+Three items were kept:
 
 - **`scripts/01*`**, the convention evidence. Re-run on 2026-08-19; they reproduce the
   numbers quoted in [CLAUDE.md](CLAUDE.md) — 15.4% median error for `VTHzm` as-is against
   1086.9% if `Vzm·THzm` is subtracted, a continuity slope of 1.011 at r = 0.9999 confirming
   log-pressure `Wzm`, and 2.9% covariance loss from daily averaging.
-- **`docs/AIDE_WACCM_validation_targets.pdf`**, the 23 pp technical report and the first PDF
+- **`stale/`**, everything superseded since: the split-anchor threshold scripts `14` and
+  `15`, the screening figure they produced, and the 23 pp technical report. `14` and `15`
+  still run and still reproduce their JSON, and §2 of the protocol cites them as the
+  out-of-sample evidence the current anchor cannot re-earn.
+- **`stale/AIDE_WACCM_validation_targets.pdf`**, the 23 pp technical report and the first PDF
   the project produced. It is **frozen**: the script that built it read JSON from five
   diagnostics that are no longer part of the repo, so it cannot be regenerated here and is
   kept as the only surviving record of the suite the protocol replaced. Its thresholds are

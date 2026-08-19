@@ -17,7 +17,7 @@ test is not independent the way 07's split is, and 1980-2014 spans the 1995/96
 restart between two separate runs. Both are stated in the protocol document.
 
 Outputs: output/15_screen_out_of_sample.json
-         docs/AIDE_WACCM_screening_1970-1995.pdf
+         stale/AIDE_WACCM_screening_1970-1995.pdf   (archived; see stale/README.md)
 """
 
 import json

@@ -5,12 +5,15 @@ Two tiers:
 - **Tier 1** — a 5-year regression check, run on every new model version
 - **Tier 2** — a 35-year validation
 
-Every number below is transcribed from `output/14_evaluation_tiers.json` and
-`output/15_screen_out_of_sample.json`, produced by `scripts/14_evaluation_tiers.py` and
-`scripts/15_screen_out_of_sample.py`. **Tier 1 is anchored on 1996–2014, tier 2 on
-1980–2014**; the reasons are in each section. Nothing here has been run against an
-AIDE-WACCM rollout: these are the criteria, plus both tiers applied to CESM's own earlier
-output.
+Every number below is transcribed from `output/16_anchors_45yr.json`, produced by
+`scripts/16_anchors_45yr.py`. **Both tiers are anchored on CESM 1970–2014, the whole
+record** — 44 annual years, 42 DJF and 45 JJA seasons. Nothing here has been run against an
+AIDE-WACCM rollout: these are the criteria, plus the machinery exercised on a window of
+CESM's own output (§3.5).
+
+The anchor uses every year the run affords, which makes σ the best estimated and the
+variance windows the tightest available. It also leaves no CESM output held back to test the
+thresholds with; §2 is that limitation and where the supporting evidence now lives.
 
 Results and interpretation are kept apart. Tables and the bullets under them state what was
 measured; every inference drawn from them is in a labelled `Interpretation` block.
@@ -22,7 +25,7 @@ measured; every inference drawn from them is in a labelled `Interpretation` bloc
 | | **Tier 1 — screening** | **Tier 2 — validation** |
 |---|---|---|
 | Length | 5 years | 35 years |
-| Anchor | 1996–2014 (19 yr) | 1980–2014 (35 yr) |
+| Anchor | 1970–2014 (45 yr) | 1970–2014 (45 yr) |
 | Runs on | every new model version | a configuration that passed tier 1 |
 | Scores | **individual years** | the **rollout mean** and the **variance** |
 | Question | is the configuration broken? | is the configuration correct? |
@@ -40,31 +43,42 @@ scientific claim.
 
 ### What is checked
 
-**Every individual year, against a ±3σ band around the CESM 1996–2014 mean.** A 5-year
-rollout produces 5 values per diagnostic; all 5 are checked. The 5-year mean is not the
-gate: a regression test has to detect a single extreme year, which averaging removes.
+**Every individual year, against a ±3σ band around the CESM 1970–2014 mean.** A 5-year
+rollout gives 5 values per diagnostic and all 5 are checked. This is not a check on the
+5-year mean: a regression test has to see a single catastrophic year, which averaging hides.
 
-| Diagnostic | Units | Anchor mean | σ | **Accept (any single year)** | CESM anchor years span |
-|---|---|---|---|---|---|
-| Mass flux, 70 hPa | 10⁹ kg s⁻¹ | 9.670 | 0.220 | **9.010 – 10.330** | −1.82 / +1.62 σ |
-| w̄*, 10°S–10°N | mm s⁻¹ | 0.1956 | 0.0127 | **0.1574 – 0.2337** | −1.79 / +1.45 σ |
-| Vortex NH, DJF | m s⁻¹ | 25.0 | 5.7 | **7.9 – 42.1** | −2.07 / +2.09 σ |
-| Vortex SH, JJA | m s⁻¹ | −81.2 | 2.7 | **−89.4 – −72.9** | −1.38 / +2.58 σ |
-| Polar cap T, NH | K | 209.0 | 2.2 | **202.3 – 215.7** | −1.37 / +2.23 σ |
-| Polar cap T, SH | K | 192.2 | 2.3 | **185.4 – 199.1** | −1.63 / +1.75 σ |
+σ is detrended within the anchor wherever the trend is significant at p < 0.05, marked `*`.
+Three diagnostics trigger it.
 
-Plus one count, which needs no band: **1–8 major NH SSWs over the 5 winters** (expected 3.9
-at the CESM rate of 0.79/winter, 95% Poisson interval). Only a rollout with no major
-warmings, or with more than eight, falls outside the interval.
+| Diagnostic | Units | Anchor mean | σ | **Accept (any single year)** | Anchor n | Widest anchor year |
+|---|---|---|---|---|---|---|
+| Mass flux, 70 hPa | 10⁹ kg s⁻¹ | 9.4487 | 0.2128* | **8.810 – 10.087** | 44 | +3.45σ (1978) |
+| w̄*, 10°S–10°N | mm s⁻¹ | 0.1917 | 0.0144* | **0.1485 – 0.2350** | 44 | +2.57σ (1992) |
+| Vortex NH, DJF | m s⁻¹ | 24.8 | 5.6 | **8.0 – 41.6** | 42 | +2.17σ (2014) |
+| Vortex SH, JJA | m s⁻¹ | −81.6 | 2.5 | **−89.0 – −74.2** | 45 | +3.05σ (2011) |
+| Polar cap T, NH | K | 209.55 | 1.90* | **203.8 – 215.3** | 42 | +2.35σ (2011) |
+| Polar cap T, SH | K | 192.13 | 2.02 | **186.1 – 198.2** | 45 | +2.75σ (1992) |
 
-### Why ±3σ, and the limit on tightening it
+Plus one count, which needs no band: **0–7 major NH SSWs over the 5 winters**, against 3.4
+expected at the anchor rate of 0.689/winter (31 events in 45 winters, 95% Poisson interval).
 
-- No CESM anchor year of any diagnostic reaches 2.6σ, so ±3σ covers the observed record
-  with margin.
-- The constraint on tightening is multiplicity: six diagnostics × 5 years is **30
-  simultaneous checks per screening run**.
+### The anchor against its own band
 
-For a model that is unbiased and Gaussian:
+Scoring all 45 anchor years back against the band they define gives **3 exceedances in 262
+year-checks**: mass flux in 1971 and 1978, SH vortex in 2011.
+
+> **Interpretation** — A band built from a detrended σ but centred on a mid-trend mean will
+> flag the ends of a trending record. Both mass-flux exceedances are in the 1970s, before
+> most of the BDC acceleration (D9). The 3 are not evidence that ±3σ is too tight; they are
+> the forced trend appearing in a statistic that has had the trend removed from its width but
+> not from its centre. A candidate flagged in the same way needs its period checked before
+> its physics.
+
+### Why ±3σ
+
+The band clears the whole anchor record apart from those 3 checks, and multiplicity is the
+reason not to start tighter. Six diagnostics × 5 years is **30 simultaneous checks per
+screening run**. For a model that is perfect and merely Gaussian:
 
 | Band | False alarm per check | Chance of ≥1 flag per screening run |
 |---|---|---|
@@ -73,206 +87,141 @@ For a model that is unbiased and Gaussian:
 | ±3.0σ | 0.27% | **7.8%** |
 | ±3.5σ | 0.05% | 1.4% |
 
-> **Interpretation** — ±2σ is not usable as a hard gate: it flags three runs in four from an
-> unbiased model, and a gate with that false-alarm rate is ignored. ±3σ is the loosest band
-> that still resolves an excursion and the tightest that holds the per-run false-alarm rate
-> below 10%. If tier 1 is tightened, ±3σ is the parameter to move; the path with the fewest
-> side effects is to keep ±3σ as the hard gate and add tighter bands as advisory flags that
-> are logged rather than failed on.
+> **Interpretation** — ±2σ is unusable as a hard gate: it would flag three runs in four on a
+> flawless model. ±3σ is the loosest band that is still informative and the tightest that
+> stays quiet. If tier 1 tightens, this is the number to move, and the sensible path is to
+> keep ±3σ as the hard gate and add tighter bands as advisory flags that are logged rather
+> than failed on.
 
-> **Settled for now: ±3σ.** Agreed 2026-08-18, to be revisited once real failure modes
-> have been seen. Section 2 is the out-of-sample check on that choice.
+> **Settled for now: ±3σ.** Agreed 2026-08-18, to be revisited once real failure modes have
+> been seen.
 
 ### Advisory, not gating, at tier 1
 
-- **The 5-year mean**, held to `max(0.5σ, 1.96σ/√5) = 0.877σ`. It detects a uniform drift
-  that no individual year is extreme enough to trip. It is not a gate: at n = 5 the
-  detection branch dominates and the threshold is close to 1σ, which admits most
-  configurations (appendix A).
+- **The 5-year mean**, held to `max(0.5σ, 1.96σ/√5) = 0.877σ`. Logged because it catches a
+  uniform drift that no individual year is extreme enough to trip. Not a gate: at n = 5 the
+  detection branch dominates so heavily that the threshold is nearly 1σ, which would pass
+  almost anything (appendix A).
 
 ### What tier 1 does not do
 
-It does not test variance, the mechanism relations, the forced trend, or the distribution. A
-tier-1 pass is not evidence that a configuration is correct, only that it is not broken in
-the six diagnostics checked. Do not report it as a validation.
+It does not test variance, the mechanism relations, the forced trend, or anything about the
+distribution.
 
-### Period sensitivity of the upwelling diagnostics
-
-- The bands above are anchored on 1996–2014.
-- Over the **pooled** 1970–2014 record the mass flux reaches −4.34σ and w̄* −2.98σ. That
-  excursion is the forced BDC trend, not natural scatter (D9), and the trend is concentrated
-  in 1970–1995.
-- The four vortex and temperature diagnostics are insensitive to the choice of record: NH
-  vortex and NH polar cap T agree to within 0.01σ, and SH vortex and SH polar cap T widen by
-  0.30σ and 0.63σ, on one side only.
-
-> **Interpretation** — A screening band built from the pooled record would accept a rollout
-> with a 1970s circulation. Score a rollout against the CESM years it covers, or detrend
-> both sides.
+> **Interpretation** — A tier-1 pass is not evidence that a configuration is good, only that
+> it is not obviously broken. Do not report it as a validation.
 
 ---
 
-## 2. Does the tier-1 gate survive out of sample?
+## 2. What this anchor cannot verify
 
-The standing rule: a threshold CESM cannot meet on a different sample of its own output is
-not a threshold (D12). The ±3σ gate was run against **CESM 1970–1995, treated as five
-consecutive 5-year screening runs** — 150 individual year-checks across the six diagnostics,
-with the five blocks spanning 1970–1994.
+The standing rule is that a threshold CESM cannot meet on a different sample of its own
+output is not a threshold (D12). The operational anchor cannot satisfy that rule: it spans
+1970–2014, so **no CESM year lies outside it** and no held-out sample exists.
 
-**Figure: [AIDE_WACCM_screening_1970-1995.pdf](AIDE_WACCM_screening_1970-1995.pdf)**
-(3 pp — the six diagnostics year by year, the same result as block verdicts, then the
-tier-2 test of section 3.3).
+The evidence therefore comes from the anchors this one replaced, archived in
+[`../stale/`](../stale/README.md):
 
-| Diagnostic | Offset of 1970–1995 from anchor | Years outside ±3σ | Worst year |
+| Test | Anchor | Scored on | Result |
 |---|---|---|---|
-| Mass flux, 70 hPa | **−1.77σ** | **4 of 25** (1970, 1971, 1975, 1978) | −4.34σ (1978) |
-| w̄*, 10°S–10°N | −0.53σ | 0 of 25 | −2.98σ (1974) |
-| Vortex NH, DJF | −0.07σ | 0 of 24 | −2.08σ (1977) |
-| Vortex SH, JJA | −0.26σ | 0 of 26 | −1.68σ (1983) |
-| Polar cap T, NH | +0.42σ | 0 of 24 | +1.74σ (1985) |
-| Polar cap T, SH | −0.07σ | 0 of 26 | +2.38σ (1992) |
+| Tier 1, ±3σ, per year | 1996–2014 | 1970–1995, as five 5-year screening runs | 28 of 30 block verdicts pass; both failures mass flux, both pre-1980 |
+| Tier 2, mean and variance | 1980–2014 | 1970–1994 | 4 of 6 mean, 6 of 6 variance |
 
-Results:
-
-- Four of six diagnostics produce no flag in 26 years of out-of-sample CESM.
-- The vortex and temperature diagnostics fall inside the band for their whole 1970–1995
-  record.
-- Mass flux flags 4 of 25 years, all in the 1970s, the worst at −4.34σ in 1978; the period
-  as a whole sits 1.77σ below the anchor.
-- As screening-run verdicts rather than year-checks: **2 of 30 block verdicts fail**, both
-  mass flux, both before 1980. The other 28 pass.
-
-> **Interpretation** — The gate does not fire on a healthy model, which is the required
-> behaviour for screening. The mass-flux failures are the outcome D9 predicts: the forced BDC
-> trend, not a broken configuration, and the reason the protocol requires scoring a rollout
-> against the CESM years it covers. Every flag the ±3σ gate raised on 26 years of CESM output
-> pointed at forced physics, none at noise, so a tier-1 flag means "inspect this", not "this
-> configuration is broken".
+> **Interpretation** — What transfers from those runs is the *method*, not the numbers: a
+> ±3σ per-year gate and a 0.5σ mean tolerance are the right size on CESM output that did not
+> set them, and the diagnostics that failed did so for an identifiable physical reason rather
+> than from noise. The thresholds in this document are the same construction on a longer
+> sample. They inherit that support and cannot add to it — which is the price of using the
+> whole record, and the reason the archived material is kept rather than deleted.
 
 ---
 
 ## 3. Tier 2 — 35-year validation
 
-**Anchored on 1980–2014** — 35 years, the same length as the rollout it scores, and a
-different anchor from tier 1, which stays on 1996–2014.
+**Anchored on 1970–2014**, the same anchor as tier 1. 35 years is past the 15.4-year
+crossover, so every mean tolerance is the full-strength **0.5σ**; running longer buys no
+further tightening on the mean.
 
-Two properties of that window, neither of them ideal:
-
-- **It spans the 1995/96 restart.** 1970–1995 and 1996–2014 are two separate CESM runs
-  joined at a restart, not one integration. The tier-1 anchor sits inside one run; this one
-  does not.
-- **It overlaps the test period below by 15 years** (1980–1994). Section 3.3 is therefore a
-  consistency check, not the independent out-of-sample test that D12 asks for.
-
-σ is detrended within the window where the trend is significant at p < 0.05, the same rule
-`07_period_split.stats_of` applies. Only the mass flux triggers it here (marked `*`).
+The anchor joins two separate CESM runs across the 1995/96 restart. σ is detrended where the
+trend is significant at p < 0.05, marked `*`.
 
 ### 3.1 Mean
 
-35 years is past the 15.4-year crossover, so the detection branch is not binding and every
-mean tolerance is the full-strength **0.5σ** — the same target a 20-year or a 45-year
-rollout would face. Running longer than 35 years gives no further tightening of the mean.
-
 | Diagnostic | Units | Anchor mean | σ | Tolerance | **Accept (rollout mean)** | as % of mean |
 |---|---|---|---|---|---|---|
-| Mass flux, 70 hPa | 10⁹ kg s⁻¹ | 9.564 | 0.204* | ±0.102 | **9.462 – 9.666** | 1.1% |
-| w̄*, 10°S–10°N | mm s⁻¹ | 0.1965 | 0.0137 | ±0.0068 | **0.1896 – 0.2033** | 3.5% |
-| Vortex NH, DJF | m s⁻¹ | 25.7 | 5.4 | ±2.7 | **23.0 – 28.4** | 10.5% |
-| Vortex SH, JJA | m s⁻¹ | −81.5 | 2.7 | ±1.3 | **−82.8 – −80.1** | 1.7% |
-| Polar cap T, NH | K | 209.1 | 1.9 | ±1.0 | **208.1 – 210.1** | 0.5% |
-| Polar cap T, SH | K | 192.3 | 2.1 | ±1.1 | **191.3 – 193.4** | 0.6% |
+| Mass flux, 70 hPa | 10⁹ kg s⁻¹ | 9.4487 | 0.2128* | ±0.1064 | **9.3423 – 9.5552** | 1.1% |
+| w̄*, 10°S–10°N | mm s⁻¹ | 0.1917 | 0.0144* | ±0.0072 | **0.1845 – 0.1990** | 3.8% |
+| Vortex NH, DJF | m s⁻¹ | 24.8 | 5.6 | ±2.8 | **22.0 – 27.6** | 11.3% |
+| Vortex SH, JJA | m s⁻¹ | −81.6 | 2.5 | ±1.2 | **−82.8 – −80.3** | 1.5% |
+| Polar cap T, NH | K | 209.55 | 1.90* | ±0.95 | **208.60 – 210.50** | 0.5% |
+| Polar cap T, SH | K | 192.13 | 2.02 | ±1.01 | **191.12 – 193.14** | 0.5% |
 
-`*` detrended σ (mass-flux trend significant at p < 0.001 over this window). The DJF and JJA
-rows rest on 34 and 35 seasons respectively — one DJF season is lost at the record edge.
-
-Moving the anchor from 1996–2014 to 1980–2014 tightens five of the six tolerances — mass
-flux from ±0.110 to ±0.102, NH polar cap T from ±1.12 to ±0.97 K — because the longer window
-has the smaller σ. w̄* loosens, from ±0.0064 to ±0.0068.
+The DJF rows rest on 42 seasons and the JJA rows on 45; the annual rows on 44 years. One
+DJF season is lost at each record edge and one annual year at the restart.
 
 ### 3.2 Variance
 
-At 35 years the interannual σ ratio becomes a usable test. D7 retired it at n = 10, where
-the window was 0.43–1.57 and nothing realistic could fail it. At 35 years against a 35-year
-anchor:
-
 | Metric | 95% acceptance window | Width |
 |---|---|---|
-| **Interannual σ ratio** (rollout σ ÷ CESM σ) | **0.66 – 1.34** | 0.67 |
-| **Daily DJF σ ratio**, u at 60°N | **0.87 – 1.13** | 0.26 |
+| **Interannual σ ratio** (rollout σ ÷ anchor σ) | **0.68 – 1.32** | 0.64 |
+| **Daily DJF σ ratio**, u at 60°N | **0.88 – 1.12** | 0.24 |
 
-- Both windows are tighter than against the 19-year anchor (0.60–1.40 and 0.84–1.16),
-  because the reference σ is now estimated from 35 years rather than 19. That is the main
-  practical gain from the longer anchor.
-- **The daily ratio is the sharper test, at 35 years as at shorter lengths.** The daily DJF
-  series gives about 6.4 independent samples per winter (14-day decorrelation time), so it
-  constrains the variance about 2.6× more tightly than the annual series. Report both.
-- **Detrend both sides before forming the interannual ratio.** A 35-year rollout spans long
-  enough for the forced trend to inflate its raw σ: over the pooled record the mass-flux σ
-  is 54% larger raw than detrended. The anchor σ in the table above is already detrended
-  where the trend is significant, and the rollout must be treated the same way.
+The daily series gives 6.8 effective samples per winter — 4013 DJF days, 14-day
+decorrelation time — against one for the annual series.
 
-> **Interpretation** — The daily ratio is the test that detects an emulator that has smoothed
-> away its own weather. An interannual ratio formed without detrending both sides measures
-> trend, not variability.
+> **Interpretation** — Both windows are tighter than the same construction on the 35-year
+> anchor gave (0.66–1.34 and 0.87–1.13), because the reference σ now rests on the whole
+> record. That is the main practical gain from the longer anchor. The daily ratio remains the
+> sharper test and is what will catch an emulator that has smoothed away its own weather.
+> Detrend both sides before forming the interannual ratio: over the pooled record the
+> mass-flux σ is 54% larger raw than detrended, so an undetrended ratio measures trend, not
+> variability.
 
-### 3.3 Tested on 1970–1994
+### 3.3 Counts and relations
 
-CESM 1970–1994 scored as if it were a rollout — 24 annual years, 23–25 seasons depending on
-the diagnostic. Page 3 of
-[AIDE_WACCM_screening_1970-1995.pdf](AIDE_WACCM_screening_1970-1995.pdf) is this table as a
-figure.
-
-| Diagnostic | Test mean | Offset | Mean verdict | σ ratio | Variance verdict |
-|---|---|---|---|---|---|
-| Mass flux, 70 hPa | 9.272 | −1.43σ | **FAIL** | 0.94 | pass |
-| w̄*, 10°S–10°N | 0.1881 | −0.61σ | **FAIL** | 0.91 | pass |
-| Vortex NH, DJF | 24.7 | −0.19σ | PASS | 1.07 | pass |
-| Vortex SH, JJA | −81.8 | −0.13σ | PASS | 0.83 | pass |
-| Polar cap T, NH | 210.0 | +0.48σ | PASS | 0.79 | pass |
-| Polar cap T, SH | 192.1 | −0.10σ | PASS | 0.87 | pass |
-
-Results:
-
-- Plus the SSW count: **15 major NH warmings in 1970–1994** against an expected 16.4
-  [9, 25] at the anchor rate of 0.66/winter — **pass**.
-- Four of six pass the mean test. The two failures are the upwelling pair, both low: mass
-  flux at −1.43σ is nearly three times the ±0.50σ tolerance, and w̄* at −0.61σ is just
-  outside it.
-- All six pass the variance test, spanning 0.79–1.07 inside a 0.66–1.34 window.
-- 15 of the test period's 24 years also lie inside the anchor.
-
-> **Interpretation** — Both mean failures are the forced BDC trend: 1970–1994 predates most
-> of the acceleration, so its mean circulation is weaker than the 1980–2014 anchor's. This is
-> not a defect of the anchor choice — the same failure appears against the 1996–2014 anchor,
-> and it is the D9 finding restated at a different length. The variance result is the
-> transferable one: CESM's year-to-year spread is stable across the whole record even where
-> its mean level is not, so a variance target set on one period transfers to another and a
-> mean target on the upwelling diagnostics does not. Read section 3.3 as a consistency check,
-> not a validation: anchor and test period are not independent, so the passes are weaker
-> evidence than the failures. Overlapping windows make agreement easier, so a diagnostic that
-> still fails under overlap is failing on a real offset.
-
-### What else becomes testable at 35 years
-
-| | At 35 years | Note |
+| Check | Anchor | **Accept at 35 years** |
 |---|---|---|
-| Major NH SSW count | expect 27.6, accept **18–38** | rate resolved to ±37% |
-| R1 wave → vortex slope | −1.345 ± 0.34 | resolvable |
-| R2 thermal wind slope | −2.194 ± 0.45 | resolvable |
-| Forced trend, mass flux | +0.1945 ± 0.0706 per decade | **resolvable** |
-| Forced trend, w̄* | +0.0058 ± 0.0048 per decade | **resolvable** (marginally) |
-| Forced trend, vortex NH | +0.598 ± 1.843 per decade | not resolvable |
-| Forced trend, vortex SH | +0.351 ± 0.802 per decade | not resolvable |
-| Forced trend, polar cap T NH | −0.562 ± 0.632 per decade | not resolvable |
-| Forced trend, polar cap T SH | +0.300 ± 0.657 per decade | not resolvable |
+| Major NH SSW, count | 0.689/winter (31 in 45) | **15 – 34**, expect 24.1 |
+| R1 wave → vortex, slope | −0.936 | resolvable to ±0.36 |
+| R2 thermal wind, slope | −2.062 | resolvable to ±0.57 |
 
-Slope standard errors are scaled from the 44-year fits in `02b_trends.json` as `n^{-3/2}`.
+### 3.4 Trends
 
-> **Interpretation** — The upwelling trend becoming resolvable is the scientific reason to
-> prefer 35 years over 20. It is also the quantity that made the targets fail out of sample
-> (D9), so a 35-year rollout is the first length at which that failure can be diagnosed
-> rather than absorbed by period-matching. The vortex and temperature trends stay within noise at any
-> rollout length this project will run; do not report them as passes.
+| Trend, per decade | Anchor value at 35 yr | Resolvable |
+|---|---|---|
+| Mass flux, 70 hPa | +0.1945 ± 0.0706 | **yes** |
+| w̄*, 10°S–10°N | +0.0058 ± 0.0048 | **yes** |
+| Vortex NH, DJF | +0.5984 ± 1.8431 | no |
+| Vortex SH, JJA | +0.3511 ± 0.8015 | no |
+| Polar cap T, NH | −0.5616 ± 0.6315 | no |
+| Polar cap T, SH | +0.3004 ± 0.6574 | no |
+
+> **Interpretation** — The upwelling trend becoming resolvable is the main scientific reason
+> to prefer 35 years over 20: it is the quantity that made the original targets fail out of
+> sample (D9), so 35 years is the first length at which that failure can be diagnosed rather
+> than worked around. The four vortex and temperature trends stay buried in noise at any
+> rollout length this project will run — do not report them as passes.
+
+### 3.5 Running a validation
+
+```bash
+$PY scripts/17_validate.py FIRST_YEAR LAST_YEAR     # default 1996 2014
+$PY scripts/18_validation_figures.py
+```
+
+Writes [`../validation_results/validation_result.md`](../validation_results/validation_result.md)
+and five figures beside it, one per test family. Candidate data enters through
+`17_validate.candidate_series`, which is the one function to replace when the candidate is a
+model rollout rather than a window of CESM's own record.
+
+The committed result scores **CESM 1996–2014**: tier 1 5/6, tier 2 mean 5/6, variance 7/7,
+SSW pass, mechanism 1/2.
+
+> **Interpretation** — That candidate lies inside the anchor, so it is a self-consistency
+> check on the machinery and not a validation. Its two mean-side failures are both predicted:
+> mass flux at +1.04σ is D9 with the sign reversed, 1996–2014 being the post-acceleration
+> half of the record, and R1 is the relation D10 demoted. Any pass there is weaker evidence
+> than the corresponding failure, and the report labels itself accordingly.
 
 ---
 
@@ -436,8 +385,12 @@ These are not negotiable per tier. They are what makes a comparison meaningful.
    two standard routes to w̄* differ by 10.8% on identical data — larger than the tier-2
    mass-flux tolerance itself (D8).
 2. **Score on the emulator's grid**, with CESM reduced onto it, not the reverse.
-3. **Period-match, or detrend both sides.** The upwelling targets are period-matched, not
-   absolute (D9). This binds harder at tier 2, where 35 years spans a real trend.
+3. **Detrend both sides, and period-match anything that overlaps CESM in time.** The
+   anchor spans a real forced trend, so its mean sits mid-trend while its σ has the trend
+   removed (D9). A free rollout with no GHG forcing cannot reproduce that trend, so an
+   absolute upwelling comparison is the wrong test for one; score it against the CESM years
+   it covers, or detrend both sides. This binds hardest on mass flux and w̄*, the two
+   diagnostics whose σ is detrended in §1 and §3.1.
 4. **Mask the `1e35` sentinel** with `abs(x) < 1e20` before any reduction. There is no
    `_FillValue`; an unguarded mean returns ~1e33.
 5. **Report the rollout length with every number.** A threshold without its n is not a
@@ -454,20 +407,27 @@ $PY scripts/02b_trends.py                 # reads 02
                                           # writes output/02b_trends.json
 $PY scripts/07_period_split.py            # reads the h6 tape
                                           # writes output/07_period_split.json
-$PY scripts/14_evaluation_tiers.py        # reads 07 and 02b
-                                          # writes output/14_evaluation_tiers.json
-$PY scripts/15_screen_out_of_sample.py    # reads 07 and 14
-                                          # writes output/15_screen_out_of_sample.json
-                                          #   and docs/AIDE_WACCM_screening_1970-1995.pdf
+$PY scripts/16_anchors_45yr.py            # reads 07
+                                          # writes output/16_anchors_45yr.json
+                                          #   -> sections 1 and 3 of this document
+$PY scripts/17_validate.py 1996 2014      # reads 16 and 07
+                                          # writes output/17_validation.json
+                                          #   and validation_results/validation_result.md
+$PY scripts/18_validation_figures.py      # reads 16, 17 and 07
+                                          # writes validation_results/*.png
 ```
 
-The pipeline is those five scripts in that order, plus `aide_val_common.py` and
-`report_layout.py`. `14` and `15` read only existing JSON and take seconds; if `output/` is
-empty, `02`, `02b` and `07` rebuild it from the tape in about five minutes. See the pipeline
-order in [../CLAUDE.md](../CLAUDE.md).
+Those six scripts in that order, plus `aide_val_common.py` and `report_layout.py`. `16`,
+`17` and `18` read only existing JSON and take seconds; if `output/` is empty, `02`, `02b`
+and `07` rebuild it from the tape in about five minutes. See the pipeline order in
+[../CLAUDE.md](../CLAUDE.md).
 
-If any number in this document changes, it changes because `14` or `15` changed. Do not
+Sections 1 and 3 change only when `16` changes; §3.5 only when `17` or `18` changes. Do not
 edit the tables by hand.
+
+The split-anchor scripts that used to sit here, `14` and `15`, are in
+[`../stale/`](../stale/README.md). They still run and still reproduce their JSON; §2 says
+what they are still cited for.
 
 ---
 
@@ -479,10 +439,13 @@ Each is cheap to change.
 **Settled, 2026-08-18:**
 
 - **±3σ as the tier-1 gate**, to be revisited once real failure modes have been seen.
-  Section 2 shows how it behaves out of sample.
-- **Tier 2 anchored on 1980–2014 and tested on 1970–1994.** Section 3 states the two
-  consequences: the anchor spans the 1995/96 restart, and it overlaps the test period by
-  15 years, so section 3.3 is a consistency check rather than an independent test.
+
+**Settled, 2026-08-19:**
+
+- **Both tiers anchored on the whole 1970–2014 record**, so the thresholds are fixed and
+  model-agnostic rather than matched to a CESM sub-period. §2 states the consequence: the
+  anchor cannot be verified out of sample, and the evidence that the construction holds up
+  is the archived split-anchor material.
 
 **Still open:**
 
@@ -551,9 +514,10 @@ statics, with no GHGs, so a free rollout has no mechanism to reproduce a GHG-for
 An absolute target would fail an unbiased emulator.
 
 **D12 · A threshold CESM cannot meet on a different sample of its own output is not a
-threshold.** Anchor and test periods are split rather than pooled, even though pooling gives
-a longer record: the data that sets a threshold cannot also test it. Sections 2 and 3.3 are
-this rule applied to the two tiers.
+threshold.** The rule stands and is what the archived split anchors were built to satisfy —
+the data that sets a threshold cannot also test it. The operational anchor deliberately
+forgoes it in exchange for the whole record; §2 is that trade stated explicitly, and any new
+diagnostic added here still owes the same held-out test before it is trusted.
 
 **D13 · Reference σ comes from CESM, not from observations.** The right reference for
 scoring an emulator *against this CESM run*, and the wrong one for any claim about realism —
@@ -564,7 +528,10 @@ see appendix C.
 - **Fixed SST.** No ENSO, so the interannual σ anchoring every tolerance is smaller than the
   real atmosphere's, and the tolerances derived from it are tighter.
 - **Volcanic years.** 1970–1995 contains El Chichón and Pinatubo, part of why its upwelling
-  variability is larger. The tier-1 anchor is volcanically quiet, so its σ is at the low end.
+  variability is larger. The anchor spans them, so their variance is inside every σ here.
+- **No held-out CESM sample.** The anchor spans the whole record, so the thresholds cannot be
+  tested against CESM output that did not set them (§2, D12). Three of the anchor's own 262
+  year-checks fall outside its ±3σ band.
 - **The two segments are separate CESM runs** joined at a 1995/96 restart, not one
   continuous integration. Some of the 4% mass-flux step could be a restart discontinuity
   rather than a trend; the significant within-segment trend in 1970–1995 argues against
@@ -580,10 +547,14 @@ see appendix C.
 ## See also
 
 - §4 — the fields, resolution and grid a model must supply to be scored
+- [../validation_results/validation_result.md](../validation_results/validation_result.md) —
+  a scored candidate, with the five figures beside it
+- [../stale/README.md](../stale/README.md) — the split-anchor material §2 cites
 - Appendix A — where `0.5σ` and `1.96σ/√n` come from
 - Appendix B — the decisions cited above by number
 - Appendix C — the limitations that apply to every number here
-- [AIDE_WACCM_screening_1970-1995.pdf](AIDE_WACCM_screening_1970-1995.pdf) — the figure for
-  section 2
-- `scripts/14_evaluation_tiers.py`, `scripts/15_screen_out_of_sample.py` — every number on
-  this page
+- [../stale/AIDE_WACCM_screening_1970-1995.pdf](../stale/AIDE_WACCM_screening_1970-1995.pdf)
+  — the figure behind the §2 table, on the anchors it was built for
+- `scripts/16_anchors_45yr.py` — every threshold on this page
+- `scripts/17_validate.py`, `scripts/18_validation_figures.py` — the scored result and its
+  figures

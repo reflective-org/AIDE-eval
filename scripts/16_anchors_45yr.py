@@ -1,9 +1,9 @@
 """
 16 - The operational anchor: CESM 1970-2014, the whole record.
 
-The protocol's own anchors are deliberately short. Tier 1 sits on 1996-2014 and
+The anchors this replaced were deliberately short. Tier 1 sat on 1996-2014 and
 tier 2 on 1980-2014, because a threshold has to be verified on CESM output that
-did NOT set it (D12), and that costs half the record.
+did NOT set it (D12), and that costs half the record. Both are in stale/.
 
 This script answers the other question. Once the method is trusted, the best
 estimate of CESM's mean and variability is the one that uses every year available,
@@ -18,9 +18,10 @@ What that buys, and what it costs:
          tightest of any anchor in the repo.
 
   COSTS  the out-of-sample verification. Every CESM year is inside this anchor,
-         so nothing is left over to test it with. Sections 2 and 3.3 of the
-         protocol remain the evidence that the METHOD holds up out of sample;
-         this anchor cannot re-earn it, and does not claim to.
+         so nothing is left over to test it with. The archived split-anchor
+         scripts in stale/ remain the evidence that the METHOD holds up out of
+         sample; this anchor cannot re-earn it, and does not claim to. Section 2
+         of the protocol states that trade.
 
   CARRIES the forced BDC trend. Over the pooled record the mass-flux trend is
          significant at p = 2e-09 and its raw sigma is 54% larger than its

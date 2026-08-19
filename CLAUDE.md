@@ -61,24 +61,28 @@ CESM2.1.5-WACCM6 fixed-SST output and produces the thresholds an AIDE-WACCM emul
 rollout must meet for tropical upwelling and the polar vortex. Every number here is
 CESM-vs-CESM; nothing has yet been run against an actual emulator rollout.
 
-Authoritative outputs: `output/14_evaluation_tiers.json` (the thresholds) and
-`output/15_screen_out_of_sample.json` (both tiers tried on CESM 1970–1995).
+Authoritative outputs: `output/16_anchors_45yr.json` (the thresholds, both tiers anchored on
+CESM 1970–2014) and `output/17_validation.json` (a scored candidate).
 The protocol is `docs/EVALUATION_PROTOCOL.md`, and it is self-contained — thresholds,
 derivation (appendix A), decisions (appendix B) and limitations (appendix C) in one file.
-Its one figure, `docs/AIDE_WACCM_screening_1970-1995.pdf`, is generated from the same JSON,
-so the two cannot drift apart.
+`validation_results/` holds a scored candidate as `validation_result.md` plus five figures,
+all generated from the same JSON, so they cannot drift apart.
 
 The repo was trimmed to this protocol on 2026-08-19. Removed and **not retained**: the
 target table and CSV, the observability and mechanism diagnostics, the explainer and 10-year
 scorecard PDFs, and the separate decision/concepts/tolerance/deferred documents. Do not
-re-derive any of it without asking. The seasonal-cycle and daily-DJF-distribution plots are
-the one part slated to be rebuilt; `output/07_period_split.json` already holds the
-diagnostics they need.
+re-derive any of it without asking.
+
+Superseded but **kept**, in `stale/`: the split-anchor threshold scripts `14` and `15`, the
+screening figure, and the 23 pp technical report. `14` and `15` still run
+(`PYTHONPATH=../scripts`) and are cited by §2 of the protocol as the out-of-sample evidence
+the 45-year anchor cannot re-earn. Do not treat any number in `stale/` as current, and do not
+resurrect either script into the pipeline without asking.
 
 Two things were restored after the trim:
 
 - **`scripts/01*`** — the convention evidence (below). Runnable: they read only the tape.
-- **`docs/AIDE_WACCM_validation_targets.pdf`** — the 23 pp technical report, the first PDF
+- **`stale/AIDE_WACCM_validation_targets.pdf`** — the 23 pp technical report, the first PDF
   the project produced. **Frozen, not regenerable**: the script that built it needed JSON
   from five diagnostics no longer in the repo. It is a historical record of the 10/20-year
   target suite, not a live artefact, and its thresholds are superseded by the tier protocol.
@@ -95,16 +99,18 @@ Two things were restored after the trim:
 | Interpreter | `/home/ubuntu/atmospheric_scale/paradis_model/paradis_venv/bin/python` |
 | Output dir | hardcoded as `C.OUTDIR` in `scripts/aide_val_common.py`; `output/` and `logs/` are gitignored |
 
-Reproduce in order (from `scripts/`, ~5 min total; verified to rebuild all five JSONs
-bit-for-bit from the tape):
+Reproduce in order (from `scripts/`, ~5 min total; verified to rebuild every JSON, the
+report and all five PNGs bit-for-bit from the tape):
 
 ```bash
 $PY 02_reference_stats.py && $PY 02b_trends.py && $PY 07_period_split.py \
-  && $PY 14_evaluation_tiers.py && $PY 15_screen_out_of_sample.py
+  && $PY 16_anchors_45yr.py && $PY 17_validate.py 1996 2014 \
+  && $PY 18_validation_figures.py
 ```
 
-`14` and `15` read only existing JSON and take seconds — iterate on a threshold without
-re-reading the tape. `01`, `01b`, `01c` and `01d` are evidence, not pipeline stages: they
+`16`, `17` and `18` read only existing JSON and take seconds — iterate on a threshold, or
+score another candidate, without re-reading the tape. `17` takes the candidate period as
+arguments; its `candidate_series` is the seam to replace for a model rollout. `01`, `01b`, `01c` and `01d` are evidence, not pipeline stages: they
 feed nothing and are run standalone to re-confirm the conventions below.
 
 ## Data conventions that are already settled — do not re-derive, do not violate
@@ -136,6 +142,9 @@ quoted here.
   years it actually covers, or detrend both sides.
 - **A target CESM itself cannot meet on a different sample of its own output is not a
   target.** Any new target gets the same train/test treatment as `07_period_split.py`.
+- **The anchor has no held-out sample.** It spans 1970–2014, so no CESM output remains to
+  test a new threshold against (D12). Any new diagnostic still owes that test — the archived
+  split anchors in `stale/` are the template.
 - **State the rollout length.** Thresholds are `max(0.5σ, 1.96σ/√n)`; the two branches
   cross at n = 15.4 yr. The interannual σ ratio and the forced BDC trend are **not
   testable** below ~15 yr — they are why tier 2 is 35 years, and they must not be reported
@@ -145,10 +154,13 @@ quoted here.
 
 - `output/` and `logs/` are **generated**. Never hand-edit a JSON, CSV or PDF —
   change the script and re-run it, so the artefact always matches the code that made it.
-- The PDF is built from the JSON. If a number changes, re-run `15` in the same pass, or
-  the figure and the document disagree.
-- Numbers quoted in `docs/EVALUATION_PROTOCOL.md` are transcribed from `output/`. If a
-  script changes a number, update the markdown in the same commit.
+- The report and figures are built from the JSON. If a number changes, re-run `17` and `18`
+  in the same pass, or the tables and the figures disagree.
+- Numbers in `docs/EVALUATION_PROTOCOL.md` §1 and §3 are transcribed from
+  `output/16_anchors_45yr.json`. If a script changes a number, update the markdown in the
+  same commit — and check the transcription, not just the prose.
+- `validation_results/` is **generated and committed**, unlike `output/`. Never hand-edit the
+  report or a figure; re-run `17` and `18`.
 - Known limitations are in `docs/EVALUATION_PROTOCOL.md` appendix C — read it before
   treating any figure as fixed (fixed SST means no ENSO; the tier-2 anchor spans the
   1995/96 restart; SSW detection is a local Charlton–Polvani implementation, not a shared
