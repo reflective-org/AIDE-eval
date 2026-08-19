@@ -2,8 +2,8 @@
 
 Two tiers:
 
-- **Tier 1** — a 5-year regression check, run on every new model version.
-- **Tier 2** — a 35-year validation, run once a configuration is a candidate.
+- **Tier 1** — a 5-year regression check, run on every new model version
+- **Tier 2** — a 35-year validation
 
 Every number below is transcribed from `output/14_evaluation_tiers.json` and
 `output/15_screen_out_of_sample.json`, produced by `scripts/14_evaluation_tiers.py` and
