@@ -279,11 +279,35 @@ Slope standard errors are scaled from the 44-year fits in `02b_trends.json` as `
 ## 4. Input requirements
 
 What a model has to supply to be scored against the thresholds above. Everything in this
-section is what `scripts/aide_val_common.py` reads and what the diagnostics consume; the
-CESM column is the reference implementation, not a constraint on the candidate model's own
-grid (§5, rule 2).
+section is what `scripts/aide_val_common.py` reads and what the diagnostics consume. The
+CESM values quoted throughout are the reference implementation, not a constraint on the
+candidate model's own grid (§5, rule 2).
 
-### 4.1 The five fields
+### 4.1 Minimum request
+
+**Tier 1 needs 5 years, tier 2 needs 35 years.** Both need the same fields, at the same
+resolution, on the same grid. Two forms of the request, depending on what the archive holds:
+
+| | **A zonal-mean TEM tape** | **A standard pressure-level archive** |
+|---|---|---|
+| Fields | ū, v̄, w̄ (log-pressure), θ̄, v'θ' | `ua`, `va`, `wap`, `ta` (CF/CMIP names) |
+| Shape | (time, level, lat), already zonally averaged | (time, level, lat, lon) daily 3-D — or zonal means **plus** 3-D `va` and `ta` |
+| Temporal | daily means | daily means |
+| Levels | pressure levels bracketing 10, 50, 70 and 100 hPa, with one level beyond each end | same |
+| Latitude | global, −90° to +90° | same |
+| Derivation | none | w̄ from `wap`, θ̄ from `ta`, v'θ' from 3-D `va` and `ta` (§4.6) |
+
+- **v'θ' is the one field that cannot be recovered from zonal means.** An archive holding
+  only zonal means must also hold the eddy heat flux itself, or the 3-D daily `va` and `ta`
+  from which to form it.
+- **θ̄ needs no 3-D data.** On a pressure surface the transform is linear in T, so
+  `θ̄ = T̄ (1000/p)^κ` exactly.
+- **`wap` is ω, not w.** It has to be converted (§4.6); using it, or a geometric vertical
+  velocity, in place of log-pressure w̄ is an 11% error on all upwelling.
+- CESM's `cam.h6` tape is the first column. §4.2–§4.6 give the exact definitions the two
+  columns have to meet.
+
+### 4.2 The five fields
 
 | Symbol | CESM `cam.h6` name | Units | Definition | Diagnostics that need it |
 |---|---|---|---|---|
@@ -298,9 +322,9 @@ grid (§5, rule 2).
 - **All five must sit on one common set of levels and one common latitude grid.**
   `tem_residual` differences them against each other level by level.
 - `VTHzm` is the eddy flux `v'θ'`, not the product of the zonal means. Passing the full
-  product where the eddy flux is expected reverses the sign of tropical w̄* (§4.5).
+  product where the eddy flux is expected reverses the sign of tropical w̄* (§4.6).
 
-### 4.2 Temporal resolution
+### 4.3 Temporal resolution
 
 **Daily means are required. A monthly archive is not sufficient.**
 
@@ -325,7 +349,7 @@ grid (§5, rule 2).
 - Incomplete DJF seasons at both record edges are dropped, leaving one fewer DJF season
   than annual years. JJA lies inside a calendar year and loses none.
 
-### 4.3 Vertical grid
+### 4.4 Vertical grid
 
 | Diagnostic | Level or layer |
 |---|---|
@@ -350,7 +374,7 @@ grid (§5, rule 2).
 - Fill values must be masked before any reduction (§5, rule 4). On CESM this is the `1e35`
   below-surface sentinel; on another model it is whatever that model writes.
 
-### 4.4 Horizontal grid
+### 4.5 Horizontal grid
 
 - **Latitude must be global, −90° to +90°.** The mass-flux integral runs over every latitude
   where w̄* > 0 at 70 hPa, not over a prescribed tropical band.
@@ -367,16 +391,22 @@ grid (§5, rule 2).
 > coarser model grid is admissible; an incomplete latitude range is not, because it changes
 > the mass-flux integral itself.
 
-### 4.5 Deriving the five fields from a standard archive
+### 4.6 Deriving the five fields from a standard archive
 
 Most archives carry ω, T and 3-D winds rather than a zonal-mean TEM tape.
 
-| Available | Derive | Constraint |
+| Available (CF/CMIP name) | Derive | Constraint |
 |---|---|---|
-| ω (Pa s⁻¹) | `w = −Hω/p`, H = 7000 m | Geometric vertical velocity is not a substitute: using it is an 11% error on all upwelling |
-| T (K) | `θ = T (1000/p)^κ`, κ = 0.2857 | p in hPa |
-| 3-D v and θ | `v'θ' = [vθ] − [v][θ]`, formed on the native 3-D grid **before** zonal averaging | Cannot be recovered from zonal means alone |
-| T archived directly | use it for polar cap T | The reference path reconstructs T from θ; a directly archived T is equivalent |
+| `ua`, `va` | ū, v̄ — zonal mean, no transform | Must be on the same pressure levels as the rest |
+| `wap` = ω (Pa s⁻¹) | `w = −Hω/p`, H = 7000 m | Geometric vertical velocity is not a substitute: using it is an 11% error on all upwelling |
+| `ta` = T (K) | `θ = T (1000/p)^κ`, κ = 0.2857 | p in hPa. Linear in T on a pressure surface, so `θ̄ = T̄ (1000/p)^κ` |
+| 3-D `va` and `ta` | `v'θ' = [vθ] − [v][θ]`, formed on the native 3-D grid **before** zonal averaging | Cannot be recovered from zonal means alone |
+
+- Polar cap T is reconstructed from θ̄ by the reference path. An archive that carries `ta`
+  can use it directly; the two are the same quantity.
+- A coarse pressure archive can bracket 10, 50, 70 and 100 hPa and still degrade two
+  diagnostics: `dθ/dz` in the TEM term is differenced over the levels supplied, and the
+  polar cap average is taken over the levels inside 10–50 hPa, of which CESM has 8 (§4.4).
 
 Constants, at CESM's own values:
 
@@ -395,12 +425,6 @@ Constants, at CESM's own values:
 > A rollout scored with different constants is being compared against a different quantity.
 > This is D8 applied to the inputs rather than to the estimator: the two standard routes to
 > w̄* differ by 10.8%, which is larger than the tier-2 mass-flux tolerance.
-
-### 4.6 Minimum request, in one line
-
-- **Tier 1** — 5 years of daily, global, zonal-mean ū, v̄, w̄ (log-pressure), θ̄ and v'θ' on a
-  common set of pressure levels bracketing 10, 50, 70 and 100 hPa.
-- **Tier 2** — the same fields, 35 years.
 
 ---
 
