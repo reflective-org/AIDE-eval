@@ -1,0 +1,394 @@
+"""
+17 - Score a candidate against the 45-year operational anchor.
+
+Usage:  17_validate.py [first_year last_year]        default 1996 2014
+
+This is the scoring step, kept separate from the anchor (16) on purpose: the
+anchor is fixed, the candidate changes. Everything the candidate side needs
+arrives through candidate_series() - one function, one place to swap when the
+candidate is a model rollout rather than a window of CESM's own record.
+
+Running it on 1996-2014 exercises the pipeline end to end. That window is INSIDE
+the anchor, so the result is a self-consistency check, not a validation: the
+verdicts show the machinery works and the thresholds are the right size, and any
+pass is weaker evidence than the corresponding failure. Real use is a candidate
+the anchor has never seen.
+
+Reads output/16_anchors_45yr.json and output/07_period_split.json.
+Output: output/17_validation.json and docs/validation_result.md
+"""
+
+import json
+import os
+import sys
+import numpy as np
+from scipy import stats
+
+import aide_val_common as C
+
+OUT_J = os.path.join(C.OUTDIR, "17_validation.json")
+OUT_M = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                     "docs", "validation_result.md")
+
+SERIES = [
+    ("mass_flux", "_annual_years", "Mass flux, 70 hPa", "10^9 kg/s", 4),
+    ("w_star", "_annual_years", "w*, 10S-10N", "mm/s", 4),
+    ("vortex_NH", "_djf_years", "Vortex NH, DJF", "m/s", 2),
+    ("vortex_SH", "_jja_years", "Vortex SH, JJA", "m/s", 2),
+    ("polar_cap_T_NH", "_djf_years", "Polar cap T, NH", "K", 2),
+    ("polar_cap_T_SH", "_jja_years", "Polar cap T, SH", "K", 2),
+]
+MECHANISM = [("R1 wave->vortex", "heat_flux_100", "vortex_NH", "_djf_years"),
+             ("R2 thermal wind", "polar_cap_T_NH", "vortex_NH", "_djf_years")]
+BLOCK = 5                     # tier-1 screening runs are 5 years long
+
+
+def candidate_series(ps, lo, hi):
+    """The candidate's scalar series, one entry per diagnostic key.
+
+    Here the candidate is a window of CESM's own record, so the series come from
+    07's JSON. A model rollout would replace this function: return the same dict
+    of {key: (years, values)} plus the daily DJF u at 60N, computed through
+    aide_val_common.tem_residual on the model's own grid (protocol section 5,
+    rules 1 and 2).
+    """
+    S = ps["series"]
+    segs = [ps["test"], ps["train"]]
+    out = {}
+    for key, ykey, _, _, _ in SERIES:
+        y, v = C.join_segments(S, segs, key, ykey)
+        m = (y >= lo) & (y <= hi)
+        out[key] = (y[m], v[m])
+    for _, xk, yk, ykey in MECHANISM:
+        for k in (xk, yk):
+            if k not in out:
+                y, v = C.join_segments(S, segs, k, ykey)
+                m = (y >= lo) & (y <= hi)
+                out[k] = (y[m], v[m])
+
+    # Daily DJF is stored per segment with no year labels, so it can only be
+    # subset when the window lines up with whole segments.
+    daily, aligned = [], True
+    for s in segs:
+        yy = np.asarray(S[s]["_annual_years"], float)
+        s_lo, s_hi = yy.min(), yy.max()
+        if s_hi < lo or s_lo > hi:
+            continue
+        if s_lo >= lo and s_hi <= hi:
+            daily += S[s]["_u60n_djf_daily"]
+        else:
+            aligned = False
+    ssw = np.array(sum((S[s]["_ssw_seasons"] for s in segs), []), float)
+    winters = sum(S[s]["_ssw_winters"] for s in segs
+                  if np.asarray(S[s]["_annual_years"], float).min() >= lo
+                  and np.asarray(S[s]["_annual_years"], float).max() <= hi)
+    return out, (np.array(daily, float) if aligned else None), ssw, winters
+
+
+def main():
+    lo, hi = (int(sys.argv[1]), int(sys.argv[2])) if len(sys.argv) > 2 else (1996, 2014)
+    A = json.load(open(os.path.join(C.OUTDIR, "16_anchors_45yr.json")))
+    ps = json.load(open(os.path.join(C.OUTDIR, "07_period_split.json")))
+    cand, daily, ssw_years, winters = candidate_series(ps, lo, hi)
+
+    res = {"candidate": f"CESM2.1.5-WACCM6 histSST {lo}-{hi}",
+           "candidate_period": [lo, hi], "anchor_period": A["anchor_period"],
+           "estimator": "aide_val_common.tem_residual",
+           "inside_anchor": bool(lo >= A["anchor_years"][0] and hi <= A["anchor_years"][1]),
+           "tier1": {}, "tier2_mean": {}, "tier2_variance": {}, "counts": {},
+           "mechanism": {}, "trend": {}}
+
+    print(f"CANDIDATE {lo}-{hi}  vs  ANCHOR {A['anchor_period']}")
+    if res["inside_anchor"]:
+        print("  NOTE the candidate lies inside the anchor: self-consistency check, "
+              "not an independent validation.")
+
+    # ------------------------------------------------------------------ tier 1
+    print(f"\nTIER 1 - individual years vs the +/-{A['k_screen']:.0f} sigma band")
+    for key, ykey, label, unit, dp in SERIES:
+        a = A["diagnostics"][key]
+        y, v = cand[key]
+        band = a["screening_band"]
+        z = (v - a["mean"]) / a["sigma_used"]
+        outside = np.abs(z) > a["k_screen"]
+        nb = len(v) // BLOCK
+        blocks_failed = sum(1 for b in range(nb)
+                            if outside[b * BLOCK:(b + 1) * BLOCK].any())
+        res["tier1"][key] = dict(
+            units=unit, band=band, n_years=int(len(v)),
+            n_outside=int(outside.sum()),
+            years_outside=[int(t) for t in y[outside]],
+            worst_sigma=float(z[np.argmax(np.abs(z))]),
+            worst_year=int(y[np.argmax(np.abs(z))]),
+            n_blocks=int(nb), blocks_failed=int(blocks_failed),
+            passes=bool(not outside.any()))
+        r = res["tier1"][key]
+        print(f"  {label:20s} {r['n_outside']:2d}/{r['n_years']:2d} outside   "
+              f"worst {r['worst_sigma']:+5.2f}s ({r['worst_year']})   "
+              f"blocks {blocks_failed}/{nb}   "
+              f"{'PASS' if r['passes'] else 'FAIL'}")
+
+    # ------------------------------------------------------------------ tier 2
+    print(f"\nTIER 2 - rollout mean and variance")
+    for key, ykey, label, unit, dp in SERIES:
+        a = A["diagnostics"][key]
+        y, v = cand[key]
+        T = C.window_stats(y, v, lo, hi)
+        sig, mu, n = a["sigma_used"], a["mean"], T["n"]
+        tol = C.bias_target(sig, n)
+        off = T["mean"] - mu
+        rlo, rhi = C.ratio_window(n, a["n"])
+        ratio = T["sigma_used"] / sig
+        res["tier2_mean"][key] = dict(
+            units=unit, anchor_mean=mu, sigma=sig, n=n, tolerance=float(tol),
+            tolerance_in_sigma=float(tol / sig),
+            binding_branch=("0.5 sigma" if 0.5 * sig >= 1.96 * sig / np.sqrt(n)
+                            else "detection"),
+            candidate_mean=T["mean"], offset=float(off),
+            offset_in_sigma=float(off / sig), passes=bool(abs(off) <= tol))
+        res["tier2_variance"][key] = dict(
+            candidate_sigma=T["sigma_used"], candidate_detrended=T["detrended"],
+            ratio=float(ratio), window=[rlo, rhi],
+            passes=bool(rlo <= ratio <= rhi))
+        res["trend"][key] = dict(
+            units=unit + " per decade", anchor=a["trend_per_decade"],
+            candidate=T["trend_per_decade"],
+            se_at_candidate_n=float(a["trend_se_per_decade"]
+                                    * (a["n"] / n) ** 1.5),
+            resolvable=bool(abs(a["trend_per_decade"])
+                            > 1.96 * a["trend_se_per_decade"] * (a["n"] / n) ** 1.5))
+        m, vr = res["tier2_mean"][key], res["tier2_variance"][key]
+        print(f"  {label:20s} mean {m['offset_in_sigma']:+5.2f}s / "
+              f"{m['tolerance_in_sigma']:.2f}s  {'PASS' if m['passes'] else 'FAIL'}"
+              f"   sigma ratio {vr['ratio']:.2f} "
+              f"[{vr['window'][0]:.2f},{vr['window'][1]:.2f}] "
+              f"{'pass' if vr['passes'] else 'FAIL'}")
+
+    # daily DJF sigma ratio
+    d = A["daily_DJF_u60N"]
+    if daily is not None and len(daily) > 0:
+        ne, nr = len(daily) / d["tau_days"], d["effective_n"]
+        rr = np.sqrt(1 / (2 * ne) + 1 / (2 * nr))
+        ratio = float(daily.std(ddof=1) / d["sigma"])
+        res["tier2_variance"]["daily_DJF_u60N"] = dict(
+            candidate_sigma=float(daily.std(ddof=1)), anchor_sigma=d["sigma"],
+            ratio=ratio, window=[float(1 - 1.96 * rr), float(1 + 1.96 * rr)],
+            effective_n=float(ne),
+            passes=bool(abs(ratio - 1) <= 1.96 * rr),
+            candidate_p05=float(np.percentile(daily, 5)),
+            candidate_p95=float(np.percentile(daily, 95)))
+        dv = res["tier2_variance"]["daily_DJF_u60N"]
+        print(f"  {'daily DJF u 60N':20s} sigma ratio {ratio:.2f} "
+              f"[{dv['window'][0]:.2f},{dv['window'][1]:.2f}] "
+              f"{'pass' if dv['passes'] else 'FAIL'}")
+    else:
+        res["tier2_variance"]["daily_DJF_u60N"] = dict(
+            available=False,
+            reason="window does not line up with whole CESM segments")
+        print(f"  {'daily DJF u 60N':20s} not available - window is not "
+              f"segment-aligned")
+
+    # ------------------------------------------------------------------ counts
+    s = A["ssw_NH"]
+    k = int(((ssw_years >= lo) & (ssw_years <= hi)).sum())
+    exp = s["rate_per_winter"] * winters
+    ilo, ihi = int(stats.poisson.ppf(0.025, exp)), int(stats.poisson.ppf(0.975, exp))
+    res["counts"]["ssw_NH"] = dict(
+        candidate_count=k, candidate_winters=int(winters),
+        anchor_rate=s["rate_per_winter"], expected=float(exp),
+        interval=[ilo, ihi], passes=bool(ilo <= k <= ihi))
+    print(f"\n  major NH SSW: {k} in {winters} winters, expected {exp:.1f} "
+          f"[{ilo}, {ihi}]  {'PASS' if res['counts']['ssw_NH']['passes'] else 'FAIL'}")
+
+    # -------------------------------------------------------------- mechanism
+    for tag, xk, yk, ykey in MECHANISM:
+        M = A["mechanism"][tag]
+        x, yv = cand[xk][1], cand[yk][1]
+        n = min(len(x), len(yv))
+        b = float(np.polyfit(x[:n], yv[:n], 1)[0])
+        res["mechanism"][tag] = dict(
+            anchor_slope=M["slope"], anchor_ci95=M["ci95"],
+            candidate_slope=b, n=int(n),
+            passes=bool(M["ci95"][0] <= b <= M["ci95"][1]))
+        r = res["mechanism"][tag]
+        print(f"  {tag:20s} slope {b:+.3f} vs anchor {M['slope']:+.3f} "
+              f"[{M['ci95'][0]:+.3f},{M['ci95'][1]:+.3f}]  "
+              f"{'PASS' if r['passes'] else 'FAIL'}")
+
+    # ------------------------------------------------------------------ totals
+    t1 = [v["passes"] for v in res["tier1"].values()]
+    t2m = [v["passes"] for v in res["tier2_mean"].values()]
+    t2v = [v["passes"] for v in res["tier2_variance"].values() if "passes" in v]
+    res["summary"] = dict(
+        tier1_pass=int(sum(t1)), tier1_total=len(t1),
+        tier2_mean_pass=int(sum(t2m)), tier2_mean_total=len(t2m),
+        tier2_variance_pass=int(sum(t2v)), tier2_variance_total=len(t2v),
+        ssw_pass=res["counts"]["ssw_NH"]["passes"],
+        mechanism_pass=int(sum(v["passes"] for v in res["mechanism"].values())),
+        mechanism_total=len(res["mechanism"]))
+    S = res["summary"]
+    print(f"\n  tier 1 {S['tier1_pass']}/{S['tier1_total']}   "
+          f"tier 2 mean {S['tier2_mean_pass']}/{S['tier2_mean_total']}   "
+          f"tier 2 variance {S['tier2_variance_pass']}/{S['tier2_variance_total']}   "
+          f"mechanism {S['mechanism_pass']}/{S['mechanism_total']}")
+
+    with open(OUT_J, "w") as f:
+        json.dump(res, f, indent=2)
+    write_markdown(res, A)
+    print(f"\nwrote {OUT_J}\nwrote {OUT_M}")
+
+
+def verdict(ok):
+    return "PASS" if ok else "**FAIL**"
+
+
+def write_markdown(res, A):
+    lo, hi = res["candidate_period"]
+    S = res["summary"]
+    L = []
+    w = L.append
+
+    w("# Validation result")
+    w("")
+    w("| | |")
+    w("|---|---|")
+    w(f"| Candidate | {res['candidate']} |")
+    w(f"| Anchor | CESM {res['anchor_period']}, "
+      f"{A['diagnostics']['vortex_SH']['n']} JJA / "
+      f"{A['diagnostics']['vortex_NH']['n']} DJF seasons, "
+      f"{A['diagnostics']['mass_flux']['n']} annual years |")
+    w(f"| Estimator | `{res['estimator']}` |")
+    w(f"| Anchor σ | {A['sigma_rule']} |")
+    w(f"| Independent of anchor | {'no — candidate lies inside the anchor' if res['inside_anchor'] else 'yes'} |")
+    w("| Generated by | `scripts/17_validate.py`, from "
+      "`output/16_anchors_45yr.json` |")
+    w("")
+    w(f"| Tier | Result |")
+    w("|---|---|")
+    w(f"| 1 · screening, individual years | {S['tier1_pass']}/{S['tier1_total']} |")
+    w(f"| 2 · mean | {S['tier2_mean_pass']}/{S['tier2_mean_total']} |")
+    w(f"| 2 · variance | {S['tier2_variance_pass']}/{S['tier2_variance_total']} |")
+    w(f"| 2 · SSW count | {verdict(S['ssw_pass'])} |")
+    w(f"| 2 · mechanism slopes | {S['mechanism_pass']}/{S['mechanism_total']} |")
+    w("")
+    w(f"## Tier 1 — individual years, ±{A['k_screen']:.0f}σ")
+    w("")
+    w("| Diagnostic | Unit | Accept | Years | Outside | Worst | 5-yr blocks failed | Verdict |")
+    w("|---|---|---|---|---|---|---|---|")
+    for key, _, label, unit, dp in SERIES:
+        r, a = res["tier1"][key], A["diagnostics"][key]
+        w(f"| {label} | {unit} | {a['screening_band'][0]:.{dp}f} – "
+          f"{a['screening_band'][1]:.{dp}f} | {r['n_years']} | {r['n_outside']} | "
+          f"{r['worst_sigma']:+.2f}σ ({r['worst_year']}) | "
+          f"{r['blocks_failed']}/{r['n_blocks']} | {verdict(r['passes'])} |")
+    w("")
+    w("## Tier 2 — mean")
+    w("")
+    w("| Diagnostic | Unit | Anchor mean | σ | Tolerance | Candidate | Offset | Verdict |")
+    w("|---|---|---|---|---|---|---|---|")
+    for key, _, label, unit, dp in SERIES:
+        m = res["tier2_mean"][key]
+        w(f"| {label} | {unit} | {m['anchor_mean']:.{dp}f} | {m['sigma']:.{dp}f} | "
+          f"±{m['tolerance']:.{dp}f} ({m['tolerance_in_sigma']:.2f}σ) | "
+          f"{m['candidate_mean']:.{dp}f} | {m['offset_in_sigma']:+.2f}σ | "
+          f"{verdict(m['passes'])} |")
+    w("")
+    w("## Tier 2 — variance")
+    w("")
+    w("| Metric | Anchor σ | Candidate σ | Ratio | 95% window | Verdict |")
+    w("|---|---|---|---|---|---|")
+    for key, _, label, unit, dp in SERIES:
+        v, a = res["tier2_variance"][key], A["diagnostics"][key]
+        w(f"| {label} | {a['sigma_used']:.{dp}f} | {v['candidate_sigma']:.{dp}f} | "
+          f"{v['ratio']:.2f} | {v['window'][0]:.2f} – {v['window'][1]:.2f} | "
+          f"{verdict(v['passes'])} |")
+    d = res["tier2_variance"]["daily_DJF_u60N"]
+    if d.get("available", True):
+        w(f"| Daily DJF u, 60°N | {d['anchor_sigma']:.2f} | "
+          f"{d['candidate_sigma']:.2f} | {d['ratio']:.2f} | "
+          f"{d['window'][0]:.2f} – {d['window'][1]:.2f} | {verdict(d['passes'])} |")
+    else:
+        w(f"| Daily DJF u, 60°N | — | — | — | — | n/a: {d['reason']} |")
+    w("")
+    w("## Tier 2 — counts and relations")
+    w("")
+    w("| Check | Anchor | Candidate | Accept | Verdict |")
+    w("|---|---|---|---|---|")
+    s = res["counts"]["ssw_NH"]
+    w(f"| Major NH SSW, count | {s['anchor_rate']:.2f}/winter | "
+      f"{s['candidate_count']} in {s['candidate_winters']} winters | "
+      f"{s['interval'][0]}–{s['interval'][1]} (expect {s['expected']:.1f}) | "
+      f"{verdict(s['passes'])} |")
+    for tag in res["mechanism"]:
+        m = res["mechanism"][tag]
+        w(f"| {tag} | {m['anchor_slope']:+.3f} | {m['candidate_slope']:+.3f} | "
+          f"{m['anchor_ci95'][0]:+.3f} – {m['anchor_ci95'][1]:+.3f} | "
+          f"{verdict(m['passes'])} |")
+    w("")
+    w(f"## Trends, and whether n = {res['tier2_mean']['mass_flux']['n']} resolves them")
+    w("")
+    w("| Trend, per decade | Anchor | Candidate | 1.96σ at this n | Resolvable |")
+    w("|---|---|---|---|---|")
+    for key, _, label, unit, dp in SERIES:
+        t = res["trend"][key]
+        w(f"| {label} | {t['anchor']:+.4f} | {t['candidate']:+.4f} | "
+          f"±{1.96 * t['se_at_candidate_n']:.4f} | "
+          f"{'yes' if t['resolvable'] else 'no'} |")
+    w("")
+    w("## Flags")
+    w("")
+    w("| Check | Reading |")
+    w("|---|---|")
+    any_flag = False
+    for key, _, label, unit, dp in SERIES:
+        if not res["tier1"][key]["passes"]:
+            r = res["tier1"][key]
+            any_flag = True
+            shared = sorted(set(r["years_outside"])
+                            & set(A["diagnostics"][key]["years_outside_band"]))
+            note = (f"; {len(shared)} of them the anchor also flags against its own "
+                    f"record ({', '.join(str(t) for t in shared)})" if shared else "")
+            w(f"| Tier 1, {label} | {r['n_outside']} of {r['n_years']} years outside; "
+              f"worst {r['worst_sigma']:+.2f}σ in {r['worst_year']}{note} |")
+        if not res["tier2_mean"][key]["passes"]:
+            m = res["tier2_mean"][key]
+            any_flag = True
+            w(f"| Tier 2 mean, {label} | offset {m['offset_in_sigma']:+.2f}σ "
+              f"against a {m['tolerance_in_sigma']:.2f}σ tolerance |")
+        if not res["tier2_variance"][key]["passes"]:
+            v = res["tier2_variance"][key]
+            any_flag = True
+            w(f"| Tier 2 variance, {label} | ratio {v['ratio']:.2f}, outside "
+              f"{v['window'][0]:.2f}–{v['window'][1]:.2f} |")
+    if not res["counts"]["ssw_NH"]["passes"]:
+        s_ = res["counts"]["ssw_NH"]
+        any_flag = True
+        w(f"| Tier 2 SSW count | {s_['candidate_count']} in "
+          f"{s_['candidate_winters']} winters, outside "
+          f"{s_['interval'][0]}–{s_['interval'][1]} |")
+    for tag, m in res["mechanism"].items():
+        if not m["passes"]:
+            any_flag = True
+            w(f"| {tag} | slope {m['candidate_slope']:+.3f}, outside the anchor CI "
+              f"{m['anchor_ci95'][0]:+.3f} – {m['anchor_ci95'][1]:+.3f} |")
+    if not any_flag:
+        w("| — | no check failed |")
+    w("")
+    w("| Standing condition | Value |")
+    w("|---|---|")
+    w(f"| Anchor carries the forced BDC trend | mass flux "
+      f"{A['diagnostics']['mass_flux']['trend_per_decade']:+.4f} per decade, "
+      f"p = {A['diagnostics']['mass_flux']['trend_p']:.0e} |")
+    w(f"| Anchor years outside their own band | "
+      f"{A['band_self_consistency']['outside']} of "
+      f"{A['band_self_consistency']['checks']} |")
+    w(f"| Candidate inside anchor | "
+      f"{'yes' if res['inside_anchor'] else 'no'} |")
+    w("")
+
+    with open(OUT_M, "w") as f:
+        f.write("\n".join(L))
+
+
+if __name__ == "__main__":
+    main()

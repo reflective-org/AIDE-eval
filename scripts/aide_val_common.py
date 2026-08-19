@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import os
 import numpy as np
+from scipy import stats as _stats
 import xarray as xr
 
 # ----------------------------------------------------------------------------
@@ -305,6 +306,50 @@ def monthly_climatology(x, mo):
 def sigma_sampling_error(sigma, n):
     """1-sigma sampling error on an estimate of sigma from n independent samples."""
     return sigma / np.sqrt(2.0 * (n - 1))
+
+
+def join_segments(series, segments, key, year_key):
+    """One diagnostic across several segments, joined and sorted by year.
+
+    The segments are separate CESM runs, so this is a concatenation, not an
+    integration: use it for statistics over the record, not for anything that
+    differences consecutive years across the 1995/96 restart.
+    """
+    y = np.array(sum((series[s][year_key] for s in segments), []), dtype=float)
+    v = np.array(sum((series[s][key] for s in segments), []), dtype=float)
+    o = np.argsort(y)
+    return y[o], v[o]
+
+
+def window_stats(years, values, lo, hi):
+    """Mean and sigma of a series over [lo, hi], detrended if the trend is real.
+
+    Detrended when the OLS trend is significant at p < 0.05, the same rule as
+    07_period_split.stats_of, so every sigma in the repo is comparable.
+    """
+    m = (years >= lo) & (years <= hi)
+    x = values[m]
+    t = np.arange(len(x), dtype=float)
+    sl, ic, _, p, se = _stats.linregress(t, x)
+    det = x - (ic + sl * t)
+    sig_raw, sig_det = float(x.std(ddof=1)), float(det.std(ddof=1))
+    return dict(n=int(m.sum()), years=[int(years[m].min()), int(years[m].max())],
+                mean=float(x.mean()), sigma_raw=sig_raw, sigma_detrended=sig_det,
+                sigma_used=(sig_det if p < 0.05 else sig_raw),
+                trend_per_decade=float(sl * 10), trend_se_per_decade=float(se * 10),
+                trend_p=float(p), detrended=bool(p < 0.05))
+
+
+def bias_target(sigma, n):
+    """max(0.5 sigma, 1.96 sigma / sqrt(n)) - D5, EVALUATION_PROTOCOL.md appendix A."""
+    return max(0.5 * sigma, 1.96 * sigma / np.sqrt(n))
+
+
+def ratio_window(n, n_ref, per_year=1.0):
+    """95% window on a sigma ratio between an n-year sample and an n_ref anchor."""
+    ne, nr = n * per_year, n_ref * per_year
+    rr = np.sqrt(1 / (2 * (ne - 1)) + 1 / (2 * (nr - 1)))
+    return float(1 - 1.96 * rr), float(1 + 1.96 * rr)
 
 
 def bootstrap_ci(values, stat_fn, n_boot=10000, ci=(2.5, 97.5), seed=20260813):
