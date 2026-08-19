@@ -1,0 +1,16 @@
+# Python 3.10.12
+#
+# Pinned to the versions that produced every number in output/ and
+# validation_results/. The whole pipeline was re-run under these and reproduces
+# all 15 artefacts bit-for-bit, PNGs included, so a change here is a change to
+# the results and has to be verified the same way:
+#
+#   python3 -m venv .AIDE-eval_env
+#   .AIDE-eval_env/bin/pip install -r requirements.txt
+#
+numpy==2.2.6
+scipy==1.15.3
+xarray==2025.6.1
+matplotlib==3.10.8
+cftime==1.6.5
+netCDF4==1.7.4

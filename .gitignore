@@ -2,6 +2,9 @@
 output/
 logs/
 
+# Local environment - 425 MB, rebuild from requirements.txt
+.AIDE-eval_env/
+
 # Python
 __pycache__/
 *.pyc

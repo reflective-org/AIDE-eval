@@ -96,11 +96,11 @@ Two things were restored after the trim:
 | Data root | `/data/cesm2.1.5_output/histSST` (read-only input; never write here) |
 | Stream | `cam.h6`, daily zonal-mean TEM tape: `Uzm Vzm Wzm THzm VTHzm UVzm UWzm` |
 | Segments | 1970–1995 and 1996–2014 — two **separate runs** joined at a restart, not one integration |
-| Interpreter | `/home/ubuntu/atmospheric_scale/paradis_model/paradis_venv/bin/python` |
+| Interpreter | `.AIDE-eval_env/bin/python`, built from `requirements.txt` (Python 3.10.12) |
 | Output dir | hardcoded as `C.OUTDIR` in `scripts/aide_val_common.py`; `output/` and `logs/` are gitignored |
 
-Reproduce in order (from `scripts/`, ~5 min total; verified to rebuild every JSON, the
-report and all five PNGs bit-for-bit from the tape):
+Reproduce in order (from `scripts/`, `PY=../.AIDE-eval_env/bin/python`, ~5 min total;
+verified to rebuild every JSON, the report and all five PNGs bit-for-bit from the tape):
 
 ```bash
 $PY 02_reference_stats.py && $PY 02b_trends.py && $PY 07_period_split.py \
@@ -154,6 +154,10 @@ quoted here.
 
 - `output/` and `logs/` are **generated**. Never hand-edit a JSON, CSV or PDF —
   change the script and re-run it, so the artefact always matches the code that made it.
+- The dependency pins in `requirements.txt` are part of the result. All 15 artefacts were
+  verified bit-for-bit under them, and the same check was run against the older
+  `/home/ubuntu/.../paradis_venv` interpreter — identical output. Changing a pin means
+  re-running that check, not assuming it still holds.
 - The report and figures are built from the JSON. If a number changes, re-run `17` and `18`
   in the same pass, or the tables and the figures disagree.
 - Numbers in `docs/EVALUATION_PROTOCOL.md` §1 and §3 are transcribed from

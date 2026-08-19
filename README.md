@@ -74,9 +74,18 @@ estimator*, valid only when model and truth pass through the same code path
 Inputs are read-only CESM history files under `/data/cesm2.1.5_output/histSST`
 (daily zonal-mean TEM tape `cam.h6`, 1970–2014).
 
+Set the environment up once, from the repo root:
+
+```bash
+python3 -m venv .AIDE-eval_env
+.AIDE-eval_env/bin/pip install -r requirements.txt
+```
+
+Then:
+
 ```bash
 cd scripts
-PY=/home/ubuntu/atmospheric_scale/paradis_model/paradis_venv/bin/python
+PY=../.AIDE-eval_env/bin/python
 $PY 02_reference_stats.py && $PY 02b_trends.py && $PY 07_period_split.py \
   && $PY 16_anchors_45yr.py && $PY 17_validate.py 1996 2014 \
   && $PY 18_validation_figures.py
@@ -96,14 +105,19 @@ that `Wzm` is log-pressure, the `1e35` sentinel, and `MSKtem` — each worth 10�
 assumed wrong, and each silent. Run them standalone against the tape whenever a convention
 is in doubt; they feed nothing downstream.
 
-Requires numpy, xarray, scipy, matplotlib and cftime. No LaTeX or reportlab —
-the PDF is built with matplotlib's `PdfPages`.
+`requirements.txt` pins numpy, scipy, xarray, matplotlib, cftime and netCDF4 to the
+versions that produced every committed number, on Python 3.10.12. No LaTeX and no reportlab —
+the figures are matplotlib. A change to those pins is a change to the results: the whole
+pipeline reproduces all 15 artefacts bit-for-bit under them, and a new environment should be
+checked the same way before its numbers are trusted.
 
 ## Repository layout
 
 ```
 README.md            this file
 CLAUDE.md            working rules, settled data conventions, protocol constraints
+requirements.txt     pinned dependencies
+.AIDE-eval_env/      the virtual environment — gitignored, 425 MB, rebuild from the above
 scripts/             02, 02b, 07, 16, 17, 18 + aide_val_common.py, report_layout.py
                      01, 01b, 01c, 01d — convention evidence, outside the pipeline
 docs/                the protocol
