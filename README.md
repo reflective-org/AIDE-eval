@@ -52,9 +52,9 @@ pair and the forced BDC trend behind them. The method carries over; the numbers 
 What a model has to supply to be scored against the thresholds above. Everything in this
 section is what `scripts/aide_val_common.py` reads and what the diagnostics consume. The
 CESM values quoted throughout are the reference implementation, not a constraint on the
-candidate model's own grid (§5, rule 2).
+climate model's own grid (§5, rule 2).
 
-**Tier 1 needs 5 years, tier 2 needs 30 years.** Both need the same fields, at the same
+**Tier 1 needs 5 years, tier 2 needs 35 years.** Both need the same fields, at the same
 resolution, on the same grid. Two forms of the request, depending on what the archive holds:
 
 | | **A zonal-mean TEM tape** | **A standard pressure-level archive** |
