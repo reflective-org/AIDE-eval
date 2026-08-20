@@ -1,35 +1,55 @@
 """
-17 - Score a candidate against the 45-year operational anchor.
+17 - Score a climate model against the 45-year operational anchor.
 
-Usage:  17_validate.py [first_year last_year]        default 1996 2014
+Usage:  17_validate.py [--climate-model NAME] [first_year last_year]
+
+  --climate-model   name of the model being scored. Default is derived from the
+                    year window, so a bare run still names itself.
+  first_year last_year   default 1996 2014
 
 This is the scoring step, kept separate from the anchor (16) on purpose: the
-anchor is fixed, the candidate changes. Everything the candidate side needs
-arrives through candidate_series() - one function, one place to swap when the
-candidate is a model rollout rather than a window of CESM's own record.
+anchor is fixed, the climate model changes. Everything the climate-model side
+needs arrives through climate_model_series() - one function, one place to swap
+when the model is a rollout rather than a window of CESM's own record.
 
 Running it on 1996-2014 exercises the pipeline end to end. That window is INSIDE
 the anchor, so the result is a self-consistency check, not a validation: the
 verdicts show the machinery works and the thresholds are the right size, and any
-pass is weaker evidence than the corresponding failure. Real use is a candidate
-the anchor has never seen.
+pass is weaker evidence than the corresponding failure. Real use is a climate
+model the anchor has never seen.
+
+Every artefact is stamped `__<climate model>__<production date>` so a result can
+never be read without knowing what was scored and when.
 
 Reads output/16_anchors_45yr.json and output/07_period_split.json.
-Output: output/17_validation.json and validation_results/validation_result.md
+Output: output/17_validation__<stamp>.json
+        validation_results/validation_result__<stamp>.md
 """
 
+import argparse
+import datetime
 import json
 import os
-import sys
+import re
 import numpy as np
 from scipy import stats
 
 import aide_val_common as C
 
-OUT_J = os.path.join(C.OUTDIR, "17_validation.json")
 RESULTS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                        "validation_results")
-OUT_M = os.path.join(RESULTS, "validation_result.md")
+
+
+def stamp_for(climate_model, produced):
+    """`<climate model>__<date>`, reduced to characters that are safe in a path."""
+    slug = re.sub(r"[^A-Za-z0-9.+-]+", "-", climate_model).strip("-")
+    return f"{slug}__{produced}"
+
+
+def stamped(name, stamp):
+    """Insert the stamp before the extension: a.png -> a__<stamp>.png"""
+    root, ext = os.path.splitext(name)
+    return f"{root}__{stamp}{ext}"
 
 SERIES = [
     ("mass_flux", "_annual_years", "Mass flux, 70 hPa", "10^9 kg/s", 4),
@@ -44,9 +64,10 @@ MECHANISM = [("R1 wave->vortex", "heat_flux_100", "vortex_NH", "_djf_years"),
 BLOCK = 5                     # tier-1 screening runs are 5 years long
 
 # Written by 18_validation_figures.py into the same directory as the report.
+# Base names; 18 stamps them the same way this script stamps the report.
 FIGURES = [
     ("tier1_screening.png",
-     "tier 1 — every candidate year against the ±3σ band, six diagnostics"),
+     "tier 1 — every climate-model year against the ±3σ band, six diagnostics"),
     ("tier2_mean.png",
      "tier 2 mean — offset from the anchor against the ±0.5σ tolerance"),
     ("tier2_variance.png",
@@ -54,15 +75,15 @@ FIGURES = [
     ("counts_and_relations.png",
      "SSW count against its Poisson interval; R1 and R2 slopes against the anchor fit"),
     ("trends.png",
-     "trends per decade, anchor against candidate, with what this n resolves"),
+     "trends per decade, anchor against climate model, with what this n resolves"),
 ]
 
 
-def candidate_series(ps, lo, hi):
-    """The candidate's scalar series, one entry per diagnostic key.
+def climate_model_series(ps, lo, hi):
+    """The climate model's scalar series, one entry per diagnostic key.
 
-    Here the candidate is a window of CESM's own record, so the series come from
-    07's JSON. A model rollout would replace this function: return the same dict
+    Here the climate model is a window of CESM's own record, so the series come
+    from 07's JSON. A model rollout would replace this function: return the same dict
     of {key: (years, values)} plus the daily DJF u at 60N, computed through
     aide_val_common.tem_residual on the model's own grid (protocol section 5,
     rules 1 and 2).
@@ -101,28 +122,41 @@ def candidate_series(ps, lo, hi):
 
 
 def main():
-    lo, hi = (int(sys.argv[1]), int(sys.argv[2])) if len(sys.argv) > 2 else (1996, 2014)
+    ap = argparse.ArgumentParser(description=__doc__.split("\n")[1].strip())
+    ap.add_argument("--climate-model", dest="climate_model", default=None,
+                    help="name of the model being scored; default from the window")
+    ap.add_argument("years", nargs="*", type=int, default=[],
+                    help="first_year last_year (default 1996 2014)")
+    args = ap.parse_args()
+    lo, hi = (args.years[0], args.years[1]) if len(args.years) > 1 else (1996, 2014)
+
+    climate_model = args.climate_model or f"CESM2.1.5-WACCM6 histSST {lo}-{hi}"
+    produced = datetime.date.today().isoformat()
+    stamp = stamp_for(climate_model, produced)
+    out_j = os.path.join(C.OUTDIR, stamped("17_validation.json", stamp))
+    out_m = os.path.join(RESULTS, stamped("validation_result.md", stamp))
+
     A = json.load(open(os.path.join(C.OUTDIR, "16_anchors_45yr.json")))
     ps = json.load(open(os.path.join(C.OUTDIR, "07_period_split.json")))
-    cand, daily, ssw_years, winters = candidate_series(ps, lo, hi)
+    cm, daily, ssw_years, winters = climate_model_series(ps, lo, hi)
 
-    res = {"candidate": f"CESM2.1.5-WACCM6 histSST {lo}-{hi}",
-           "candidate_period": [lo, hi], "anchor_period": A["anchor_period"],
+    res = {"climate_model": climate_model, "produced": produced, "stamp": stamp,
+           "climate_model_period": [lo, hi], "anchor_period": A["anchor_period"],
            "estimator": "aide_val_common.tem_residual",
            "inside_anchor": bool(lo >= A["anchor_years"][0] and hi <= A["anchor_years"][1]),
            "tier1": {}, "tier2_mean": {}, "tier2_variance": {}, "counts": {},
            "mechanism": {}, "trend": {}}
 
-    print(f"CANDIDATE {lo}-{hi}  vs  ANCHOR {A['anchor_period']}")
+    print(f"CLIMATE MODEL {climate_model}  {lo}-{hi}  vs  ANCHOR {A['anchor_period']}")
     if res["inside_anchor"]:
-        print("  NOTE the candidate lies inside the anchor: self-consistency check, "
+        print("  NOTE the climate model lies inside the anchor: self-consistency check, "
               "not an independent validation.")
 
     # ------------------------------------------------------------------ tier 1
     print(f"\nTIER 1 - individual years vs the +/-{A['k_screen']:.0f} sigma band")
     for key, ykey, label, unit, dp in SERIES:
         a = A["diagnostics"][key]
-        y, v = cand[key]
+        y, v = cm[key]
         band = a["screening_band"]
         z = (v - a["mean"]) / a["sigma_used"]
         outside = np.abs(z) > a["k_screen"]
@@ -147,7 +181,7 @@ def main():
     print(f"\nTIER 2 - rollout mean and variance")
     for key, ykey, label, unit, dp in SERIES:
         a = A["diagnostics"][key]
-        y, v = cand[key]
+        y, v = cm[key]
         T = C.window_stats(y, v, lo, hi)
         sig, mu, n = a["sigma_used"], a["mean"], T["n"]
         tol = C.bias_target(sig, n)
@@ -159,16 +193,16 @@ def main():
             tolerance_in_sigma=float(tol / sig),
             binding_branch=("0.5 sigma" if 0.5 * sig >= 1.96 * sig / np.sqrt(n)
                             else "detection"),
-            candidate_mean=T["mean"], offset=float(off),
+            climate_model_mean=T["mean"], offset=float(off),
             offset_in_sigma=float(off / sig), passes=bool(abs(off) <= tol))
         res["tier2_variance"][key] = dict(
-            candidate_sigma=T["sigma_used"], candidate_detrended=T["detrended"],
+            climate_model_sigma=T["sigma_used"], climate_model_detrended=T["detrended"],
             ratio=float(ratio), window=[rlo, rhi],
             passes=bool(rlo <= ratio <= rhi))
         res["trend"][key] = dict(
             units=unit + " per decade", anchor=a["trend_per_decade"],
-            candidate=T["trend_per_decade"],
-            se_at_candidate_n=float(a["trend_se_per_decade"]
+            climate_model=T["trend_per_decade"],
+            se_at_climate_model_n=float(a["trend_se_per_decade"]
                                     * (a["n"] / n) ** 1.5),
             resolvable=bool(abs(a["trend_per_decade"])
                             > 1.96 * a["trend_se_per_decade"] * (a["n"] / n) ** 1.5))
@@ -186,12 +220,12 @@ def main():
         rr = np.sqrt(1 / (2 * ne) + 1 / (2 * nr))
         ratio = float(daily.std(ddof=1) / d["sigma"])
         res["tier2_variance"]["daily_DJF_u60N"] = dict(
-            candidate_sigma=float(daily.std(ddof=1)), anchor_sigma=d["sigma"],
+            climate_model_sigma=float(daily.std(ddof=1)), anchor_sigma=d["sigma"],
             ratio=ratio, window=[float(1 - 1.96 * rr), float(1 + 1.96 * rr)],
             effective_n=float(ne),
             passes=bool(abs(ratio - 1) <= 1.96 * rr),
-            candidate_p05=float(np.percentile(daily, 5)),
-            candidate_p95=float(np.percentile(daily, 95)))
+            climate_model_p05=float(np.percentile(daily, 5)),
+            climate_model_p95=float(np.percentile(daily, 95)))
         dv = res["tier2_variance"]["daily_DJF_u60N"]
         print(f"  {'daily DJF u 60N':20s} sigma ratio {ratio:.2f} "
               f"[{dv['window'][0]:.2f},{dv['window'][1]:.2f}] "
@@ -209,7 +243,7 @@ def main():
     exp = s["rate_per_winter"] * winters
     ilo, ihi = int(stats.poisson.ppf(0.025, exp)), int(stats.poisson.ppf(0.975, exp))
     res["counts"]["ssw_NH"] = dict(
-        candidate_count=k, candidate_winters=int(winters),
+        climate_model_count=k, climate_model_winters=int(winters),
         anchor_rate=s["rate_per_winter"], expected=float(exp),
         interval=[ilo, ihi], passes=bool(ilo <= k <= ihi))
     print(f"\n  major NH SSW: {k} in {winters} winters, expected {exp:.1f} "
@@ -218,12 +252,12 @@ def main():
     # -------------------------------------------------------------- mechanism
     for tag, xk, yk, ykey in MECHANISM:
         M = A["mechanism"][tag]
-        x, yv = cand[xk][1], cand[yk][1]
+        x, yv = cm[xk][1], cm[yk][1]
         n = min(len(x), len(yv))
         b = float(np.polyfit(x[:n], yv[:n], 1)[0])
         res["mechanism"][tag] = dict(
             anchor_slope=M["slope"], anchor_ci95=M["ci95"],
-            candidate_slope=b, n=int(n),
+            climate_model_slope=b, n=int(n),
             passes=bool(M["ci95"][0] <= b <= M["ci95"][1]))
         r = res["mechanism"][tag]
         print(f"  {tag:20s} slope {b:+.3f} vs anchor {M['slope']:+.3f} "
@@ -247,18 +281,18 @@ def main():
           f"tier 2 variance {S['tier2_variance_pass']}/{S['tier2_variance_total']}   "
           f"mechanism {S['mechanism_pass']}/{S['mechanism_total']}")
 
-    with open(OUT_J, "w") as f:
+    with open(out_j, "w") as f:
         json.dump(res, f, indent=2)
-    write_markdown(res, A)
-    print(f"\nwrote {OUT_J}\nwrote {OUT_M}")
+    write_markdown(res, A, out_m)
+    print(f"\nwrote {out_j}\nwrote {out_m}")
 
 
 def verdict(ok):
     return "PASS" if ok else "**FAIL**"
 
 
-def write_markdown(res, A):
-    lo, hi = res["candidate_period"]
+def write_markdown(res, A, out_m):
+    lo, hi = res["climate_model_period"]
     S = res["summary"]
     L = []
     w = L.append
@@ -267,14 +301,16 @@ def write_markdown(res, A):
     w("")
     w("| | |")
     w("|---|---|")
-    w(f"| Candidate | {res['candidate']} |")
+    w(f"| Climate model | {res['climate_model']} |")
+    w(f"| Scored period | {lo}-{hi} |")
+    w(f"| Produced | {res['produced']} |")
     w(f"| Anchor | CESM {res['anchor_period']}, "
       f"{A['diagnostics']['vortex_SH']['n']} JJA / "
       f"{A['diagnostics']['vortex_NH']['n']} DJF seasons, "
       f"{A['diagnostics']['mass_flux']['n']} annual years |")
     w(f"| Estimator | `{res['estimator']}` |")
     w(f"| Anchor σ | {A['sigma_rule']} |")
-    w(f"| Independent of anchor | {'no — candidate lies inside the anchor' if res['inside_anchor'] else 'yes'} |")
+    w(f"| Independent of anchor | {'no — the model lies inside the anchor' if res['inside_anchor'] else 'yes'} |")
     w("| Generated by | `scripts/17_validate.py`, from "
       "`output/16_anchors_45yr.json` |")
     w("")
@@ -299,55 +335,55 @@ def write_markdown(res, A):
     w("")
     w("## Tier 2 — mean")
     w("")
-    w("| Diagnostic | Unit | Anchor mean | σ | Tolerance | Candidate | Offset | Verdict |")
+    w("| Diagnostic | Unit | Anchor mean | σ | Tolerance | Climate model | Offset | Verdict |")
     w("|---|---|---|---|---|---|---|---|")
     for key, _, label, unit, dp in SERIES:
         m = res["tier2_mean"][key]
         w(f"| {label} | {unit} | {m['anchor_mean']:.{dp}f} | {m['sigma']:.{dp}f} | "
           f"±{m['tolerance']:.{dp}f} ({m['tolerance_in_sigma']:.2f}σ) | "
-          f"{m['candidate_mean']:.{dp}f} | {m['offset_in_sigma']:+.2f}σ | "
+          f"{m['climate_model_mean']:.{dp}f} | {m['offset_in_sigma']:+.2f}σ | "
           f"{verdict(m['passes'])} |")
     w("")
     w("## Tier 2 — variance")
     w("")
-    w("| Metric | Anchor σ | Candidate σ | Ratio | 95% window | Verdict |")
+    w("| Metric | Anchor σ | Climate-model σ | Ratio | 95% window | Verdict |")
     w("|---|---|---|---|---|---|")
     for key, _, label, unit, dp in SERIES:
         v, a = res["tier2_variance"][key], A["diagnostics"][key]
-        w(f"| {label} | {a['sigma_used']:.{dp}f} | {v['candidate_sigma']:.{dp}f} | "
+        w(f"| {label} | {a['sigma_used']:.{dp}f} | {v['climate_model_sigma']:.{dp}f} | "
           f"{v['ratio']:.2f} | {v['window'][0]:.2f} – {v['window'][1]:.2f} | "
           f"{verdict(v['passes'])} |")
     d = res["tier2_variance"]["daily_DJF_u60N"]
     if d.get("available", True):
         w(f"| Daily DJF u, 60°N | {d['anchor_sigma']:.2f} | "
-          f"{d['candidate_sigma']:.2f} | {d['ratio']:.2f} | "
+          f"{d['climate_model_sigma']:.2f} | {d['ratio']:.2f} | "
           f"{d['window'][0]:.2f} – {d['window'][1]:.2f} | {verdict(d['passes'])} |")
     else:
         w(f"| Daily DJF u, 60°N | — | — | — | — | n/a: {d['reason']} |")
     w("")
     w("## Tier 2 — counts and relations")
     w("")
-    w("| Check | Anchor | Candidate | Accept | Verdict |")
+    w("| Check | Anchor | Climate model | Accept | Verdict |")
     w("|---|---|---|---|---|")
     s = res["counts"]["ssw_NH"]
     w(f"| Major NH SSW, count | {s['anchor_rate']:.2f}/winter | "
-      f"{s['candidate_count']} in {s['candidate_winters']} winters | "
+      f"{s['climate_model_count']} in {s['climate_model_winters']} winters | "
       f"{s['interval'][0]}–{s['interval'][1]} (expect {s['expected']:.1f}) | "
       f"{verdict(s['passes'])} |")
     for tag in res["mechanism"]:
         m = res["mechanism"][tag]
-        w(f"| {tag} | {m['anchor_slope']:+.3f} | {m['candidate_slope']:+.3f} | "
+        w(f"| {tag} | {m['anchor_slope']:+.3f} | {m['climate_model_slope']:+.3f} | "
           f"{m['anchor_ci95'][0]:+.3f} – {m['anchor_ci95'][1]:+.3f} | "
           f"{verdict(m['passes'])} |")
     w("")
     w(f"## Trends, and whether n = {res['tier2_mean']['mass_flux']['n']} resolves them")
     w("")
-    w("| Trend, per decade | Anchor | Candidate | 1.96σ at this n | Resolvable |")
+    w("| Trend, per decade | Anchor | Climate model | 1.96σ at this n | Resolvable |")
     w("|---|---|---|---|---|")
     for key, _, label, unit, dp in SERIES:
         t = res["trend"][key]
-        w(f"| {label} | {t['anchor']:+.4f} | {t['candidate']:+.4f} | "
-          f"±{1.96 * t['se_at_candidate_n']:.4f} | "
+        w(f"| {label} | {t['anchor']:+.4f} | {t['climate_model']:+.4f} | "
+          f"±{1.96 * t['se_at_climate_model_n']:.4f} | "
           f"{'yes' if t['resolvable'] else 'no'} |")
     w("")
     w("## Flags")
@@ -378,13 +414,13 @@ def write_markdown(res, A):
     if not res["counts"]["ssw_NH"]["passes"]:
         s_ = res["counts"]["ssw_NH"]
         any_flag = True
-        w(f"| Tier 2 SSW count | {s_['candidate_count']} in "
-          f"{s_['candidate_winters']} winters, outside "
+        w(f"| Tier 2 SSW count | {s_['climate_model_count']} in "
+          f"{s_['climate_model_winters']} winters, outside "
           f"{s_['interval'][0]}–{s_['interval'][1]} |")
     for tag, m in res["mechanism"].items():
         if not m["passes"]:
             any_flag = True
-            w(f"| {tag} | slope {m['candidate_slope']:+.3f}, outside the anchor CI "
+            w(f"| {tag} | slope {m['climate_model_slope']:+.3f}, outside the anchor CI "
               f"{m['anchor_ci95'][0]:+.3f} – {m['anchor_ci95'][1]:+.3f} |")
     if not any_flag:
         w("| — | no check failed |")
@@ -397,7 +433,7 @@ def write_markdown(res, A):
     w(f"| Anchor years outside their own band | "
       f"{A['band_self_consistency']['outside']} of "
       f"{A['band_self_consistency']['checks']} |")
-    w(f"| Candidate inside anchor | "
+    w(f"| Climate model inside anchor | "
       f"{'yes' if res['inside_anchor'] else 'no'} |")
     w("")
     w("## Evidence")
@@ -405,13 +441,14 @@ def write_markdown(res, A):
     w("| Figure | Covers |")
     w("|---|---|")
     for fn, cap in FIGURES:
-        w(f"| [{fn}]({fn}) | {cap} |")
+        sfn = stamped(fn, res["stamp"])
+        w(f"| [{sfn}]({sfn}) | {cap} |")
     w("")
     w("Figures are written by `scripts/18_validation_figures.py`, from the same two "
       "JSON files as the tables above.")
     w("")
 
-    with open(OUT_M, "w") as f:
+    with open(out_m, "w") as f:
         f.write("\n".join(L))
 
 

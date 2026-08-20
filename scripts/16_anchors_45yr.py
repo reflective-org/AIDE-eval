@@ -7,7 +7,7 @@ did NOT set it (D12), and that costs half the record. Both are in stale/.
 
 This script answers the other question. Once the method is trusted, the best
 estimate of CESM's mean and variability is the one that uses every year available,
-and a candidate model that is not CESM does not sit inside the anchor at all.
+and a climate model that is not CESM does not sit inside the anchor at all.
 So: one fixed anchor on the full 45 years, for scoring anything that is not this
 CESM run.
 
@@ -195,7 +195,7 @@ def main():
         effective_samples_per_winter=float(per_year))
     iw = res["tiers"]["variance"]["mass_flux"]["interannual_ratio_window"]
     dw = res["tiers"]["variance"]["daily_DJF_u60N"]["ratio_window"]
-    print(f"\n  sigma ratio windows for a {FULL}-yr candidate: "
+    print(f"\n  sigma ratio windows for a {FULL}-yr climate model: "
           f"interannual {iw[0]:.2f}-{iw[1]:.2f}, daily DJF {dw[0]:.2f}-{dw[1]:.2f} "
           f"({per_year:.1f} effective samples per winter)")
 

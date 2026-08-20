@@ -62,10 +62,10 @@ rollout must meet for tropical upwelling and the polar vortex. Every number here
 CESM-vs-CESM; nothing has yet been run against an actual emulator rollout.
 
 Authoritative outputs: `output/16_anchors_45yr.json` (the thresholds, both tiers anchored on
-CESM 1970–2014) and `output/17_validation.json` (a scored candidate).
+CESM 1970–2014) and `output/17_validation__<stamp>.json` (a scored climate model).
 The protocol is `docs/EVALUATION_PROTOCOL.md`, and it is self-contained — thresholds,
 derivation (appendix A), decisions (appendix B) and limitations (appendix C) in one file.
-`validation_results/` holds a scored candidate as `validation_result.md` plus five figures,
+`validation_results/` holds a scored climate model as `validation_result__<stamp>.md` plus five figures,
 all generated from the same JSON, so they cannot drift apart.
 
 The repo was trimmed to this protocol on 2026-08-19. Removed and **not retained**: the
@@ -109,8 +109,9 @@ $PY 02_reference_stats.py && $PY 02b_trends.py && $PY 07_period_split.py \
 ```
 
 `16`, `17` and `18` read only existing JSON and take seconds — iterate on a threshold, or
-score another candidate, without re-reading the tape. `17` takes the candidate period as
-arguments; its `candidate_series` is the seam to replace for a model rollout. `01`, `01b`, `01c` and `01d` are evidence, not pipeline stages: they
+score another climate model, without re-reading the tape. `17` takes `--climate-model NAME`
+and the period as arguments and stamps every artefact `__<climate model>__<production date>`;
+its `climate_model_series` is the seam to replace for a model rollout. `01`, `01b`, `01c` and `01d` are evidence, not pipeline stages: they
 feed nothing and are run standalone to re-confirm the conventions below.
 
 ## Data conventions that are already settled — do not re-derive, do not violate

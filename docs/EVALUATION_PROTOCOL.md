@@ -71,7 +71,7 @@ year-checks**: mass flux in 1971 and 1978, SH vortex in 2011.
 > flag the ends of a trending record. Both mass-flux exceedances are in the 1970s, before
 > most of the BDC acceleration (D9). The 3 are not evidence that ±3σ is too tight; they are
 > the forced trend appearing in a statistic that has had the trend removed from its width but
-> not from its centre. A candidate flagged in the same way needs its period checked before
+> not from its centre. A model flagged in the same way needs its period checked before
 > its physics.
 
 ### Why ±3σ
@@ -209,15 +209,15 @@ $PY scripts/17_validate.py FIRST_YEAR LAST_YEAR     # default 1996 2014
 $PY scripts/18_validation_figures.py
 ```
 
-Writes [`../validation_results/validation_result.md`](../validation_results/validation_result.md)
-and five figures beside it, one per test family. Candidate data enters through
-`17_validate.candidate_series`, which is the one function to replace when the candidate is a
+Writes [`../validation_results/validation_result.md`](../validation_results/)
+and five figures beside it, one per test family. Climate-model data enters through
+`17_validate.climate_model_series`, which is the one function to replace when the model is a
 model rollout rather than a window of CESM's own record.
 
 The committed result scores **CESM 1996–2014**: tier 1 5/6, tier 2 mean 5/6, variance 7/7,
 SSW pass, mechanism 1/2.
 
-> **Interpretation** — That candidate lies inside the anchor, so it is a self-consistency
+> **Interpretation** — That model lies inside the anchor, so it is a self-consistency
 > check on the machinery and not a validation. Its two mean-side failures are both predicted:
 > mass flux at +1.04σ is D9 with the sign reversed, 1996–2014 being the post-acceleration
 > half of the record, and R1 is the relation D10 demoted. Any pass there is weaker evidence
@@ -230,7 +230,7 @@ SSW pass, mechanism 1/2.
 What a model has to supply to be scored against the thresholds above. Everything in this
 section is what `scripts/aide_val_common.py` reads and what the diagnostics consume. The
 CESM values quoted throughout are the reference implementation, not a constraint on the
-candidate model's own grid (§5, rule 2).
+climate model's own grid (§5, rule 2).
 
 ### 4.1 Minimum request
 
@@ -335,7 +335,7 @@ resolution, on the same grid. Two forms of the request, depending on what the ar
 - Zonal means only. No longitudinal information enters any diagnostic.
 - CESM reference: 192 latitudes, 0.9424° spacing (f09).
 
-> **Interpretation** — The grid above is what CESM supplies, not what a candidate model must
+> **Interpretation** — The grid above is what CESM supplies, not what a climate model must
 > match. Rule 2 in §5 scores on the emulator's own grid with CESM reduced onto it, so a
 > coarser model grid is admissible; an incomplete latitude range is not, because it changes
 > the mass-flux integral itself.
@@ -410,11 +410,13 @@ $PY scripts/07_period_split.py            # reads the h6 tape
 $PY scripts/16_anchors_45yr.py            # reads 07
                                           # writes output/16_anchors_45yr.json
                                           #   -> sections 1 and 3 of this document
-$PY scripts/17_validate.py 1996 2014      # reads 16 and 07
-                                          # writes output/17_validation.json
-                                          #   and validation_results/validation_result.md
-$PY scripts/18_validation_figures.py      # reads 16, 17 and 07
-                                          # writes validation_results/*.png
+$PY scripts/17_validate.py \
+      --climate-model NAME 1996 2014      # reads 16 and 07; NAME defaults from the window
+                                          # writes output/17_validation__<stamp>.json
+                                          #   and validation_results/
+                                          #     validation_result__<stamp>.md
+$PY scripts/18_validation_figures.py      # reads 16, 07 and the newest 17 output
+      [--climate-model NAME]              # writes validation_results/*__<stamp>.png
 ```
 
 Those six scripts in that order, plus `aide_val_common.py` and `report_layout.py`. `16`,
@@ -424,6 +426,11 @@ and `07` rebuild it from the tape in about five minutes. See the pipeline order 
 
 Sections 1 and 3 change only when `16` changes; §3.5 only when `17` or `18` changes. Do not
 edit the tables by hand.
+
+Every scored result is stamped `__<climate model>__<production date>`, so the report, its
+five figures and the JSON behind them carry the name of what was scored and the day it was
+produced. `18` takes the stamp from `17`'s JSON rather than recomputing it, so a run that
+crosses midnight cannot split its own figures from its report.
 
 The split-anchor scripts that used to sit here, `14` and `15`, are in
 [`../stale/`](../stale/README.md). They still run and still reproduce their JSON; §2 says
@@ -547,8 +554,8 @@ see appendix C.
 ## See also
 
 - §4 — the fields, resolution and grid a model must supply to be scored
-- [../validation_results/validation_result.md](../validation_results/validation_result.md) —
-  a scored candidate, with the five figures beside it
+- [../validation_results/validation_result.md](../validation_results/) —
+  a scored climate model, with the five figures beside it
 - [../stale/README.md](../stale/README.md) — the split-anchor material §2 cites
 - Appendix A — where `0.5σ` and `1.96σ/√n` come from
 - Appendix B — the decisions cited above by number

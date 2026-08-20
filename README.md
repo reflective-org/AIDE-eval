@@ -14,7 +14,7 @@ been done.
 | If you want | Read |
 |---|---|
 | The protocol — both tiers, every threshold, the reasoning | [docs/EVALUATION_PROTOCOL.md](docs/EVALUATION_PROTOCOL.md) |
-| A scored candidate, with figures | [validation_results/](validation_results/validation_result.md) |
+| A scored climate model, with figures | [validation_results/](validation_results/) |
 | How to score your own model | [docs/EVALUATION_PROTOCOL.md](docs/EVALUATION_PROTOCOL.md) §3.5, and §4 for the inputs |
 | Where the tolerances come from | [docs/EVALUATION_PROTOCOL.md](docs/EVALUATION_PROTOCOL.md) appendix A |
 | Why a choice was made | [docs/EVALUATION_PROTOCOL.md](docs/EVALUATION_PROTOCOL.md) appendix B |
@@ -91,10 +91,11 @@ $PY 02_reference_stats.py && $PY 02b_trends.py && $PY 07_period_split.py \
 
 About five minutes in total. Order matters — later scripts read earlier JSON. `16`, `17` and
 `18` read only existing JSON and take seconds, so iterating on a threshold or scoring another
-candidate does not mean re-reading the tape.
+climate model does not mean re-reading the tape.
 
-`17_validate.py` takes the candidate period as arguments. Candidate data enters through one
-function, `candidate_series`, which is what gets replaced when the candidate is a model
+`17_validate.py` takes `--climate-model NAME` and the period as arguments, and stamps every
+artefact it writes `__<climate model>__<production date>`. Climate-model data enters through
+one function, `climate_model_series`, which is what gets replaced when the model is a
 rollout rather than a window of CESM's own record.
 
 `01_check_conventions.py`, `01b`, `01c` and `01d` sit outside the pipeline. They establish
@@ -119,7 +120,7 @@ requirements.txt     pinned dependencies
 scripts/             02, 02b, 07, 16, 17, 18 + aide_val_common.py, report_layout.py
                      01, 01b, 01c, 01d — convention evidence, outside the pipeline
 docs/                the protocol
-validation_results/  a scored candidate: validation_result.md and five figures
+validation_results/  a scored climate model: validation_result__<stamp>.md and five figures
 stale/               superseded material, kept — see stale/README.md
 output/              JSON results            — generated, gitignored
 logs/                stdout of every run     — generated, gitignored
