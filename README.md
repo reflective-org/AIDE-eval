@@ -47,27 +47,25 @@ test the thresholds against, so §2 of the protocol cites the archived split-anc
 30 tier-1 block verdicts and 4 of 6 tier-2 mean tests pass, the failures being the upwelling
 pair and the forced BDC trend behind them. The method carries over; the numbers do not.
 
-## The three results worth knowing
+## Input requirements
 
-**1. Thresholds depend on rollout length, and two roles of σ get conflated.**
-σ as a statement about nature comes from the longest record available; σ as a limit on
-detection is σ/√n. The operative rule is `target(n) = max(0.5σ, 1.96σ/√n)`, whose two
-branches cross at **n = 15.4 years**. That crossover is why tier 1's 5-year mean check is
-advisory only, and why tier 2 needs 35 years to make the variance and the forced trend
-testable at all.
+What a model has to supply to be scored against the thresholds above. Everything in this
+section is what `scripts/aide_val_common.py` reads and what the diagnostics consume. The
+CESM values quoted throughout are the reference implementation, not a constraint on the
+candidate model's own grid (§5, rule 2).
 
-**2. A threshold CESM cannot meet on another sample of its own output is not a threshold.**
-Both tiers are therefore tried out of sample before being published. Both upwelling
-diagnostics fail on 1970–1994 because the BDC acceleration is concentrated in the earlier
-period, which makes it a protocol requirement rather than a looser number: **upwelling
-targets are period-matched, not absolute** — score a rollout against the CESM years it
-covers, or detrend both sides.
+**Tier 1 needs 5 years, tier 2 needs 30 years.** Both need the same fields, at the same
+resolution, on the same grid. Two forms of the request, depending on what the archive holds:
 
-**3. The estimator spread is larger than the target.**
-The two standard routes to w̄* differ by **10.8%** on identical data, against the 1.1%
-mass-flux tolerance at tier 2. A threshold is therefore a statement about a *specific
-estimator*, valid only when model and truth pass through the same code path
-(`scripts/aide_val_common.py:tem_residual`) on the same grid.
+| | **A zonal-mean TEM tape** | **A standard pressure-level archive** |
+|---|---|---|
+| Fields | ū, v̄, w̄ (log-pressure), θ̄, v'θ' | `ua`, `va`, `wap`, `ta` (CF/CMIP names) |
+| Shape | (time, level, lat), already zonally averaged | (time, level, lat, lon) daily 3-D — or zonal means **plus** 3-D `va` and `ta` |
+| Temporal | daily means | daily means |
+| Levels | pressure levels bracketing 10, 50, 70 and 100 hPa, with one level beyond each end | same |
+| Latitude | global, −90° to +90° | same |
+| Derivation | none | w̄ from `wap`, θ̄ from `ta`, v'θ' from 3-D `va` and `ta` (§4.6) |
+
 
 ## Running it
 
@@ -132,40 +130,3 @@ and `/data`, and JSON diffs would dominate the history. Never hand-edit a genera
 artefact — change the script and re-run, so the result always matches the code that
 made it.
 
-## History
-
-The protocol supersedes an earlier 10/20-year target suite: a target table and CSV, the
-observability and mechanism diagnostics, a plain-language explainer and a 10-year scorecard,
-and separate decision, concepts, tolerance-rule and deferred-work documents. That suite was
-removed on 2026-08-19 and **is not retained here** — what it established survives only where
-this protocol restates it, principally appendices A–C.
-
-The seasonal-cycle and daily-DJF-distribution plots went with it and are to be rebuilt
-against the tier protocol. The diagnostics they visualise are still computed, in
-`output/07_period_split.json`.
-
-Three items were kept:
-
-- **`scripts/01*`**, the convention evidence. Re-run on 2026-08-19; they reproduce the
-  numbers quoted in [CLAUDE.md](CLAUDE.md) — 15.4% median error for `VTHzm` as-is against
-  1086.9% if `Vzm·THzm` is subtracted, a continuity slope of 1.011 at r = 0.9999 confirming
-  log-pressure `Wzm`, and 2.9% covariance loss from daily averaging.
-- **`stale/`**, everything superseded since: the split-anchor threshold scripts `14` and
-  `15`, the screening figure they produced, and the 23 pp technical report. `14` and `15`
-  still run and still reproduce their JSON, and §2 of the protocol cites them as the
-  out-of-sample evidence the current anchor cannot re-earn.
-- **`stale/AIDE_WACCM_validation_targets.pdf`**, the 23 pp technical report and the first PDF
-  the project produced. It is **frozen**: the script that built it read JSON from five
-  diagnostics that are no longer part of the repo, so it cannot be regenerated here and is
-  kept as the only surviving record of the suite the protocol replaced. Its thresholds are
-  superseded —
-  read them as history, not as current targets, and note that the `max(0.5σ, 1.96σ/√n)`
-  columns in it are evaluated at n = 10 and n = 20, not at the tier lengths of 5 and 35.
-
-## Caveats you should not skip
-
-Fixed SST means no ENSO, so the interannual σ anchoring every tolerance is smaller than the
-real atmosphere's — the right reference for scoring against *this* CESM run, the wrong
-one for claiming realism. The 1970–1995 and 1996–2014 segments are two separate runs
-joined at a restart, not one integration, and the tier-2 anchor spans that restart. Full
-list in [docs/EVALUATION_PROTOCOL.md](docs/EVALUATION_PROTOCOL.md) appendix C.
