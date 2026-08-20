@@ -65,11 +65,30 @@ def style(ax, title=None, sub=None):
     return ax
 
 
-def newfig(w, h, title, lead):
+def newfig(w, h, title, lead, interp=None):
+    """Title, a descriptive lead, and optionally an interpretation line.
+
+    The lead says what is plotted; the interpretation line says what it means,
+    kept visually separate the way the protocol separates the two.
+    `fig.text_bottom` is where the block ends, so the axes can sit under it.
+    """
     fig = plt.figure(figsize=(w, h), facecolor=SURFACE)
     fig.text(0.045, 0.965, title, color=INK, fontsize=12.5, va="top")
-    fig.text(0.045, 0.925, textwrap.fill(lead, int(w * 13.5)), color=INK2,
-             fontsize=8, va="top", linespacing=1.5)
+    wrap = int(w * 13.5)
+    lead_t = textwrap.fill(lead, wrap)
+    fig.text(0.045, 0.925, lead_t, color=INK2, fontsize=8, va="top", linespacing=1.5)
+
+    def block_h(text, size):
+        return (text.count("\n") + 1) * size * 1.5 / (h * 72)
+
+    y = 0.925 - block_h(lead_t, 8)
+    if interp:
+        y -= 0.010
+        interp_t = textwrap.fill(f"Interpretation — {interp}", wrap)
+        fig.text(0.045, y, interp_t, color=MUTED, fontsize=7.5, style="italic",
+                 va="top", linespacing=1.5)
+        y -= block_h(interp_t, 7.5)
+    fig.text_bottom = y
     return fig
 
 
@@ -99,8 +118,9 @@ def save(fig, name, stamp):
 # ---------------------------------------------------------------- tier 1
 def fig_tier1(A, res, S, segs):
     fig = newfig(11.0, 7.2, "Tier 1 — individual years against the ±3σ band",
-                 "Grey: anchor years outside the model window. Blue: climate-model years. "
-                 "Band: anchor mean ±3σ. A year outside it is a flag, not a verdict.")
+                 "Grey: anchor years outside the model window. Blue: climate-model "
+                 "years. Band: anchor mean ±3σ.",
+                 "a year outside the band is a flag, not a verdict.")
     lo, hi = res["climate_model_period"]
     for i, (key, ykey, label, unit) in enumerate(SERIES):
         ax = style(fig.add_subplot(3, 2, i + 1))
@@ -128,7 +148,7 @@ def fig_tier1(A, res, S, segs):
         span = [min(band[0], v.min()), max(band[1], v.max())]
         pad = 0.10 * (span[1] - span[0])
         ax.set_ylim(span[0] - pad, span[1] + pad)
-    fig.subplots_adjust(left=0.075, right=0.975, top=0.855, bottom=0.075,
+    fig.subplots_adjust(left=0.075, right=0.975, top=fig.text_bottom - 0.062, bottom=0.075,
                         hspace=0.62, wspace=0.19)
     footer(fig, res)
     save(fig, "tier1_screening.png", res["stamp"])
@@ -138,8 +158,8 @@ def fig_tier1(A, res, S, segs):
 def fig_mean(A, res):
     fig = newfig(9.2, 5.4, "Tier 2 — the rollout mean",
                  "Offset of the climate-model mean from the anchor, in units of the "
-                 "anchor σ. Shaded: the ±0.5σ tolerance. Everything is scaled by σ, "
-                 "so the six diagnostics share one axis.")
+                 "anchor σ. Shaded: the ±0.5σ tolerance. All six diagnostics are "
+                 "scaled by σ, so they share one axis.")
     ax = style(fig.add_subplot(111))
     keys = [k for k, *_ in SERIES][::-1]
     labels = [l for _, _, l, _ in SERIES][::-1]
@@ -164,17 +184,22 @@ def fig_mean(A, res):
     ax.set_xlim(-lim, lim)
     ax.text(0.5, 1.0, " tolerance ±0.5σ", transform=ax.get_xaxis_transform(),
             color=AQUA, fontsize=7, va="top")
-    fig.subplots_adjust(left=0.20, right=0.965, top=0.80, bottom=0.135)
+    fig.subplots_adjust(left=0.20, right=0.965, top=fig.text_bottom - 0.030, bottom=0.135)
     footer(fig, res)
     save(fig, "tier2_mean.png", res["stamp"])
 
 
 # ------------------------------------------------------------ tier 2 variance
 def fig_variance(A, res):
+    # samples per winter comes from 16, not a literal: it follows the anchor length
+    eff = A["tiers"]["variance"]["daily_DJF_u60N"]["effective_samples_per_winter"]
+    tau = A["daily_DJF_u60N"]["tau_days"]
     fig = newfig(9.2, 5.4, "Tier 2 — the variance",
                  "Ratio of climate-model σ to anchor σ, against the 95% window that "
-                 "sampling alone allows. The daily DJF ratio is the sharper test: "
-                 "≈7 effective samples per winter instead of one.")
+                 "sampling alone allows.",
+                 f"the daily DJF ratio is the sharper test: {eff:.1f} independent "
+                 f"samples per winter, at a {tau:.0f}-day decorrelation time, "
+                 "against one for the annual series.")
     ax = style(fig.add_subplot(111))
     rows = [(l, res["tier2_variance"][k]) for k, _, l, _ in SERIES]
     d = res["tier2_variance"]["daily_DJF_u60N"]
@@ -198,7 +223,7 @@ def fig_variance(A, res):
     ax.set_ylim(-0.7, len(rows) - 0.3)
     ax.text(0.02, 0.02, "grey bar: 95% window from sampling error alone",
             transform=ax.transAxes, color=MUTED, fontsize=7)
-    fig.subplots_adjust(left=0.20, right=0.965, top=0.80, bottom=0.135)
+    fig.subplots_adjust(left=0.20, right=0.965, top=fig.text_bottom - 0.030, bottom=0.135)
     footer(fig, res)
     save(fig, "tier2_variance.png", res["stamp"])
 
@@ -258,7 +283,7 @@ def fig_counts(A, res, S, segs):
               f"anchor CI {m['anchor_ci95'][0]:+.2f} to "
               f"{m['anchor_ci95'][1]:+.2f} · "
               f"{'PASS' if m['passes'] else 'FAIL'}")
-    fig.subplots_adjust(left=0.06, right=0.985, top=0.75, bottom=0.19, wspace=0.30)
+    fig.subplots_adjust(left=0.06, right=0.985, top=fig.text_bottom - 0.098, bottom=0.19, wspace=0.30)
     footer(fig, res)
     save(fig, "counts_and_relations.png", res["stamp"])
 
@@ -268,9 +293,9 @@ def fig_trends(A, res):
     n = res["tier2_mean"]["mass_flux"]["n"]
     fig = newfig(9.2, 5.4, f"Trends, and what n = {n} resolves",
                  "Anchor and climate-model trend per decade, each scaled by the 1.96σ "
-                 "the model length can resolve. Inside the shaded band a trend "
-                 "cannot be told from zero, so neither a match nor a mismatch means "
-                 "anything.")
+                 f"that n = {n} resolves. Shaded: the band in which a trend is not "
+                 "distinguishable from zero.",
+                 "inside the band, neither agreement nor disagreement is evidence.")
     ax = style(fig.add_subplot(111))
     keys = [k for k, *_ in SERIES][::-1]
     labels = [l for _, _, l, _ in SERIES][::-1]
@@ -308,9 +333,9 @@ def fig_trends(A, res):
           for k in keys]
     lim = 1.25 * max(1.2, max(abs(z) for z in zs))
     ax.set_xlim(-lim, lim)
-    ax.text(-0.5 * lim, -0.52, "shaded: cannot be told from zero at this n",
+    ax.text(-0.5 * lim, -0.52, "shaded: not distinguishable from zero at this n",
             color=MUTED, fontsize=7, ha="center")
-    fig.subplots_adjust(left=0.20, right=0.845, top=0.775, bottom=0.135)
+    fig.subplots_adjust(left=0.20, right=0.845, top=fig.text_bottom - 0.065, bottom=0.135)
     footer(fig, res)
     save(fig, "trends.png", res["stamp"])
 
