@@ -1,4 +1,7 @@
-# AIDE-WACCM atmosphere validation
+# AIDE-SAI validation
+This repository validates single parts and the fully interactive version of the AIDE-SAI framework. 
+
+## 1. AIDE-atmosphere validation
 
 The **two-tier evaluation protocol** an AIDE-WACCM emulator rollout is scored against for
 tropical upwelling (Brewer–Dobson circulation) and the stratospheric polar vortex,
