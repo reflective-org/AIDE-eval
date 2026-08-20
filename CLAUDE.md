@@ -89,6 +89,13 @@ Two things were restored after the trim:
   Do not cite its numbers as current; do not hand-edit it; this is the one artefact in the
   repo that does not match code that can rebuild it.
 
+## Repository layout
+
+Only `README.md`, `CLAUDE.md`, `LICENSE`, `requirements.txt`, `.gitignore` and the
+gitignored `.AIDE-eval_env/` sit at the repo root. Everything else — `scripts/`, `docs/`,
+`output/`, `logs/`, `stale/`, `validation_results/` — is under **`AIDE-atmosphere/`**, and
+every bare path in this file is relative to it.
+
 ## Data and environment
 
 | | |
@@ -96,10 +103,10 @@ Two things were restored after the trim:
 | Data root | `/data/cesm2.1.5_output/histSST` (read-only input; never write here) |
 | Stream | `cam.h6`, daily zonal-mean TEM tape: `Uzm Vzm Wzm THzm VTHzm UVzm UWzm` |
 | Segments | 1970–1995 and 1996–2014 — two **separate runs** joined at a restart, not one integration |
-| Interpreter | `.AIDE-eval_env/bin/python`, built from `requirements.txt` (Python 3.10.12) |
-| Output dir | hardcoded as `C.OUTDIR` in `scripts/aide_val_common.py`; `output/` and `logs/` are gitignored |
+| Interpreter | `.AIDE-eval_env/bin/python` at the repo root, built from `requirements.txt` (Python 3.10.12) |
+| Output dir | `C.OUTDIR` in `scripts/aide_val_common.py`, derived from `__file__` as `<AIDE-atmosphere>/output`; `output/` and `logs/` are gitignored |
 
-Reproduce in order (from `scripts/`, `PY=../.AIDE-eval_env/bin/python`, ~5 min total;
+Reproduce in order (from `AIDE-atmosphere/scripts/`, `PY=../../.AIDE-eval_env/bin/python`, ~5 min total;
 verified to rebuild every JSON, the report and all five PNGs bit-for-bit from the tape):
 
 ```bash

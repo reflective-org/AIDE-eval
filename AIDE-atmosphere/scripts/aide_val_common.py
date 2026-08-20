@@ -53,7 +53,8 @@ SEGMENTS = {
     ),
 }
 
-OUTDIR = "/home/susanne/docs/AIDE-atmosphere_validation/output"
+_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+OUTDIR = os.path.join(_ROOT, "output")
 
 # ----------------------------------------------------------------------------
 # Physical constants (CESM values)

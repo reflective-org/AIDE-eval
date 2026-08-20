@@ -13,15 +13,15 @@ been done.
 
 | If you want | Read |
 |---|---|
-| The protocol — both tiers, every threshold, the reasoning | [docs/EVALUATION_PROTOCOL.md](docs/EVALUATION_PROTOCOL.md) |
-| A scored climate model, with figures | [validation_results/](validation_results/) |
-| How to score your own model | [docs/EVALUATION_PROTOCOL.md](docs/EVALUATION_PROTOCOL.md) §3.5, and §4 for the inputs |
-| Where the tolerances come from | [docs/EVALUATION_PROTOCOL.md](docs/EVALUATION_PROTOCOL.md) appendix A |
-| Why a choice was made | [docs/EVALUATION_PROTOCOL.md](docs/EVALUATION_PROTOCOL.md) appendix B |
-| What is knowingly not covered | [docs/EVALUATION_PROTOCOL.md](docs/EVALUATION_PROTOCOL.md) appendix C, §7 |
+| The protocol — both tiers, every threshold, the reasoning | [docs/EVALUATION_PROTOCOL.md](AIDE-atmosphere/docs/EVALUATION_PROTOCOL.md) |
+| A scored climate model, with figures | [validation_results/](AIDE-atmosphere/validation_results/) |
+| How to score your own model | [docs/EVALUATION_PROTOCOL.md](AIDE-atmosphere/docs/EVALUATION_PROTOCOL.md) §3.5, and §4 for the inputs |
+| Where the tolerances come from | [docs/EVALUATION_PROTOCOL.md](AIDE-atmosphere/docs/EVALUATION_PROTOCOL.md) appendix A |
+| Why a choice was made | [docs/EVALUATION_PROTOCOL.md](AIDE-atmosphere/docs/EVALUATION_PROTOCOL.md) appendix B |
+| What is knowingly not covered | [docs/EVALUATION_PROTOCOL.md](AIDE-atmosphere/docs/EVALUATION_PROTOCOL.md) appendix C, §7 |
 | Settled data conventions and working rules | [CLAUDE.md](CLAUDE.md) |
 | The evidence for those conventions | `scripts/01*`, `logs/01*` |
-| Superseded material, kept | [stale/](stale/README.md) |
+| Superseded material, kept | [stale/](AIDE-atmosphere/stale/README.md) |
 
 The protocol document is self-contained: every threshold, its derivation, the decisions
 behind it and the limitations on it are in that one file, and every number in it is
@@ -43,7 +43,7 @@ slopes and the upwelling trend. This is the scientific claim.
 
 **What the anchor gives up.** Spanning the whole record leaves no CESM output held back to
 test the thresholds against, so §2 of the protocol cites the archived split-anchor runs in
-[stale/](stale/README.md) instead: on anchors that did not include the scored period, 28 of
+[stale/](AIDE-atmosphere/stale/README.md) instead: on anchors that did not include the scored period, 28 of
 30 tier-1 block verdicts and 4 of 6 tier-2 mean tests pass, the failures being the upwelling
 pair and the forced BDC trend behind them. The method carries over; the numbers do not.
 
@@ -82,8 +82,8 @@ python3 -m venv .AIDE-eval_env
 Then:
 
 ```bash
-cd scripts
-PY=../.AIDE-eval_env/bin/python
+cd AIDE-atmosphere/scripts
+PY=../../.AIDE-eval_env/bin/python
 $PY 02_reference_stats.py && $PY 02b_trends.py && $PY 07_period_split.py \
   && $PY 16_anchors_45yr.py && $PY 17_validate.py 1996 2014 \
   && $PY 18_validation_figures.py
@@ -113,21 +113,27 @@ checked the same way before its numbers are trusted.
 ## Repository layout
 
 ```
-README.md            this file
-CLAUDE.md            working rules, settled data conventions, protocol constraints
-requirements.txt     pinned dependencies
-.AIDE-eval_env/      the virtual environment — gitignored, 425 MB, rebuild from the above
-scripts/             02, 02b, 07, 16, 17, 18 + aide_val_common.py, report_layout.py
-                     01, 01b, 01c, 01d — convention evidence, outside the pipeline
-docs/                the protocol
-validation_results/  a scored climate model: validation_result__<stamp>.md and five figures
-stale/               superseded material, kept — see stale/README.md
-output/              JSON results            — generated, gitignored
-logs/                stdout of every run     — generated, gitignored
+README.md              this file
+CLAUDE.md              working rules, settled data conventions, protocol constraints
+LICENSE
+requirements.txt       pinned dependencies
+.gitignore
+.AIDE-eval_env/        the virtual environment — gitignored, 425 MB, rebuild from the above
+
+AIDE-atmosphere/       everything else lives here
+  scripts/             02, 02b, 07, 16, 17, 18 + aide_val_common.py, report_layout.py
+                       01, 01b, 01c, 01d — convention evidence, outside the pipeline
+  docs/                the protocol
+  validation_results/  a scored climate model: validation_result__<stamp>.md and five figures
+  stale/               superseded material, kept — see stale/README.md
+  output/              JSON results            — generated, gitignored
+  logs/                stdout of every run     — generated, gitignored
 ```
+
+Paths written bare below — `scripts/`, `output/`, `docs/` — are relative to
+`AIDE-atmosphere/`.
 
 `output/` and `logs/` are not in version control: they are reproducible from the scripts
 and `/data`, and JSON diffs would dominate the history. Never hand-edit a generated
 artefact — change the script and re-run, so the result always matches the code that
 made it.
-

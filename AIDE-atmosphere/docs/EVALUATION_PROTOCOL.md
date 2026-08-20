@@ -422,7 +422,7 @@ $PY scripts/18_validation_figures.py      # reads 16, 07 and the newest 17 outpu
 Those six scripts in that order, plus `aide_val_common.py` and `report_layout.py`. `16`,
 `17` and `18` read only existing JSON and take seconds; if `output/` is empty, `02`, `02b`
 and `07` rebuild it from the tape in about five minutes. See the pipeline order in
-[../CLAUDE.md](../CLAUDE.md).
+[../CLAUDE.md](../../CLAUDE.md).
 
 Sections 1 and 3 change only when `16` changes; §3.5 only when `17` or `18` changes. Do not
 edit the tables by hand.
