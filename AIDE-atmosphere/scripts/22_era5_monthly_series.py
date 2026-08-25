@@ -92,6 +92,21 @@ def main():
     print(f"polar cap layer uses {ksel.sum()} levels inside 10-50 hPa "
           f"({lev[ksel].tolist()}); CESM has 8")
 
+    # -- per-year 12-month climatology, which the seasonal shape check reads.
+    #    Monthly input is the native resolution for this one: the tape already
+    #    IS the monthly climatology, so no expansion is involved.
+    raw = {"vortex_NH": u60n, "vortex_SH": u60s,
+           "polar_cap_T_NH": tcapN, "polar_cap_T_SH": tcapS}
+    myears = sorted(set(int(y) for y in yr))
+    full_years = [y for y in myears if (yr == y).sum() == 12]
+    monthly = {}
+    for name, x in raw.items():
+        rows = []
+        for y in full_years:
+            sel = yr == y
+            rows.append(np.asarray(x[sel])[np.argsort(mo[sel])])
+        monthly[name] = rows
+
     # -- day-weight, then reduce exactly as the CESM path does
     out, series = {}, {}
     for name, x, months, label in (
@@ -108,6 +123,11 @@ def main():
         print(f"  {name:16s} {len(vals)} seasons "
               f"{years.min()}-{years.max()}  "
               f"mean {vals.mean():8.3f}")
+
+    out["_monthly_years"] = [int(y) for y in full_years]
+    for name, rows in monthly.items():
+        out[f"_monthly_{name}"] = [[float(v) for v in r] for r in rows]
+        print(f"  _monthly_{name:16s} {len(rows)} years x 12 months")
 
     doc = {
         "source": "ERA5 monthly means via CDS "
