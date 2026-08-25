@@ -16,8 +16,14 @@ wrong costs days of transfer:
 One day of data settles all three. Nothing here is part of the pipeline; it
 writes a log and is read by a human.
 
-Run with the download environment:
-  ../era5_env/bin/python 19_era5_probe.py
+Run with the download environment. Stages are a (one day native),
+b (one day regridded) and c (one month, batching efficiency):
+  ../era5_env/bin/python 19_era5_probe.py          # all three
+  ../era5_env/bin/python 19_era5_probe.py b,c      # just these
+
+Requests take minutes each and the log is appended, so stages can be run
+separately. Do not wrap this in `timeout` - a killed request still occupies
+a CDS queue slot.
 
 Output: logs/19_probe.txt
 """
@@ -47,6 +53,8 @@ def base_request():
         "daily_statistic": "daily_mean",
         "time_zone": "utc+00:00",
         "frequency": "1_hourly",
+        "data_format": "netcdf",
+        "download_format": "unarchived",
     }
 
 
@@ -71,6 +79,12 @@ def describe(path, w):
         import netCDF4
     except ImportError:
         w("  netCDF4 not available; skipping inspection")
+        return
+    import zipfile
+    if zipfile.is_zipfile(path):
+        names = zipfile.ZipFile(path).namelist()
+        w(f"  ZIP archive, {len(names)} members: {', '.join(names[:6])}")
+        w("  -> ingest must unzip; one netCDF per variable")
         return
     try:
         ds = netCDF4.Dataset(path)
@@ -100,18 +114,20 @@ def describe(path, w):
 def main():
     os.makedirs(LOGDIR, exist_ok=True)
     os.makedirs(SCRATCH, exist_ok=True)
-    log = open(os.path.join(LOGDIR, "19_probe.txt"), "w")
+    stages = sys.argv[1].split(",") if len(sys.argv) > 1 else ["a", "b", "c"]
+    log = open(os.path.join(LOGDIR, "19_probe.txt"), "a")
 
     def w(line=""):
         print(line)
         log.write(line + "\n")
         log.flush()
 
-    w("ERA5 CDS probe")
+    w("")
+    w("=" * 72)
+    w(f"ERA5 CDS probe - stages {','.join(stages)} - {time.strftime('%Y-%m-%d %H:%M')}")
     w(f"dataset   {DATASET}")
     w(f"levels    {len(LEVELS)}: {' '.join(LEVELS)} hPa")
     w(f"variables {', '.join(VARIABLES)}")
-    w("probe day 2000-01-01")
     w()
 
     try:
@@ -120,11 +136,9 @@ def main():
         w("cdsapi not installed. Run with ../era5_env/bin/python")
         return 1
 
-    rc = os.path.expanduser("~/.cdsapirc")
-    if not os.path.exists(rc) and not os.environ.get("CDSAPI_KEY"):
-        w("NO CREDENTIALS.")
-        w("  Register at https://cds.climate.copernicus.eu, accept the ERA5 licence,")
-        w("  and write the key to ~/.cdsapirc. Then re-run this probe.")
+    if not os.path.exists(os.path.expanduser("~/.cdsapirc")) \
+            and not os.environ.get("CDSAPI_KEY"):
+        w("NO CREDENTIALS. Write a CDS key to ~/.cdsapirc and re-run.")
         return 2
 
     try:
@@ -133,34 +147,57 @@ def main():
         w(f"could not construct client: {exc}")
         return 2
 
-    # -- A: native grid, to establish the per-day byte cost and the true layout
-    w("A. native grid (no grid key)")
-    a_path = os.path.join(SCRATCH, "probe_native.nc")
-    a_bytes = fetch(client, base_request(), a_path, w)
-    if a_bytes:
-        describe(a_path, w)
-    w()
+    got = {}
 
-    # -- B: does the server regrid? This is the factor of 16.
-    w("B. grid = [1.0, 1.0]")
-    b_req = base_request()
-    b_req["grid"] = [1.0, 1.0]
-    b_path = os.path.join(SCRATCH, "probe_1deg.nc")
-    b_bytes = fetch(client, b_req, b_path, w)
-    if b_bytes:
-        describe(b_path, w)
-    w()
+    # -- A: one day, native grid. Per-day byte cost and the true layout.
+    if "a" in stages:
+        w("A. one day, native grid (no grid key)")
+        path = os.path.join(SCRATCH, "probe_native.nc")
+        got["a"] = fetch(client, base_request(), path, w)
+        if got["a"]:
+            describe(path, w)
+        w()
 
-    # -- what this implies for the real pull
-    w("IMPLICATIONS for 1990-2025 (36 years, 13149 days)")
-    for tag, n in (("native 0.25 deg", a_bytes), ("regridded 1.0 deg", b_bytes)):
-        if n:
-            w(f"  {tag:20s} {n / 1e6:7.1f} MB/day -> {n * 13149 / 1e12:6.2f} TB total")
-    if b_bytes and a_bytes:
-        w(f"  grid key is HONOURED - use 1.0 deg, {a_bytes / b_bytes:.1f}x less transfer")
-    elif a_bytes and not b_bytes:
-        w("  grid key REJECTED - fall back to native 0.25 deg, or to")
+    # -- B: does the server regrid? This is the factor of 16 on volume.
+    if "b" in stages:
+        w("B. one day, grid = [1.0, 1.0]")
+        req = base_request()
+        req["grid"] = [1.0, 1.0]
+        path = os.path.join(SCRATCH, "probe_1deg.nc")
+        got["b"] = fetch(client, req, path, w)
+        if got["b"]:
+            describe(path, w)
+        w()
+
+    # -- C: a whole month. A costs ~6.5 min of which ~7 s is transfer, so the
+    #       schedule is set by per-request processing, not by bytes. If a month
+    #       costs about what a day costs, 432 month-requests is the plan; if it
+    #       scales with days, the pull is 30x longer and needs rethinking.
+    if "c" in stages:
+        w("C. one month (Jan 2000), native grid - batching efficiency")
+        req = base_request()
+        req["day"] = [f"{d:02d}" for d in range(1, 32)]
+        path = os.path.join(SCRATCH, "probe_month.nc")
+        got["c"] = fetch(client, req, path, w)
+        if got["c"]:
+            describe(path, w)
+        w()
+
+    w("IMPLICATIONS for 1990-2025 (36 years, 13149 days, 432 months)")
+    if got.get("a"):
+        w(f"  native 0.25 deg   {got['a'] / 1e6:7.1f} MB/day"
+          f" -> {got['a'] * 13149 / 1e12:5.2f} TB total")
+    if got.get("b"):
+        w(f"  regridded 1.0 deg {got['b'] / 1e6:7.1f} MB/day"
+          f" -> {got['b'] * 13149 / 1e12:5.2f} TB total")
+        if got.get("a"):
+            w(f"  grid key HONOURED - {got['a'] / got['b']:.1f}x less transfer at 1.0 deg")
+    elif "b" in stages:
+        w("  grid key REJECTED - stay native 0.25 deg, or switch to")
         w("  reanalysis-era5-complete, which is MARS-backed and supports grid/levelist")
+    if got.get("c") and got.get("a"):
+        w(f"  month request returned {got['c'] / got['a']:.1f}x one day's bytes"
+          f" ({got['c'] / 1e6:.1f} MB)")
     w()
     w("Raw probe files are under output/era5_probe/ and can be deleted.")
     log.close()
