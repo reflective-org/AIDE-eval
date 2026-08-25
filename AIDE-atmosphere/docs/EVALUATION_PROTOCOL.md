@@ -295,7 +295,7 @@ $PY scripts/18_validation_figures.py
 ```
 
 Writes [`../validation_results/validation_result.md`](../validation_results/)
-and eight figures beside it, one per test family. Climate-model data enters through
+and seven figures beside it. Climate-model data enters through
 `17_validate.climate_model_series`, which is the one function to replace when the model is a
 model rollout rather than a window of CESM's own record — the three shape checks of §3.5 come
 through that same function, so a rollout scores everything in one pass.
@@ -526,7 +526,7 @@ each profile level year by year, and the per-winter DJF percentiles. They are co
 tape stage on purpose, so that `16`, `17` and `18` stay JSON-only and fast.
 
 Every scored result is stamped `__<climate model>__<production date>`, so the report, its
-eight figures and the JSON behind them carry the name of what was scored and the day it was
+seven figures and the JSON behind them carry the name of what was scored and the day it was
 produced. `18` takes the stamp from `17`'s JSON rather than recomputing it, so a run that
 crosses midnight cannot split its own figures from its report.
 
@@ -706,7 +706,7 @@ see appendix C.
 
 - §4 — the fields, resolution and grid a model must supply to be scored
 - [../validation_results/validation_result.md](../validation_results/) —
-  a scored climate model, with the eight figures beside it
+  a scored climate model, with the seven figures beside it
 - [../stale/README.md](../stale/README.md) — the split-anchor material §2 cites
 - Appendix A — where `0.5σ` and `1.96σ/√n` come from
 - Appendix B — the decisions cited above by number

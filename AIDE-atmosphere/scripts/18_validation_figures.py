@@ -7,7 +7,7 @@ at rather than a number to trust:
   tier1_screening.png       every climate-model year against the +/-3 sigma band
   tier2_mean.png            offset from the anchor against the +/-0.5 sigma tolerance
   tier2_variance.png        sigma ratios against their 95% windows
-  counts_and_relations.png  the SSW count, and the two mechanism slopes
+  counts_and_relations.png  the major NH SSW count against its Poisson interval
 
 Reads output/16_anchors_45yr__<stamp>.json, written by 17, plus the series in
 output/07_period_split.json. Run after 17.
@@ -221,16 +221,20 @@ def fig_variance(A, res):
     save(fig, "tier2_variance.png", res["stamp"])
 
 
-# ------------------------------------------------------- counts and relations
-def fig_counts(A, res, S, segs):
-    fig = newfig(11.0, 4.3, "Tier 2 — the count, and the mechanism relations",
-                 "Left: major NH sudden stratospheric warmings against the Poisson "
-                 "interval implied by the anchor rate. Right: the two mechanism "
-                 "slopes, climate-model fit against the anchor's bootstrap CI.")
+# ------------------------------------------------------------------- the count
+def fig_counts(A, res):
     s = res["counts"]["ssw_NH"]
-    ax = style(fig.add_subplot(1, 3, 1), "a   Major NH SSW",
+    fig = newfig(6.6, 4.6, "Tier 2 — the major NH SSW count",
+                 "Major sudden stratospheric warmings against the Poisson interval "
+                 "implied by the anchor rate. Blue bars are the 95% acceptance "
+                 "interval; grey bars fall outside it.",
+                 "a count, not a rate: a rate band needs about 23 winters before it "
+                 "is resolvable at all, while a count interval is well defined at any "
+                 "length (D6).")
+    ax = style(fig.add_subplot(111), None,
                f"{s['climate_model_count']} in {s['climate_model_winters']} winters · "
-               f"expect {s['expected']:.1f} · "
+               f"expect {s['expected']:.1f} · anchor rate "
+               f"{s['anchor_rate']:.3f}/winter · "
                f"{'PASS' if s['passes'] else 'FAIL'}")
     ilo, ihi = s["interval"]
     xs = np.arange(max(0, ilo - 4), ihi + 5)
@@ -239,44 +243,16 @@ def fig_counts(A, res, S, segs):
            color=[BLUE if ilo <= x <= ihi else RULE for x in xs], lw=0)
     c = PASS if s["passes"] else FAIL
     ax.axvline(s["climate_model_count"], color=c, lw=1.6)
-    ax.annotate(f"climate model {s['climate_model_count']}", (s["climate_model_count"], 1.0),
+    ax.annotate(f"climate model {s['climate_model_count']}",
+                (s["climate_model_count"], 1.0),
                 xycoords=("data", "axes fraction"), textcoords="offset points",
                 xytext=(4, -8), color=c, fontsize=7.5)
+    ax.annotate(f"accept {ilo}–{ihi} events", (0.025, 0.95),
+                xycoords="axes fraction", color=BLUE, fontsize=7.5, ha="left")
     ax.set_xlabel("events", color=INK2, fontsize=8)
     ax.set_ylabel("Poisson probability", color=INK2, fontsize=8)
-
-    lo, hi = res["climate_model_period"]
-    panels = [("R1 wave->vortex", "heat_flux_100", "vortex_NH",
-               "v'θ' 100 hPa, 45–75°N  [K m s⁻¹]", "u 60°N DJF  [m s⁻¹]"),
-              ("R2 thermal wind", "polar_cap_T_NH", "vortex_NH",
-               "polar cap T, NH  [K]", "u 60°N DJF  [m s⁻¹]")]
-    for j, (tag, xk, yk, xlab, ylab) in enumerate(panels):
-        m = res["mechanism"][tag]
-        ax = style(fig.add_subplot(1, 3, j + 2))
-        yx, vx = C.join_segments(S, segs, xk, "_djf_years")
-        yy, vy = C.join_segments(S, segs, yk, "_djf_years")
-        n = min(len(vx), len(vy))
-        inc = (yx[:n] >= lo) & (yx[:n] <= hi)
-        ax.plot(vx[:n][~inc], vy[:n][~inc], "o", ms=3, color=RULE, mec="none")
-        ax.plot(vx[:n][inc], vy[:n][inc], "o", ms=3.6, color=BLUE, mec="none")
-        xx = np.linspace(vx[:n].min(), vx[:n].max(), 2)
-        a_int = vy[:n].mean() - m["anchor_slope"] * vx[:n].mean()
-        ax.plot(xx, m["anchor_slope"] * xx + a_int, color=MUTED, lw=1.1,
-                label=f"anchor {m['anchor_slope']:+.2f}")
-        c_int = (vy[:n][inc].mean() - m["climate_model_slope"] * vx[:n][inc].mean())
-        col = PASS if m["passes"] else FAIL
-        ax.plot(xx, m["climate_model_slope"] * xx + c_int, color=col, lw=1.4,
-                label=f"climate model {m['climate_model_slope']:+.2f}")
-        lg = ax.legend(frameon=False, fontsize=7, loc="best")
-        for t in lg.get_texts():
-            t.set_color(INK2)
-        ax.set_xlabel(xlab, color=INK2, fontsize=7.5)
-        ax.set_ylabel(ylab, color=INK2, fontsize=7.5)
-        style(ax, f"{'bc'[j]}   {tag}",
-              f"anchor CI {m['anchor_ci95'][0]:+.2f} to "
-              f"{m['anchor_ci95'][1]:+.2f} · "
-              f"{'PASS' if m['passes'] else 'FAIL'}")
-    fig.subplots_adjust(left=0.06, right=0.985, top=fig.text_bottom - 0.098, bottom=0.19, wspace=0.30)
+    fig.subplots_adjust(left=0.135, right=0.965, top=fig.text_bottom - 0.075,
+                        bottom=0.135)
     footer(fig, res)
     save(fig, "counts_and_relations.png", res["stamp"])
 
@@ -311,58 +287,31 @@ def _tolerance_axis(ax, offsets, xlabel, n):
 
 
 def fig_seasonal(A, res):
-    fig = newfig(11.0, 7.4, "Tier 2 shape — the seasonal cycle",
-                 "Left: the 12-month climatology, anchor in grey and climate model "
-                 "in blue. Right: the amplitude and phase of the annual harmonic "
-                 "fitted to each year, as an offset from the anchor in units of the "
-                 "anchor σ, against the ±0.5σ tolerance.",
-                 "the twelve monthly means are not scored individually - that would "
-                 "be a twelve-way multiplicity problem. Amplitude and phase are two "
-                 "numbers that summarise the annual march, and a model can reproduce "
-                 "the annual mean while getting either of them wrong.")
-    gs = fig.add_gridspec(3, 4, hspace=0.62, wspace=0.42)
+    fig = newfig(11.0, 6.6, "Tier 2 shape — the seasonal cycle",
+                 "The 12-month climatology of each diagnostic, anchor in grey and "
+                 "climate model in blue. Monthly means averaged over each period.",
+                 "a model can reproduce the annual mean and still have the annual "
+                 "march wrong, which is what this shows and no test of the mean can. "
+                 "The amplitude and phase of the annual harmonic are what is actually "
+                 "scored; they are in the report tables, not drawn here.")
+    gs = fig.add_gridspec(2, 3, hspace=0.52, wspace=0.28)
     x = np.arange(1, 13)
     for i, (key, _, label, unit) in enumerate(SERIES):
-        ax = style(fig.add_subplot(gs[i // 2, i % 2]), label)
+        ax = style(fig.add_subplot(gs[i // 3, i % 3]), f"{'abcdef'[i]}   {label}")
         r = res["shape_seasonal"][key]
-        ax.plot(x, r["anchor_climatology"], "-o", color=MUTED, lw=1.3, ms=2.8,
+        ax.plot(x, r["anchor_climatology"], "-o", color=MUTED, lw=1.3, ms=3.0,
                 label="anchor")
-        ax.plot(x, r["climate_model_climatology"], "-o", color=BLUE, lw=1.5, ms=2.8,
+        ax.plot(x, r["climate_model_climatology"], "-o", color=BLUE, lw=1.6, ms=3.0,
                 label="climate model")
         ax.set_xticks(x)
-        ax.set_xticklabels(list(MONTH_INITIALS), fontsize=6)
-        ax.set_ylabel(unit, color=INK2, fontsize=7)
+        ax.set_xticklabels(list(MONTH_INITIALS), fontsize=6.5)
+        ax.set_ylabel(unit, color=INK2, fontsize=7.5)
         if i == 0:
-            ax.legend(fontsize=6.2, frameon=False, loc="best")
-
-    for j, (which, title) in enumerate((("amplitude", "amplitude"),
-                                        ("phase", "phase, month of max"))):
-        ax = style(fig.add_subplot(gs[j if j == 0 else 1, 2:]),
-                   f"harmonic {title}")
-        keys = [k for k, *_ in SERIES][::-1]
-        offs = [res["shape_seasonal"][k][which]["offset_in_sigma"] for k in keys]
-        for i, k in enumerate(keys):
-            _offset_row(ax, i, res["shape_seasonal"][k][which])
-        _tolerance_axis(ax, offs, "offset from the anchor, in anchor σ", len(keys))
-        # ticks on the right: on the left they run back into the climatology column
-        ax.yaxis.tick_right()
-        ax.set_yticks(range(len(keys)))
-        ax.set_yticklabels([l for _, _, l, _ in SERIES][::-1], fontsize=7,
-                           color=INK)
-
-    ax = style(fig.add_subplot(gs[2, 2:]), "where the curve actually peaks")
-    ax.axis("off")
-    lines = ["The harmonic phase is not the observed maximum where the annual march",
-             "carries a strong semi-annual component. Anchor, by month:"]
-    for key, _, label, _ in SERIES:
-        r = res["shape_seasonal"][key]
-        lines.append(f"   {label:18s} harmonic {r['phase']['anchor'] + 1:5.2f}   "
-                     f"observed {r['month_of_max_observed']:2d}")
-    ax.text(0, 1.0, "\n".join(lines), transform=ax.transAxes, va="top",
-            color=MUTED, fontsize=6.6, family="DejaVu Sans Mono", linespacing=1.6)
-
-    fig.subplots_adjust(left=0.075, right=0.975, top=fig.text_bottom - 0.035,
-                        bottom=0.095)
+            lg = ax.legend(fontsize=6.6, frameon=False, loc="best")
+            for t in lg.get_texts():
+                t.set_color(INK2)
+    fig.subplots_adjust(left=0.065, right=0.975, top=fig.text_bottom - 0.055,
+                        bottom=0.085)
     footer(fig, res)
     save(fig, "shape_seasonal.png", res["stamp"])
 
@@ -494,7 +443,7 @@ def main():
     fig_tier1(A, res, S, segs)
     fig_mean(A, res)
     fig_variance(A, res)
-    fig_counts(A, res, S, segs)
+    fig_counts(A, res)
     fig_seasonal(A, res)
     fig_daily_distribution(A, res)
     fig_w_star_profile(A, res)
