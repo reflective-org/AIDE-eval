@@ -76,6 +76,17 @@ FILL_SENTINEL = 1e20     # anything larger is the 1e35 below-surface sentinel
 # vertical derivatives.
 ILEV_SLICE = slice(20, 61)
 
+# Shape checks (protocol sections 1 and 3). Both are shared by 07, which derives
+# the per-year series from the tape, and 16, which sets the thresholds - keeping
+# them here is what stops the two disagreeing about levels or percentiles.
+#
+# Every profile level is in the ERA5 request in 19_era5_probe.py, so the profile
+# is scoreable against the reanalysis with no vertical regridding, and all six sit
+# above the 181.9 hPa pure-pressure transition, so none needs a surface-pressure
+# field or touches the below-surface sentinel.
+PROFILE_LEVELS = (100.0, 70.0, 50.0, 30.0, 20.0, 10.0)
+DJF_PCTL = (5, 25, 50, 75, 95)
+
 
 # ----------------------------------------------------------------------------
 # Loading
@@ -344,6 +355,38 @@ def window_stats(years, values, lo, hi):
 def bias_target(sigma, n):
     """max(0.5 sigma, 1.96 sigma / sqrt(n)) - D5, EVALUATION_PROTOCOL.md appendix A."""
     return max(0.5 * sigma, 1.96 * sigma / np.sqrt(n))
+
+
+def first_harmonic(m12):
+    """Amplitude and phase of the annual harmonic of a 12-point climatology.
+
+    Amplitude is the harmonic's half range, so its peak-to-trough is twice this.
+    Phase is a CONTINUOUS month in [0, 12), 0 = mid-January, which is what makes it
+    scoreable at all: the argmax of the twelve points is an integer and it wraps.
+
+    Note the sign. For x_k = A cos(2 pi (k - k0) / 12) the transform returns
+    A exp(-2 pi i k0 / 12), so the phase is MINUS its angle. Getting that wrong
+    reflects the calendar about January and July - invisible for a field peaking in
+    either of those months, and wrong by up to six months for anything else.
+
+    The annual harmonic is not the whole annual march. Where the cycle carries a
+    strong semi-annual component the phase can sit a month or more from the observed
+    maximum; both upwelling diagnostics do. Report the observed argmax alongside.
+    """
+    k = np.arange(12)
+    c = 2.0 / 12.0 * np.sum(np.asarray(m12, float) * np.exp(-2j * np.pi * k / 12.0))
+    return float(abs(c)), float((-np.angle(c) / (2 * np.pi) * 12.0) % 12.0)
+
+
+def wrap_months(d):
+    """Wrap a month difference into [-6, +6)."""
+    return (np.asarray(d, float) + 6.0) % 12.0 - 6.0
+
+
+def circ_mean_months(ph):
+    """Circular mean of phases given in months, in [0, 12)."""
+    a = np.asarray(ph, float) / 12.0 * 2 * np.pi
+    return float((np.angle(np.mean(np.exp(1j * a))) / (2 * np.pi) * 12.0) % 12.0)
 
 
 def ratio_window(n, n_ref, per_year=1.0):
