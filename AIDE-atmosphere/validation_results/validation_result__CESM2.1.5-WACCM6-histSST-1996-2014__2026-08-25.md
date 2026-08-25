@@ -104,17 +104,6 @@ The gate is on the profile divided by its own vertical mean, which cancels a mul
 | R1 wave->vortex | -0.936 | -1.345 | -1.287 – -0.622 | **FAIL** |
 | R2 thermal wind | -2.062 | -2.194 | -2.529 – -1.491 | PASS |
 
-## Trends, and whether n = 19 resolves them
-
-| Trend, per decade | Anchor | Climate model | 1.96σ at this n | Resolvable |
-|---|---|---|---|---|
-| Mass flux, 70 hPa | +0.1945 | +0.0913 | ±0.1766 | yes |
-| w*, 10S-10N | +0.0058 | +0.0019 | ±0.0120 | no |
-| Vortex NH, DJF | +0.5984 | +0.1847 | ±4.9973 | no |
-| Vortex SH, JJA | +0.3511 | +0.9590 | ±2.0039 | no |
-| Polar cap T, NH | -0.5616 | +0.2432 | ±1.7122 | no |
-| Polar cap T, SH | +0.3004 | +1.6134 | ±1.6436 | no |
-
 ## Flags
 
 | Check | Reading |

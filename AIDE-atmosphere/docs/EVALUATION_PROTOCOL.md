@@ -9,7 +9,7 @@ Every number below is transcribed from `output/16_anchors_45yr.json`, produced b
 `scripts/16_anchors_45yr.py`. **Both tiers are anchored on CESM 1970–2014, the whole
 record** — 44 annual years, 42 DJF and 45 JJA seasons. Nothing here has been run against an
 AIDE-WACCM rollout: these are the criteria, plus the machinery exercised on a window of
-CESM's own output (§3.5).
+CESM's own output (§3.4).
 
 The anchor uses every year the run affords, which makes σ the best estimated and the
 variance windows the tightest available. It also leaves no CESM output held back to test the
@@ -107,7 +107,7 @@ A failure still counts at any length — see the asymmetry in appendix A.
   uniform drift that no individual year is extreme enough to trip. Not a gate: at n = 5 the
   detection branch dominates so heavily that the threshold is nearly 1σ, which would pass
   almost anything (appendix A).
-- **The three shape checks of §3.5** — seasonal cycle, daily distribution, tropical w*
+- **The three shape checks of §3.4** — seasonal cycle, daily distribution, tropical w*
   profile. Computed and reported at 5 years, gated only at 35. Two reasons their passes
   cannot gate here. Their tolerances at n = 5 sit near 0.88σ for the same reason the mean's
   does, so they would pass almost anything; and adding 23 gated checks to the 30 already in
@@ -117,7 +117,7 @@ A failure still counts at any length — see the asymmetry in appendix A.
 ### What tier 1 does not do
 
 It does not **gate** on variance, the mechanism relations, the forced trend, or the shape
-checks of §3.5 — it reports the last of these and gates on none of them. Nothing at tier 1
+checks of §3.4 — it reports the last of these and gates on none of them. Nothing at tier 1
 tests the forced trend at all.
 
 > **Interpretation** — A tier-1 pass is not evidence that a configuration is good, only that
@@ -197,24 +197,7 @@ decorrelation time — against one for the annual series.
 | R1 wave → vortex, slope | −0.936 | resolvable to ±0.36 |
 | R2 thermal wind, slope | −2.062 | resolvable to ±0.57 |
 
-### 3.4 Trends
-
-| Trend, per decade | Anchor value at 35 yr | Resolvable |
-|---|---|---|
-| Mass flux, 70 hPa | +0.1945 ± 0.0706 | **yes** |
-| w̄*, 10°S–10°N | +0.0058 ± 0.0048 | **yes** |
-| Vortex NH, DJF | +0.5984 ± 1.8431 | no |
-| Vortex SH, JJA | +0.3511 ± 0.8015 | no |
-| Polar cap T, NH | −0.5616 ± 0.6315 | no |
-| Polar cap T, SH | +0.3004 ± 0.6574 | no |
-
-> **Interpretation** — The upwelling trend becoming resolvable is the main scientific reason
-> to prefer 35 years over 20: it is the quantity that made the original targets fail out of
-> sample (D9), so 35 years is the first length at which that failure can be diagnosed rather
-> than worked around. The four vortex and temperature trends stay buried in noise at any
-> rollout length this project will run — do not report them as passes.
-
-### 3.5 Shape — the annual march, the distribution, the vertical profile
+### 3.4 Shape — the annual march, the distribution, the vertical profile
 
 Everything above scores the **level** of the circulation and its **spread**. A model can pass
 both and still have the wrong shape: the right annual-mean upwelling with the annual march
@@ -287,7 +270,7 @@ normalised values are independent, since they are divided by their own mean.
 > circulation. All six levels are standard pressure levels, carried by reanalyses and model
 > archives alike, so the check needs no regridding in the vertical to score either.
 
-### 3.6 Running a validation
+### 3.5 Running a validation
 
 ```bash
 $PY scripts/17_validate.py FIRST_YEAR LAST_YEAR     # default 1996 2014
@@ -297,7 +280,7 @@ $PY scripts/18_validation_figures.py
 Writes [`../validation_results/validation_result.md`](../validation_results/)
 and seven figures beside it. Climate-model data enters through
 `17_validate.climate_model_series`, which is the one function to replace when the model is a
-model rollout rather than a window of CESM's own record — the three shape checks of §3.5 come
+model rollout rather than a window of CESM's own record — the three shape checks of §3.4 come
 through that same function, so a rollout scores everything in one pass.
 
 The committed result scores **CESM 1996–2014**: tier 1 5/6, tier 2 mean 5/6, variance 7/7,
@@ -393,14 +376,14 @@ resolution, on the same grid. Two forms of the request, depending on what the ar
 | Vortex NH, vortex SH, SSW | 10 hPa |
 | Polar cap T, both hemispheres | layer 10–50 hPa |
 | R1 heat flux (tier-2 mechanism) | 100 hPa |
-| w̄* profile (§3.5 shape) | 100, 70, 50, 30, 20, 10 hPa |
+| w̄* profile (§3.4 shape) | 100, 70, 50, 30, 20, 10 hPa |
 
 - **Pressure levels, monotonically increasing**, with the pressure of each level known
   independently of surface pressure. On CESM's hybrid grid every level above 182 hPa has
   `hybi = 0`, so interface pressure is `hyai·P0` and no `PS` is needed.
 - Interpolation onto 10, 70 and 100 hPa is **linear in ln p**. The level set must bracket
   each target, with at least one further level beyond each end of the 10–100 hPa range so
-  the centred vertical derivative is defined at the brackets. The §3.5 profile adds 20, 30
+  the centred vertical derivative is defined at the brackets. The §3.4 profile adds 20, 30
   and 50 hPa to that list; all six of its levels sit above the 182 hPa `hybi = 0` transition,
   so none needs a surface-pressure field.
 - **A grid too coarse to resolve the profile cannot be scored on it.** The 20-layer store
@@ -517,10 +500,10 @@ Those six scripts in that order, plus `aide_val_common.py` and `report_layout.py
 and `07` rebuild it from the tape in about five minutes. See the pipeline order in
 [../CLAUDE.md](../../CLAUDE.md).
 
-Sections 1 and 3 change only when `16` changes; §3.6 only when `17` or `18` changes. Do not
+Sections 1 and 3 change only when `16` changes; §3.5 only when `17` or `18` changes. Do not
 edit the tables by hand.
 
-`07` also derives the three per-year series the shape checks of §3.5 need and that exist
+`07` also derives the three per-year series the shape checks of §3.4 need and that exist
 nowhere else — the 12-month climatology of each diagnostic year by year, the tropical w̄* at
 each profile level year by year, and the per-winter DJF percentiles. They are computed at the
 tape stage on purpose, so that `16`, `17` and `18` stay JSON-only and fast.
@@ -554,7 +537,7 @@ Each is cheap to change.
 
 **Settled, 2026-08-25:**
 
-- **The three shape checks of §3.5 fold into the existing tiers** rather than forming tiers of
+- **The three shape checks of §3.4 fold into the existing tiers** rather than forming tiers of
   their own: reported at 5 years, gated at 35.
 - **The w\* profile gate is set on the normalised shape**, with the absolute per-level values
   advisory, and the height-uniformity of the grid error is assumed rather than measured. The
@@ -687,12 +670,12 @@ see appendix C.
   Recomputing w̄* at 70 hPa from coarse stores against CESM's native 70-level answer, for one
   year, gave **+2.0%** on a 20-layer grid and **+11.8%** on a 45-layer grid — the finer grid
   worse, because w̄* is a small residual of two larger terms and is sensitive to the `dθ/dz`
-  stencil. Both figures exceed the tier-2 w̄* tolerance of 3.8%, which is why §3.5 gates the
+  stencil. Both figures exceed the tier-2 w̄* tolerance of 3.8%, which is why §3.4 gates the
   normalised profile rather than the absolute one. But they are two *grids* at one *level*:
   nothing here measures whether the error is uniform in height, which is the assumption the
   normalisation rests on. It is also a single year, so it sizes the error without bounding its
   year-to-year spread.
-- **The annual harmonic is not the whole annual march.** §3.5 scores the amplitude and phase
+- **The annual harmonic is not the whole annual march.** §3.4 scores the amplitude and phase
   of the first harmonic. Where a diagnostic carries a strong semi-annual component the
   harmonic phase sits away from the observed maximum — w̄*'s harmonic peaks in December while
   its 12-point curve peaks in March — so a model could reproduce the harmonic and still have
