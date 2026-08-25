@@ -68,6 +68,34 @@ MECHANISM = [("R1 wave->vortex", "heat_flux_100", "vortex_NH", "_djf_years"),
              ("R2 thermal wind", "polar_cap_T_NH", "vortex_NH", "_djf_years")]
 
 
+first_harmonic, wrap_months = C.first_harmonic, C.wrap_months
+
+
+def phase_stats(years, ph, lo, hi):
+    """Circular-mean phase and its interannual sigma over [lo, hi], in months.
+
+    Deviations are taken about the window's own circular mean and then treated
+    linearly, which holds because the phases cluster within a few weeks. Phase
+    carries no trend term - a shift in the annual march is what it would detect.
+    """
+    m = (years >= lo) & (years <= hi)
+    p = np.asarray(ph, float)[m]
+    mu = C.circ_mean_months(p)
+    return dict(n=int(m.sum()), mean=mu,
+                sigma_used=float(wrap_months(p - mu).std(ddof=1)))
+
+
+def shape_row(years, values, lo, hi, unit):
+    """Anchor mean, sigma and the two tier tolerances for one shape quantity."""
+    A = C.window_stats(years, values, lo, hi)
+    sig = A["sigma_used"]
+    t1, t2 = C.bias_target(sig, SCREEN), C.bias_target(sig, FULL)
+    A.update(units=unit,
+             tier1_advisory_tolerance=float(t1),
+             tier2_tolerance=float(t2), tier2_in_sigma=float(t2 / sig))
+    return A
+
+
 def slope_ci(x, y, seed=20260813, n_boot=4000):
     n = min(len(x), len(y))
     x, y = x[:n], y[:n]
@@ -147,6 +175,100 @@ def main():
     print(f"  major NH SSW: {count} in {winters} winters, "
           f"{count / winters:.3f}/winter")
 
+    # ------------------------------------------------------------ shape checks
+    # Three things the mean and variance tests cannot see: the annual march, the
+    # shape of the daily distribution, and the vertical structure of the tropical
+    # upwelling. Reported at tier 1, gated at tier 2 (protocol sections 1 and 3).
+
+    # 1. seasonal cycle - amplitude and phase of the annual harmonic, fitted per
+    # year so that both carry an interannual sigma. The twelve monthly means are
+    # NOT scored individually: that would be a twelve-way multiplicity problem.
+    res["seasonal_cycle"] = {}
+    print(f"\nSHAPE 1 - seasonal cycle, annual harmonic fitted per year")
+    print(f"{'diagnostic':16s} {'amp':>10} {'amp sig':>9} {'amp t2 tol':>11} "
+          f"{'phase':>7} {'ph sig':>8} {'ph t2 tol':>10}")
+    for key, ykey, unit in SERIES:
+        y, m12 = C.join_segments(S, segs, f"_monthly_{key}", "_monthly_years")
+        m12 = np.asarray(m12, float)
+        amp = np.array([first_harmonic(r)[0] for r in m12])
+        pha = np.array([first_harmonic(r)[1] for r in m12])
+        A = shape_row(y, amp, lo, hi, unit)
+        P = phase_stats(y, pha, lo, hi)
+        pt1, pt2 = C.bias_target(P["sigma_used"], SCREEN), \
+            C.bias_target(P["sigma_used"], FULL)
+        P.update(units="months, 0 = mid-January",
+                 tier1_advisory_tolerance=float(pt1), tier2_tolerance=float(pt2))
+        sel = (y >= lo) & (y <= hi)
+        clim = m12[sel].mean(0)
+        res["seasonal_cycle"][key] = dict(
+            amplitude=A, phase=P,
+            monthly_climatology=[float(v) for v in clim],
+            # carried for transparency, not scored: where the 12-point curve
+            # actually peaks. It can sit a month or more from the annual-harmonic
+            # phase when the annual march has a strong semi-annual component,
+            # which is the case for both upwelling diagnostics.
+            month_of_max_observed=int(np.argmax(clim) + 1),
+            month_of_min_observed=int(np.argmin(clim) + 1))
+        print(f"{key:16s} {A['mean']:10.4f} {A['sigma_used']:9.4f} "
+              f"{A['tier2_tolerance']:11.4f} {P['mean']:7.2f} "
+              f"{P['sigma_used']:8.3f} {pt2:10.3f}")
+
+    # 2. daily distribution - percentiles taken WITHIN each winter, so the sample
+    # is winters and the 14-day decorrelation time never enters. Supersedes the
+    # flat 5 m/s p05/p95 row the older target table carried, which had no length.
+    res["daily_distribution"] = dict(
+        diagnostic="u 60N 10 hPa, daily DJF",
+        reduction="percentile within each winter, then across winters",
+        percentiles={})
+    wy, wq = C.join_segments(S, segs, "_djf_pctl", "_djf_pctl_years")
+    wq = np.asarray(wq, float)
+    print(f"\nSHAPE 2 - daily distribution, per-winter percentiles of u 60N")
+    print(f"{'pctl':>6} {'anchor':>9} {'sigma':>8} {'t1 tol':>8} {'t2 tol':>8}")
+    for i, q in enumerate(C.DJF_PCTL):
+        A = shape_row(wy, wq[:, i], lo, hi, "m/s")
+        res["daily_distribution"]["percentiles"][f"p{q}"] = A
+        print(f"p{q:<5d} {A['mean']:9.3f} {A['sigma_used']:8.3f} "
+              f"{A['tier1_advisory_tolerance']:8.3f} {A['tier2_tolerance']:8.3f}")
+
+    # 3. tropical w* profile. The ABSOLUTE per-level values are advisory only:
+    # appendix C records a +2.0% (20-layer) / +11.8% (45-layer) grid error on w* at
+    # 70 hPa against a tier-2 tolerance near 3.5%, so an absolute per-level target
+    # would fail a correct model on grid choice alone. What is gated is the profile
+    # divided by its own vertical mean, which cancels a multiplicative estimator
+    # bias that is uniform in height. That uniformity is ASSUMED, not measured -
+    # the two figures above are two grids at one level, not one grid at two levels.
+    res["w_star_profile"] = dict(
+        band="10S-10N", units_absolute="mm/s",
+        levels_hPa=list(C.PROFILE_LEVELS),
+        normalisation="each level divided by the same year's 6-level profile mean",
+        absolute_is_advisory=True,
+        uniformity_assumed=("the normalisation cancels a height-uniform "
+                            "multiplicative grid error; uniformity is assumed and "
+                            "unmeasured, see appendix C"),
+        levels={})
+    py, mat = None, []
+    for pl in C.PROFILE_LEVELS:
+        py, v = C.join_segments(S, segs, f"_profile_{pl:g}", "_profile_years")
+        mat.append(np.asarray(v, float))
+    mat = np.array(mat)                                   # (level, year)
+    norm = mat / mat.mean(axis=0, keepdims=True)
+    print(f"\nSHAPE 3 - tropical w* profile, 10S-10N")
+    print(f"{'hPa':>6} {'abs mean':>10} {'norm mean':>10} {'norm sig':>9} "
+          f"{'t1 tol':>8} {'t2 tol':>8}")
+    for i, pl in enumerate(C.PROFILE_LEVELS):
+        Aa = shape_row(py, mat[i], lo, hi, "mm/s")
+        An = shape_row(py, norm[i], lo, hi, "1")
+        res["w_star_profile"]["levels"][f"{pl:g}"] = dict(
+            absolute_advisory=Aa, normalised_gated=An)
+        print(f"{pl:6.0f} {Aa['mean']:10.4f} {An['mean']:10.4f} "
+              f"{An['sigma_used']:9.4f} {An['tier1_advisory_tolerance']:8.4f} "
+              f"{An['tier2_tolerance']:8.4f}")
+    imin = int(np.argmin([res["w_star_profile"]["levels"][f"{pl:g}"]
+                          ["absolute_advisory"]["mean"] for pl in C.PROFILE_LEVELS]))
+    res["w_star_profile"]["minimum_level_hPa"] = float(C.PROFILE_LEVELS[imin])
+    print(f"  profile minimum at {C.PROFILE_LEVELS[imin]:g} hPa - non-monotonic, so a "
+          f"single 70 hPa value does not constrain the vertical structure")
+
     # ----------------------------------------------------------------- mechanism
     res["mechanism"] = {}
     for tag, xk, yk, ykey in MECHANISM:
@@ -163,7 +285,7 @@ def main():
     # The thresholds themselves, at the two lengths the protocol scores at. Tier 1
     # gates individual years; only its mean row depends on the 5-year length.
     res["tiers"] = {"screen_length": SCREEN, "full_length": FULL, "mean": {},
-                    "variance": {}, "trend": {}, "mechanism": {}}
+                    "variance": {}, "mechanism": {}}
     print(f"\nTIER THRESHOLDS from this anchor - tier 1 at n = {SCREEN}, "
           f"tier 2 at n = {FULL}")
     print(f"{'diagnostic':16s} {'sigma':>8} {'t1 mean tol':>12} {'t2 mean tol':>12} "
@@ -220,18 +342,6 @@ def main():
         c = res["tiers"]["ssw_count"][tag]
         print(f"  major NH SSW over {n:2d} winters: expect {c['expected']:5.1f}, "
               f"accept {c['interval'][0]}-{c['interval'][1]}")
-
-    for key, ykey, unit in SERIES:
-        d = res["diagnostics"][key]
-        se = d["trend_se_per_decade"] * (d["n"] / FULL) ** 1.5
-        res["tiers"]["trend"][key] = dict(
-            units=unit + " per decade", trend=d["trend_per_decade"],
-            se_at_full=float(se),
-            resolvable_at_full=bool(abs(d["trend_per_decade"]) > 1.96 * se))
-        t = res["tiers"]["trend"][key]
-        print(f"  trend {key:16s} {d['trend_per_decade']:+.4f} +/- {1.96 * se:.4f} "
-              f"per decade at {FULL} yr  "
-              + ("resolvable" if t["resolvable_at_full"] else "NOT resolvable"))
 
     for tag, M in res["mechanism"].items():
         half = 0.5 * (M["ci95"][1] - M["ci95"][0])

@@ -30,6 +30,53 @@ import aide_val_common as C
 OUT = os.path.join(C.OUTDIR, "07_period_split.json")
 TRAIN, TEST = "1996-2014", "1970-1995"
 
+PROFILE_LEVELS, DJF_PCTL = C.PROFILE_LEVELS, C.DJF_PCTL
+
+
+def monthly_by_year(daily, yr, mo, min_days=20):
+    """Per-year 12-month means of each daily series.
+
+    A threshold on the seasonal cycle needs an interannual sigma, so the
+    climatology has to be resolved per year rather than pooled across the record.
+    Years with a month thinner than min_days are dropped whole.
+    """
+    years = np.array([int(y) for y in np.unique(yr)
+                      if min(np.sum((yr == y) & (mo == k)) for k in range(1, 13))
+                      >= min_days])
+    rows = {k: np.array([[np.nanmean(x[(yr == y) & (mo == m)]) for m in range(1, 13)]
+                         for y in years])
+            for k, x in daily.items()}
+    return years, rows
+
+
+def profile_by_year(wstar, p, lat, yr):
+    """Tropical 10S-10N w* at each profile level, calendar-year means, mm/s."""
+    years = np.array([int(y) for y in np.unique(yr) if np.sum(yr == y) >= 350])
+    out = {}
+    for pl in PROFILE_LEVELS:
+        b = C.band_mean(C.interp_level(wstar, p, pl, axis=1),
+                        lat, -10, 10, axis=-1) * 1e3
+        out[f"{pl:g}"] = np.array([np.nanmean(b[yr == y]) for y in years])
+    return years, out
+
+
+def winter_percentiles(x, yr, mo, min_days=81):
+    """Per-winter DJF percentiles of a daily series.
+
+    Computed within each winter rather than over the pooled days, because winters
+    are independent: the D5 rule then applies with n = winters and the 14-day
+    decorrelation time of the daily series never enters.
+    """
+    sel = C.djf_mask(mo)
+    lab = C.season_year(yr, mo)
+    years, rows = [], []
+    for y in np.unique(lab[sel]):
+        s = sel & (lab == y)
+        if s.sum() >= min_days:
+            years.append(int(y))
+            rows.append([float(np.nanpercentile(x[s], q)) for q in DJF_PCTL])
+    return np.array(years), np.array(rows)
+
 
 def diagnostics_for(seg):
     """Every scalar series this validation suite needs, for one period."""
@@ -76,6 +123,25 @@ def diagnostics_for(seg):
     # daily DJF vortex, for the daily sigma and the percentiles
     djf = C.djf_mask(mo)
     out["_u60n_djf_daily"] = u60n[djf]
+
+    # shape checks - the per-year series a threshold on the seasonal cycle, the
+    # daily distribution and the tropical w* profile needs. Derived here because
+    # this is the tape stage; 16, 17 and 18 stay JSON-only and take seconds.
+    daily = {"mass_flux": mflux, "w_star": w70 * 1e3, "vortex_NH": u60n,
+             "vortex_SH": u60s, "polar_cap_T_NH": tcapN, "polar_cap_T_SH": tcapS}
+    my, mrows = monthly_by_year(daily, yr, mo)
+    out["_monthly_years"] = my
+    for k, v in mrows.items():
+        out[f"_monthly_{k}"] = v
+
+    py, prof = profile_by_year(wstar, p, lat, yr)
+    out["_profile_years"] = py
+    for k, v in prof.items():
+        out[f"_profile_{k}"] = v
+
+    wy, pct = winter_percentiles(u60n, yr, mo)
+    out["_djf_pctl_years"] = wy
+    out["_djf_pctl"] = pct
 
     # SSW
     ssw = C.detect_ssw_cp07(u60n, yr, mo, dy, "NH")
