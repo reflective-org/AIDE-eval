@@ -317,43 +317,60 @@ def fig_seasonal(A, res):
 
 
 # ------------------------------------------------------- shape: daily distribution
-def fig_daily_distribution(A, res):
-    tau = A["daily_DJF_u60N"]["tau_days"]
-    fig = newfig(9.6, 5.6, "Tier 2 shape — the daily distribution",
-                 "Percentiles of daily u at 60°N, 10 hPa, taken within each DJF "
-                 "winter and then averaged across winters. Left: the ladder, with "
-                 "the anchor's tolerance as a bar. Right: the offsets.",
-                 f"the per-winter reduction is the point. Winters are independent, "
-                 f"so the sample is winters and the {tau:.0f}-day decorrelation time "
-                 f"of the daily series never enters. A model that has smoothed away "
-                 f"its own weather shows p5 too high and p95 too low at once, which "
-                 f"no test of the mean can see.")
-    gs = fig.add_gridspec(1, 2, wspace=0.30, width_ratios=[1.0, 1.0])
-    qs = list(A["daily_distribution"]["percentiles"].keys())
+def fig_daily_distribution(A, res, S, segs):
+    a = A["daily_DJF_u60N"]
+    m = res["tier2_variance"]["daily_DJF_u60N"]
+    lo, hi = res["climate_model_period"]
 
-    ax = style(fig.add_subplot(gs[0, 0]), "the winter-percentile ladder")
-    xs = np.arange(len(qs))
-    a_mu = [res["shape_daily_distribution"][q]["anchor"] for q in qs]
-    t_mu = [res["shape_daily_distribution"][q]["climate_model"] for q in qs]
-    tol = [res["shape_daily_distribution"][q]["tolerance"] for q in qs]
-    ax.errorbar(xs - 0.08, a_mu, yerr=tol, fmt="o", color=MUTED, ms=5, capsize=4,
-                lw=1.1, label="anchor ± tolerance")
-    ax.plot(xs + 0.08, t_mu, "s", color=BLUE, ms=5, label="climate model")
-    ax.set_xticks(xs); ax.set_xticklabels(qs, fontsize=7)
-    ax.set_ylabel("u 60°N, 10 hPa  (m s⁻¹)", color=INK2, fontsize=8)
-    ax.legend(fontsize=6.5, frameon=False, loc="upper left")
+    anchor = np.array(sum((S[s]["_u60n_djf_daily"] for s in segs), []), float)
+    # Same rule 17 applies: the daily series carries no year labels, so it can only
+    # be subset when the window covers whole segments. 17 has already decided that,
+    # so follow its verdict rather than re-deriving it.
+    model = None
+    if m.get("available", True):
+        model = np.array(sum((S[s]["_u60n_djf_daily"] for s in segs
+                              if np.asarray(S[s]["_annual_years"], float).min() >= lo
+                              and np.asarray(S[s]["_annual_years"], float).max() <= hi),
+                             []), float)
 
-    ax2 = style(fig.add_subplot(gs[0, 1]), "offsets")
-    keys = qs[::-1]
-    offs = [res["shape_daily_distribution"][q]["offset_in_sigma"] for q in keys]
-    for i, q in enumerate(keys):
-        _offset_row(ax2, i, res["shape_daily_distribution"][q])
-    _tolerance_axis(ax2, offs, "offset from the anchor, in anchor σ", len(keys))
-    ax2.set_yticks(range(len(keys)))
-    ax2.set_yticklabels(keys, fontsize=7.5, color=INK)
+    fig = newfig(8.4, 5.0, "Tier 2 shape — the daily distribution",
+                 f"Every DJF day of u at 60°N, 10 hPa: {len(anchor)} anchor days in "
+                 f"grey, the climate model outlined in blue. Densities, so the two "
+                 f"are comparable at different lengths.",
+                 "the width is the point. A model that has smoothed away its own "
+                 "weather is narrow here while its mean and its seasonal cycle stay "
+                 "right. What is scored is the five per-winter percentiles, in the "
+                 "report table; this is what they summarise.")
+    ax = style(fig.add_subplot(111), None,
+               f"σ ratio {m['ratio']:.2f} · window {m['window'][0]:.2f}–"
+               f"{m['window'][1]:.2f} · "
+               f"{'PASS' if m.get('passes') else 'n/a'}"
+               if m.get("available", True) else
+               "climate-model days unavailable: window is not segment-aligned")
 
-    fig.subplots_adjust(left=0.085, right=0.975, top=fig.text_bottom - 0.035,
-                        bottom=0.115)
+    span = (anchor.min(), anchor.max()) if model is None else (
+        min(anchor.min(), model.min()), max(anchor.max(), model.max()))
+    bins = np.linspace(span[0], span[1], 46)
+    ax.hist(anchor, bins=bins, density=True, color=RULE, lw=0,
+            label=f"anchor CESM {res['anchor_period']}")
+    if model is not None:
+        ax.hist(model, bins=bins, density=True, histtype="step", color=BLUE,
+                lw=1.5, label=f"climate model {lo}–{hi}")
+    for v, c, ls in ((a["p05"], MUTED, (0, (3, 3))), (a["p95"], MUTED, (0, (3, 3)))):
+        ax.axvline(v, color=c, lw=0.9, ls=ls)
+    ax.annotate(f"anchor p5 {a['p05']:.1f}", (a["p05"], 1.0),
+                xycoords=("data", "axes fraction"), textcoords="offset points",
+                xytext=(3, -9), color=MUTED, fontsize=7)
+    ax.annotate(f"p95 {a['p95']:.1f}", (a["p95"], 1.0),
+                xycoords=("data", "axes fraction"), textcoords="offset points",
+                xytext=(3, -9), color=MUTED, fontsize=7)
+    ax.set_xlabel("u 60°N, 10 hPa, daily DJF  (m s⁻¹)", color=INK2, fontsize=8)
+    ax.set_ylabel("density", color=INK2, fontsize=8)
+    lg = ax.legend(frameon=False, fontsize=7, loc="upper left")
+    for t in lg.get_texts():
+        t.set_color(INK2)
+    fig.subplots_adjust(left=0.105, right=0.965, top=fig.text_bottom - 0.075,
+                        bottom=0.135)
     footer(fig, res)
     save(fig, "shape_daily_distribution.png", res["stamp"])
 
@@ -445,7 +462,7 @@ def main():
     fig_variance(A, res)
     fig_counts(A, res)
     fig_seasonal(A, res)
-    fig_daily_distribution(A, res)
+    fig_daily_distribution(A, res, S, segs)
     fig_w_star_profile(A, res)
 
 

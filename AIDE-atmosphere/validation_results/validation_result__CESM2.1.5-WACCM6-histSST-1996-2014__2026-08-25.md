@@ -138,7 +138,7 @@ The gate is on the profile divided by its own vertical mean, which cancels a mul
 | [tier2_variance__CESM2.1.5-WACCM6-histSST-1996-2014__2026-08-25.png](tier2_variance__CESM2.1.5-WACCM6-histSST-1996-2014__2026-08-25.png) | tier 2 variance — σ ratios against their 95% windows, interannual and daily |
 | [counts_and_relations__CESM2.1.5-WACCM6-histSST-1996-2014__2026-08-25.png](counts_and_relations__CESM2.1.5-WACCM6-histSST-1996-2014__2026-08-25.png) | major NH SSW count against the Poisson interval implied by the anchor rate |
 | [shape_seasonal__CESM2.1.5-WACCM6-histSST-1996-2014__2026-08-25.png](shape_seasonal__CESM2.1.5-WACCM6-histSST-1996-2014__2026-08-25.png) | seasonal cycle — the 12-month climatology of each diagnostic |
-| [shape_daily_distribution__CESM2.1.5-WACCM6-histSST-1996-2014__2026-08-25.png](shape_daily_distribution__CESM2.1.5-WACCM6-histSST-1996-2014__2026-08-25.png) | daily distribution — per-winter percentiles of u at 60°N against the anchor |
+| [shape_daily_distribution__CESM2.1.5-WACCM6-histSST-1996-2014__2026-08-25.png](shape_daily_distribution__CESM2.1.5-WACCM6-histSST-1996-2014__2026-08-25.png) | daily distribution — every DJF day of u at 60°N, climate model against the anchor |
 | [shape_w_star_profile__CESM2.1.5-WACCM6-histSST-1996-2014__2026-08-25.png](shape_w_star_profile__CESM2.1.5-WACCM6-histSST-1996-2014__2026-08-25.png) | tropical w* profile — absolute (advisory) and normalised (gated) |
 
 Figures are written by `scripts/18_validation_figures.py`, from the same two JSON files as the tables above.

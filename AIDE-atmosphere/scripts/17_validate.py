@@ -77,7 +77,8 @@ FIGURES = [
     ("shape_seasonal.png",
      "seasonal cycle — the 12-month climatology of each diagnostic"),
     ("shape_daily_distribution.png",
-     "daily distribution — per-winter percentiles of u at 60°N against the anchor"),
+     "daily distribution — every DJF day of u at 60°N, climate model against the "
+     "anchor"),
     ("shape_w_star_profile.png",
      "tropical w* profile — absolute (advisory) and normalised (gated)"),
 ]
