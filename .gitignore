@@ -5,6 +5,9 @@ logs/
 # Local environment - 425 MB, rebuild from requirements.txt
 .AIDE-eval_env/
 
+# ERA5 download environment - rebuild from AIDE-atmosphere/era5_requirements.txt
+AIDE-atmosphere/era5_env/
+
 # Python
 __pycache__/
 *.pyc
