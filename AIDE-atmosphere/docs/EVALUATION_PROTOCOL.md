@@ -284,8 +284,8 @@ normalised values are independent, since they are divided by their own mean.
 > that is **uniform in height**, and that uniformity is assumed, not measured: the two figures
 > above are two grids at one level, not one grid at two levels. Until it is measured, treat a
 > profile-shape failure as a reason to check the grid before concluding anything about the
-> circulation. Every level here is in the ERA5 request of `19_era5_probe.py`, so the check
-> needs no vertical regridding to score a reanalysis.
+> circulation. All six levels are standard pressure levels, carried by reanalyses and model
+> archives alike, so the check needs no regridding in the vertical to score either.
 
 ### 3.6 Running a validation
 

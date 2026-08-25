@@ -80,10 +80,10 @@ ILEV_SLICE = slice(20, 61)
 # the per-year series from the tape, and 16, which sets the thresholds - keeping
 # them here is what stops the two disagreeing about levels or percentiles.
 #
-# Every profile level is in the ERA5 request in 19_era5_probe.py, so the profile
-# is scoreable against the reanalysis with no vertical regridding, and all six sit
-# above the 181.9 hPa pure-pressure transition, so none needs a surface-pressure
-# field or touches the below-surface sentinel.
+# All six profile levels are standard pressure levels, carried by reanalyses and
+# model archives alike, so the profile is scoreable without regridding in the
+# vertical. All six also sit above the 181.9 hPa pure-pressure transition, so none
+# needs a surface-pressure field or touches the below-surface sentinel.
 PROFILE_LEVELS = (100.0, 70.0, 50.0, 30.0, 20.0, 10.0)
 DJF_PCTL = (5, 25, 50, 75, 95)
 
