@@ -65,7 +65,7 @@ Authoritative outputs: `output/16_anchors_45yr.json` (the thresholds, both tiers
 CESM 1970–2014) and `output/17_validation__<stamp>.json` (a scored climate model).
 The protocol is `docs/EVALUATION_PROTOCOL.md`, and it is self-contained — thresholds,
 derivation (appendix A), decisions (appendix B) and limitations (appendix C) in one file.
-`validation_results/` holds a scored climate model as `validation_result__<stamp>.md` plus five figures,
+`validation_results/` holds a scored climate model as `validation_result__<stamp>.md` plus four figures,
 all generated from the same JSON, so they cannot drift apart.
 
 The repo was trimmed to this protocol on 2026-08-19. Removed and **not retained**: the

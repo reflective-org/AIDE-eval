@@ -9,7 +9,7 @@ Every number below is transcribed from `output/16_anchors_45yr.json`, produced b
 `scripts/16_anchors_45yr.py`. **Both tiers are anchored on CESM 1970–2014, the whole
 record** — 44 annual years, 42 DJF and 45 JJA seasons. Nothing here has been run against an
 AIDE-WACCM rollout: these are the criteria, plus the machinery exercised on a window of
-CESM's own output (§3.5).
+CESM's own output (§3.4).
 
 The anchor uses every year the run affords, which makes σ the best estimated and the
 variance windows the tightest available. It also leaves no CESM output held back to test the
@@ -185,24 +185,7 @@ decorrelation time — against one for the annual series.
 | R1 wave → vortex, slope | −0.936 | resolvable to ±0.36 |
 | R2 thermal wind, slope | −2.062 | resolvable to ±0.57 |
 
-### 3.4 Trends
-
-| Trend, per decade | Anchor value at 35 yr | Resolvable |
-|---|---|---|
-| Mass flux, 70 hPa | +0.1945 ± 0.0706 | **yes** |
-| w̄*, 10°S–10°N | +0.0058 ± 0.0048 | **yes** |
-| Vortex NH, DJF | +0.5984 ± 1.8431 | no |
-| Vortex SH, JJA | +0.3511 ± 0.8015 | no |
-| Polar cap T, NH | −0.5616 ± 0.6315 | no |
-| Polar cap T, SH | +0.3004 ± 0.6574 | no |
-
-> **Interpretation** — The upwelling trend becoming resolvable is the main scientific reason
-> to prefer 35 years over 20: it is the quantity that made the original targets fail out of
-> sample (D9), so 35 years is the first length at which that failure can be diagnosed rather
-> than worked around. The four vortex and temperature trends stay buried in noise at any
-> rollout length this project will run — do not report them as passes.
-
-### 3.5 Running a validation
+### 3.4 Running a validation
 
 ```bash
 $PY scripts/17_validate.py FIRST_YEAR LAST_YEAR     # default 1996 2014
@@ -210,7 +193,7 @@ $PY scripts/18_validation_figures.py
 ```
 
 Writes [`../validation_results/validation_result.md`](../validation_results/)
-and five figures beside it, one per test family. Climate-model data enters through
+and four figures beside it, one per test family. Climate-model data enters through
 `17_validate.climate_model_series`, which is the one function to replace when the model is a
 model rollout rather than a window of CESM's own record.
 
@@ -424,11 +407,11 @@ Those six scripts in that order, plus `aide_val_common.py` and `report_layout.py
 and `07` rebuild it from the tape in about five minutes. See the pipeline order in
 [../CLAUDE.md](../../CLAUDE.md).
 
-Sections 1 and 3 change only when `16` changes; §3.5 only when `17` or `18` changes. Do not
+Sections 1 and 3 change only when `16` changes; §3.4 only when `17` or `18` changes. Do not
 edit the tables by hand.
 
 Every scored result is stamped `__<climate model>__<production date>`, so the report, its
-five figures and the JSON behind them carry the name of what was scored and the day it was
+four figures and the JSON behind them carry the name of what was scored and the day it was
 produced. `18` takes the stamp from `17`'s JSON rather than recomputing it, so a run that
 crosses midnight cannot split its own figures from its report.
 
@@ -459,7 +442,7 @@ Each is cheap to change.
 1. **Tier 1 gates on individual years only**, with the 5-year mean advisory. The brief
    specified individual years; the mean check was added here and can be dropped or promoted
    to a gate.
-2. **SSW count, mechanism slopes and trends are reported at tier 2** although the brief
+2. **SSW count and mechanism slopes are reported at tier 2** although the brief
    specified mean and variance. They are part of the existing target set and become
    resolvable at this length, so they are included and flagged rather than omitted.
 
@@ -555,7 +538,7 @@ see appendix C.
 
 - §4 — the fields, resolution and grid a model must supply to be scored
 - [../validation_results/validation_result.md](../validation_results/) —
-  a scored climate model, with the five figures beside it
+  a scored climate model, with the four figures beside it
 - [../stale/README.md](../stale/README.md) — the split-anchor material §2 cites
 - Appendix A — where `0.5σ` and `1.96σ/√n` come from
 - Appendix B — the decisions cited above by number
