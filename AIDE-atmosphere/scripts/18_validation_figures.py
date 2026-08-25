@@ -167,13 +167,7 @@ def fig_mean(A, res):
         ax.axvline(x, color=AQUA, lw=0.9, ls=(0, (4, 3)))
     ax.axvline(0, color=MUTED, lw=0.8)
     for i, k in enumerate(keys):
-        m = res["tier2_mean"][k]
-        c = PASS if m["passes"] else FAIL
-        ax.plot([0, m["offset_in_sigma"]], [i, i], color=c, lw=1.2, alpha=0.5)
-        ax.plot(m["offset_in_sigma"], i, "o", ms=8, color=c, mec="none")
-        ax.annotate(f"{m['offset_in_sigma']:+.2f}σ",
-                    (m["offset_in_sigma"], i), textcoords="offset points",
-                    xytext=(0, 11), ha="center", color=c, fontsize=7.5)
+        _offset_row(ax, i, res["tier2_mean"][k])
     ax.set_yticks(range(len(keys)))
     ax.set_yticklabels(labels, fontsize=8, color=INK)
     ax.set_xlabel("offset from the anchor mean, in anchor σ", color=INK2, fontsize=8)
@@ -291,12 +285,18 @@ def fig_counts(A, res, S, segs):
 MONTH_INITIALS = "JFMAMJJASOND"
 
 
-def _offset_row(ax, i, off, ok, fmt="{:+.2f}σ"):
-    c = PASS if ok else FAIL
+def _offset_row(ax, i, d, fmt="{:+.2f}σ"):
+    """One offset marker. Advisory checks are drawn grey and hollow: their
+    tolerance is below the n = 15.4 crossover, so neither colour would be honest."""
+    off = d["offset_in_sigma"]
+    adv = d.get("advisory")
+    c = MUTED if adv else (PASS if d["passes"] else FAIL)
     ax.plot([0, off], [i, i], color=c, lw=1.2, alpha=0.5)
-    ax.plot(off, i, "o", ms=8, color=c, mec="none")
-    ax.annotate(fmt.format(off), (off, i), textcoords="offset points",
-                xytext=(0, 11), ha="center", color=c, fontsize=7.5)
+    ax.plot(off, i, "o", ms=8, color=c, mec=c,
+            mfc="none" if adv else c, mew=1.4 if adv else 0)
+    ax.annotate(fmt.format(off) + ("  advisory" if adv else ""), (off, i),
+                textcoords="offset points", xytext=(0, 11), ha="center",
+                color=c, fontsize=7.5)
 
 
 def _tolerance_axis(ax, offsets, xlabel, n):
@@ -342,8 +342,7 @@ def fig_seasonal(A, res):
         keys = [k for k, *_ in SERIES][::-1]
         offs = [res["shape_seasonal"][k][which]["offset_in_sigma"] for k in keys]
         for i, k in enumerate(keys):
-            d = res["shape_seasonal"][k][which]
-            _offset_row(ax, i, d["offset_in_sigma"], d["passes"])
+            _offset_row(ax, i, res["shape_seasonal"][k][which])
         _tolerance_axis(ax, offs, "offset from the anchor, in anchor σ", len(keys))
         # ticks on the right: on the left they run back into the climatology column
         ax.yaxis.tick_right()
@@ -399,8 +398,7 @@ def fig_daily_distribution(A, res):
     keys = qs[::-1]
     offs = [res["shape_daily_distribution"][q]["offset_in_sigma"] for q in keys]
     for i, q in enumerate(keys):
-        d = res["shape_daily_distribution"][q]
-        _offset_row(ax2, i, d["offset_in_sigma"], d["passes"])
+        _offset_row(ax2, i, res["shape_daily_distribution"][q])
     _tolerance_axis(ax2, offs, "offset from the anchor, in anchor σ", len(keys))
     ax2.set_yticks(range(len(keys)))
     ax2.set_yticklabels(keys, fontsize=7.5, color=INK)
@@ -455,8 +453,7 @@ def fig_w_star_profile(A, res):
     rk = keys[::-1]
     offs = [L[k]["normalised"]["offset_in_sigma"] for k in rk]
     for i, k in enumerate(rk):
-        d = L[k]["normalised"]
-        _offset_row(ax3, i, d["offset_in_sigma"], d["passes"])
+        _offset_row(ax3, i, L[k]["normalised"])
     _tolerance_axis(ax3, offs, "offset from the anchor, in anchor σ", len(rk))
     ax3.set_yticks(range(len(rk)))
     ax3.set_yticklabels([f"{k} hPa" for k in rk], fontsize=7.5, color=INK)

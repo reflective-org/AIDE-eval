@@ -357,6 +357,35 @@ def bias_target(sigma, n):
     return max(0.5 * sigma, 1.96 * sigma / np.sqrt(n))
 
 
+# Where the two branches of bias_target cross: 0.5 = 1.96/sqrt(n) at n = 15.37.
+# Below it the tolerance is set by what the sample can resolve rather than by what
+# the physics tolerates, so a pass says only "too short to tell" and must not be
+# reported as a gate. 17_validate marks such a check advisory.
+CROSSOVER_N = (1.96 / 0.5) ** 2
+
+
+def is_advisory(n):
+    """True when n is below the detection crossover, so a PASS cannot be trusted."""
+    return bool(n < CROSSOVER_N)
+
+
+def verdict_flags(offset, tolerance, n):
+    """(passes, advisory) for one tolerance comparison.
+
+    The two verdicts are not symmetric below the crossover, and conflating them
+    would hide real problems. Exceeding a detection-limited tolerance means the
+    discrepancy is larger than sampling noise could produce at 95% confidence, so
+    a FAIL is meaningful at any n and always counts. A PASS is not: below the
+    crossover it cannot separate "inside 0.5 sigma" from "outside 0.5 sigma but
+    unresolvable at this length", so it says only *too short to tell*.
+
+    Hence advisory marks a pass that could not have failed informatively - never
+    a failure.
+    """
+    ok = bool(abs(offset) <= tolerance)
+    return ok, bool(ok and is_advisory(n))
+
+
 def first_harmonic(m12):
     """Amplitude and phase of the annual harmonic of a 12-point climatology.
 

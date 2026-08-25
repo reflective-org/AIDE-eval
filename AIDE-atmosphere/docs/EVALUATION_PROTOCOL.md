@@ -98,16 +98,21 @@ screening run**. For a model that is perfect and merely Gaussian:
 
 ### Advisory, not gating, at tier 1
 
+This is **enforced by the report, not left to the reader**: any check whose tolerance sits
+below the n = 15.4 crossover and which would otherwise pass is marked `advisory`, printed as
+`advisory` rather than `PASS`, and excluded from every total, with the number excluded stated.
+A failure still counts at any length — see the asymmetry in appendix A.
+
 - **The 5-year mean**, held to `max(0.5σ, 1.96σ/√5) = 0.877σ`. Logged because it catches a
   uniform drift that no individual year is extreme enough to trip. Not a gate: at n = 5 the
   detection branch dominates so heavily that the threshold is nearly 1σ, which would pass
   almost anything (appendix A).
 - **The three shape checks of §3.5** — seasonal cycle, daily distribution, tropical w*
-  profile. Computed and reported at 5 years, gated only at 35. Two reasons they cannot gate
-  here. Their tolerances at n = 5 sit near 0.88σ for the same reason the mean's does, so they
-  would pass almost anything; and adding 22 gated checks to the 30 already in the per-year
-  band would multiply the false-alarm budget below, which is the one thing a screening gate
-  must not do.
+  profile. Computed and reported at 5 years, gated only at 35. Two reasons their passes
+  cannot gate here. Their tolerances at n = 5 sit near 0.88σ for the same reason the mean's
+  does, so they would pass almost anything; and adding 23 gated checks to the 30 already in
+  the per-year band would multiply the false-alarm budget below, which is the one thing a
+  screening gate must not do.
 
 ### What tier 1 does not do
 
@@ -602,6 +607,29 @@ than the run length can resolve. The branches cross where `0.5 = 1.96/√n`, i.e
 (1.96/0.5)² = 15.4 years**: below that, detection binds; above it, tolerance binds. This is
 why tier 1's 5-year mean threshold is 0.877σ and therefore advisory (§1), and why tier 2 at
 35 years gets the full-strength 0.5σ on every diagnostic (§3.1).
+
+### Pass and fail are not symmetric below the crossover
+
+Where detection binds, the two verdicts carry different amounts of information, and
+`17_validate.py` treats them differently.
+
+| Below n = 15.4 | Means | Treated as |
+|---|---|---|
+| \|offset\| **>** tolerance | the discrepancy is larger than sampling noise could produce at 95%, *and* larger than 0.5σ | a real **FAIL**, counted |
+| \|offset\| **≤** tolerance | cannot separate "inside 0.5σ" from "outside 0.5σ but unresolvable at this length" | **advisory**, not counted |
+
+So a short run can still fail informatively; what it cannot do is pass informatively. Every
+check whose threshold comes from this rule is marked `advisory` in the JSON and printed as
+`advisory` rather than `PASS` when its n falls below the crossover **and** it would otherwise
+have passed. Advisory checks are excluded from every total in the report, and the report says
+how many were excluded, so a 5-year run cannot present itself as a 35-year validation.
+
+> **Interpretation** — this is the equivalence-testing shape: the tolerance is the
+> equivalence bound, and a comparison too noisy to place the estimate relative to that bound
+> is inconclusive rather than passing. The σ-ratio windows of §3.2 are *not* covered by this
+> flag — they have their own precedent in D7, which retires the interannual ratio at n = 10
+> because its window is uselessly wide, and that is a judgement about window width rather
+> than about this crossover.
 
 ## Appendix B · Decisions cited above
 

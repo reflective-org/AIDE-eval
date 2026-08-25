@@ -84,6 +84,23 @@ FIGURES = [
 ]
 
 
+def mark(d):
+    """PASS / FAIL for a gated check; `advisory` where n cannot support a gate.
+
+    A tolerance below the n = 15.4 crossover is set by what the sample resolves,
+    not by what the physics tolerates, so its verdict carries no information and
+    is neither reported as a pass nor counted (appendix A).
+    """
+    if d.get("advisory"):
+        return "advisory"
+    return "PASS" if d["passes"] else "FAIL"
+
+
+def gated(values):
+    """The `passes` flags of the checks that actually gate, advisory ones dropped."""
+    return [v["passes"] for v in values if not v.get("advisory")]
+
+
 def climate_model_series(ps, lo, hi):
     """The climate model's scalar series, one entry per diagnostic key.
 
@@ -215,14 +232,15 @@ def main():
             binding_branch=("0.5 sigma" if 0.5 * sig >= 1.96 * sig / np.sqrt(n)
                             else "detection"),
             climate_model_mean=T["mean"], offset=float(off),
-            offset_in_sigma=float(off / sig), passes=bool(abs(off) <= tol))
+            offset_in_sigma=float(off / sig),
+            **dict(zip(("passes", "advisory"), C.verdict_flags(off, tol, n))))
         res["tier2_variance"][key] = dict(
             climate_model_sigma=T["sigma_used"], climate_model_detrended=T["detrended"],
             ratio=float(ratio), window=[rlo, rhi],
             passes=bool(rlo <= ratio <= rhi))
         m, vr = res["tier2_mean"][key], res["tier2_variance"][key]
         print(f"  {label:20s} mean {m['offset_in_sigma']:+5.2f}s / "
-              f"{m['tolerance_in_sigma']:.2f}s  {'PASS' if m['passes'] else 'FAIL'}"
+              f"{m['tolerance_in_sigma']:.2f}s  {mark(m)}"
               f"   sigma ratio {vr['ratio']:.2f} "
               f"[{vr['window'][0]:.2f},{vr['window'][1]:.2f}] "
               f"{'pass' if vr['passes'] else 'FAIL'}")
@@ -280,17 +298,19 @@ def main():
             amplitude=dict(anchor=ma, sigma=sa, climate_model=float(amp.mean()),
                            tolerance=float(tol_a), offset=off_a,
                            offset_in_sigma=float(off_a / sa),
-                           passes=bool(abs(off_a) <= tol_a)),
+                           **dict(zip(("passes", "advisory"),
+                                      C.verdict_flags(off_a, tol_a, n)))),
             phase=dict(units="months, 0 = mid-January", anchor=mp, sigma=sp,
                        climate_model=C.circ_mean_months(pha),
                        tolerance=float(tol_p), offset=off_p,
                        offset_in_sigma=float(off_p / sp),
-                       passes=bool(abs(off_p) <= tol_p)))
+                       **dict(zip(("passes", "advisory"),
+                                  C.verdict_flags(off_p, tol_p, n)))))
         r = res["shape_seasonal"][key]
         print(f"  {label:20s} amp {r['amplitude']['offset_in_sigma']:+5.2f}s "
-              f"{'PASS' if r['amplitude']['passes'] else 'FAIL'}   "
+              f"{mark(r['amplitude']):>8}   "
               f"phase {r['phase']['offset_in_sigma']:+5.2f}s "
-              f"{'PASS' if r['phase']['passes'] else 'FAIL'}")
+              f"{mark(r['phase']):>8}")
 
     res["shape_daily_distribution"] = {}
     ywq, wq = cm["_djf_pctl"]
@@ -304,10 +324,10 @@ def main():
             units="m/s", anchor=a["mean"], sigma=a["sigma_used"], n=int(n),
             climate_model=float(v.mean()), tolerance=float(tol), offset=off,
             offset_in_sigma=float(off / a["sigma_used"]),
-            passes=bool(abs(off) <= tol))
+            **dict(zip(("passes", "advisory"), C.verdict_flags(off, tol, n))))
         r = res["shape_daily_distribution"][f"p{q}"]
         print(f"  {'u 60N DJF p' + str(q):20s} {r['offset_in_sigma']:+5.2f}s / "
-              f"{tol / a['sigma_used']:.2f}s  {'PASS' if r['passes'] else 'FAIL'}")
+              f"{tol / a['sigma_used']:.2f}s  {mark(r)}")
 
     res["shape_w_star_profile"] = dict(
         normalisation=A["w_star_profile"]["normalisation"],
@@ -325,13 +345,14 @@ def main():
                             climate_model=float(norm[i].mean()),
                             tolerance=float(tol), offset=off,
                             offset_in_sigma=float(off / an["sigma_used"]),
-                            passes=bool(abs(off) <= tol)),
+                            **dict(zip(("passes", "advisory"),
+                                       C.verdict_flags(off, tol, n)))),
             absolute_advisory=dict(units="mm/s", anchor=aa["mean"],
                                    climate_model=float(mat[i].mean()),
                                    offset=float(mat[i].mean() - aa["mean"])))
         r = res["shape_w_star_profile"]["levels"][f"{pl:g}"]["normalised"]
         print(f"  {'w* ' + f'{pl:g}' + ' hPa norm':20s} {r['offset_in_sigma']:+5.2f}s / "
-              f"{tol / an['sigma_used']:.2f}s  {'PASS' if r['passes'] else 'FAIL'}")
+              f"{tol / an['sigma_used']:.2f}s  {mark(r)}")
 
     # ------------------------------------------------------------------ counts
     s = A["ssw_NH"]
@@ -361,14 +382,20 @@ def main():
               f"{'PASS' if r['passes'] else 'FAIL'}")
 
     # ------------------------------------------------------------------ totals
+    # Advisory checks are excluded from every tally: below the n = 15.4 crossover a
+    # tolerance measures the sample, not the model, so counting it would inflate the
+    # score with checks that nothing could fail.
     t1 = [v["passes"] for v in res["tier1"].values()]
-    t2m = [v["passes"] for v in res["tier2_mean"].values()]
+    t2m = gated(res["tier2_mean"].values())
     t2v = [v["passes"] for v in res["tier2_variance"].values() if "passes" in v]
-    shape = ([v["amplitude"]["passes"] for v in res["shape_seasonal"].values()]
-             + [v["phase"]["passes"] for v in res["shape_seasonal"].values()]
-             + [v["passes"] for v in res["shape_daily_distribution"].values()]
-             + [v["normalised"]["passes"]
-                for v in res["shape_w_star_profile"]["levels"].values()])
+    shape_all = ([v["amplitude"] for v in res["shape_seasonal"].values()]
+                 + [v["phase"] for v in res["shape_seasonal"].values()]
+                 + list(res["shape_daily_distribution"].values())
+                 + [v["normalised"]
+                    for v in res["shape_w_star_profile"]["levels"].values()])
+    shape = gated(shape_all)
+    n_adv = sum(1 for v in shape_all if v.get("advisory")) \
+        + sum(1 for v in res["tier2_mean"].values() if v.get("advisory"))
     res["summary"] = dict(
         tier1_pass=int(sum(t1)), tier1_total=len(t1),
         tier2_mean_pass=int(sum(t2m)), tier2_mean_total=len(t2m),
@@ -376,13 +403,16 @@ def main():
         ssw_pass=res["counts"]["ssw_NH"]["passes"],
         mechanism_pass=int(sum(v["passes"] for v in res["mechanism"].values())),
         mechanism_total=len(res["mechanism"]),
-        shape_pass=int(sum(shape)), shape_total=len(shape))
+        shape_pass=int(sum(shape)), shape_total=len(shape),
+        advisory_not_counted=int(n_adv),
+        crossover_n=float(C.CROSSOVER_N))
     S = res["summary"]
     print(f"\n  tier 1 {S['tier1_pass']}/{S['tier1_total']}   "
           f"tier 2 mean {S['tier2_mean_pass']}/{S['tier2_mean_total']}   "
           f"tier 2 variance {S['tier2_variance_pass']}/{S['tier2_variance_total']}   "
           f"mechanism {S['mechanism_pass']}/{S['mechanism_total']}   "
-          f"shape {S['shape_pass']}/{S['shape_total']}")
+          f"shape {S['shape_pass']}/{S['shape_total']}"
+          + (f"   ({n_adv} advisory, not counted)" if n_adv else ""))
 
     with open(out_j, "w") as f:
         json.dump(res, f, indent=2)
@@ -392,6 +422,11 @@ def main():
 
 def verdict(ok):
     return "PASS" if ok else "**FAIL**"
+
+
+def verdict_of(d):
+    """Markdown verdict for a check that may be advisory rather than gating."""
+    return "— *advisory*" if d.get("advisory") else verdict(d["passes"])
 
 
 def write_markdown(res, A, out_m):
@@ -426,7 +461,18 @@ def write_markdown(res, A, out_m):
     w(f"| 2 · mechanism slopes | {S['mechanism_pass']}/{S['mechanism_total']} |")
     w(f"| 2 · shape — cycle, distribution, profile | "
       f"{S['shape_pass']}/{S['shape_total']} |")
+    if S.get("advisory_not_counted"):
+        w(f"| *advisory, not counted* | "
+          f"*{S['advisory_not_counted']} checks* |")
     w("")
+    if S.get("advisory_not_counted"):
+        w(f"> **{S['advisory_not_counted']} checks are marked advisory and excluded "
+          f"from the totals above.** Their tolerance sits below the "
+          f"n = {S['crossover_n']:.1f} crossover, where `max(0.5σ, 1.96σ/√n)` is set "
+          f"by what this many years can resolve rather than by what the physics "
+          f"tolerates (appendix A). A pass there would mean *too short to tell*, so "
+          f"it is neither reported as a pass nor counted.")
+        w("")
     w(f"## Tier 1 — individual years, ±{A['k_screen']:.0f}σ")
     w("")
     w("| Diagnostic | Unit | Accept | Years | Outside | Worst | 5-yr blocks failed | Verdict |")
@@ -447,7 +493,7 @@ def write_markdown(res, A, out_m):
         w(f"| {label} | {unit} | {m['anchor_mean']:.{dp}f} | {m['sigma']:.{dp}f} | "
           f"±{m['tolerance']:.{dp}f} ({m['tolerance_in_sigma']:.2f}σ) | "
           f"{m['climate_model_mean']:.{dp}f} | {m['offset_in_sigma']:+.2f}σ | "
-          f"{verdict(m['passes'])} |")
+          f"{verdict_of(m)} |")
     w("")
     w("## Tier 2 — variance")
     w("")
@@ -485,9 +531,9 @@ def write_markdown(res, A, out_m):
         r = res["shape_seasonal"][key]
         a, p = r["amplitude"], r["phase"]
         w(f"| {label} | {unit} | {a['anchor']:.{dp}f} | "
-          f"{a['offset_in_sigma']:+.2f}σ | {verdict(a['passes'])} | "
+          f"{a['offset_in_sigma']:+.2f}σ | {verdict_of(a)} | "
           f"{p['anchor']:.2f} | {p['offset_in_sigma']:+.2f}σ | "
-          f"{verdict(p['passes'])} |")
+          f"{verdict_of(p)} |")
     w("")
     w("### Daily distribution — per-winter percentiles of u at 60°N")
     w("")
@@ -501,7 +547,7 @@ def write_markdown(res, A, out_m):
         r = res["shape_daily_distribution"][f"p{q}"]
         w(f"| p{q} | {r['anchor']:.2f} | {r['sigma']:.2f} | ±{r['tolerance']:.2f} | "
           f"{r['climate_model']:.2f} | {r['offset_in_sigma']:+.2f}σ | "
-          f"{verdict(r['passes'])} |")
+          f"{verdict_of(r)} |")
     w("")
     w("### Tropical w* profile — 10°S–10°N")
     w("")
@@ -519,7 +565,7 @@ def write_markdown(res, A, out_m):
         nm, ab = r["normalised"], r["absolute_advisory"]
         w(f"| {pl:g} hPa | {nm['anchor']:.4f} | ±{nm['tolerance']:.4f} | "
           f"{nm['climate_model']:.4f} | {nm['offset_in_sigma']:+.2f}σ | "
-          f"{verdict(nm['passes'])} | {ab['anchor']:.4f} mm/s | "
+          f"{verdict_of(nm)} | {ab['anchor']:.4f} mm/s | "
           f"{ab['climate_model']:.4f} mm/s |")
     w("")
     w("## Tier 2 — counts and relations")
