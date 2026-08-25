@@ -102,6 +102,24 @@ def score(A, series, years_of):
     return out
 
 
+def footer(fig, res):
+    """18's footer reads `inside_anchor` as "not independent of the anchor".
+
+    That holds when the scored model is CESM itself, which was the only case
+    when it was written. ERA5 sits inside the anchor PERIOD but is an entirely
+    independent observational product, so 18's wording would state the reverse.
+    """
+    lo, hi = res["climate_model_period"]
+    figs.plt.figure(fig.number)
+    fig.text(0.045, 0.033,
+             f"{res['climate_model']}  ·  scored {lo}–{hi}  ·  "
+             f"produced {res['produced']}", color=MUTED, fontsize=6.5)
+    fig.text(0.045, 0.014,
+             f"anchor CESM {res['anchor_period']}  ·  {res['estimator']}  ·  "
+             "independent of the anchor; its period lies inside the anchor's",
+             color=MUTED, fontsize=6.5)
+
+
 def score_seasonal(A, series):
     """Amplitude and phase of the annual harmonic, per 17's shape_seasonal block.
 
@@ -174,7 +192,7 @@ def fig_seasonal(A, res):
                 t.set_color(INK2)
     fig.subplots_adjust(left=0.085, right=0.975, top=fig.text_bottom - 0.070,
                         bottom=0.085, hspace=0.55, wspace=0.24)
-    figs.footer(fig, res)
+    footer(fig, res)
     figs.save(fig, "shape_seasonal.png", res["stamp"])
 
 
@@ -200,9 +218,10 @@ def fig_screening(A, res, ps):
         bad = np.isin(y, r["years_outside"])
         if bad.any():
             ax.plot(y[bad], v[bad], "o", ms=8, mfc="none", mec=ORANGE, mew=1.4)
-            for t, val in zip(y[bad], v[bad]):
+            for j, (t, val) in enumerate(zip(y[bad], v[bad])):
                 ax.annotate(f"{int(t)}", (t, val), textcoords="offset points",
-                            xytext=(7, 0), color=ORANGE, fontsize=6.5, va="center")
+                            xytext=(8, 7 if j % 2 else -7), color=ORANGE,
+                            fontsize=6.5, va="center")
         figs.style(ax, f"{'abcd'[i]}   {label}",
                    f"{unit} · {r['n_outside']}/{r['n_years']} outside · "
                    f"worst {r['worst_sigma']:+.2f}σ ({r['worst_year']}) · "
@@ -213,7 +232,7 @@ def fig_screening(A, res, ps):
         ax.set_ylim(span[0] - pad, span[1] + pad)
     fig.subplots_adjust(left=0.085, right=0.975, top=fig.text_bottom - 0.070,
                         bottom=0.105, hspace=0.55, wspace=0.21)
-    figs.footer(fig, res)
+    footer(fig, res)
     figs.save(fig, "tier1_screening.png", res["stamp"])
 
 
@@ -254,7 +273,7 @@ def fig_sigma(A, res):
         t.set_color(INK2)
     fig.subplots_adjust(left=0.095, right=0.975, top=fig.text_bottom - 0.085,
                         bottom=0.135)
-    figs.footer(fig, res)
+    footer(fig, res)
     figs.save(fig, "tier1_sigma.png", res["stamp"])
 
 
