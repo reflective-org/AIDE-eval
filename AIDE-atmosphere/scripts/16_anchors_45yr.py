@@ -163,7 +163,7 @@ def main():
     # The thresholds themselves, at the two lengths the protocol scores at. Tier 1
     # gates individual years; only its mean row depends on the 5-year length.
     res["tiers"] = {"screen_length": SCREEN, "full_length": FULL, "mean": {},
-                    "variance": {}, "trend": {}, "mechanism": {}}
+                    "variance": {}, "mechanism": {}}
     print(f"\nTIER THRESHOLDS from this anchor - tier 1 at n = {SCREEN}, "
           f"tier 2 at n = {FULL}")
     print(f"{'diagnostic':16s} {'sigma':>8} {'t1 mean tol':>12} {'t2 mean tol':>12} "
@@ -220,18 +220,6 @@ def main():
         c = res["tiers"]["ssw_count"][tag]
         print(f"  major NH SSW over {n:2d} winters: expect {c['expected']:5.1f}, "
               f"accept {c['interval'][0]}-{c['interval'][1]}")
-
-    for key, ykey, unit in SERIES:
-        d = res["diagnostics"][key]
-        se = d["trend_se_per_decade"] * (d["n"] / FULL) ** 1.5
-        res["tiers"]["trend"][key] = dict(
-            units=unit + " per decade", trend=d["trend_per_decade"],
-            se_at_full=float(se),
-            resolvable_at_full=bool(abs(d["trend_per_decade"]) > 1.96 * se))
-        t = res["tiers"]["trend"][key]
-        print(f"  trend {key:16s} {d['trend_per_decade']:+.4f} +/- {1.96 * se:.4f} "
-              f"per decade at {FULL} yr  "
-              + ("resolvable" if t["resolvable_at_full"] else "NOT resolvable"))
 
     for tag, M in res["mechanism"].items():
         half = 0.5 * (M["ci95"][1] - M["ci95"][0])
