@@ -4,7 +4,7 @@
 |---|---|
 | Climate model | CESM2.1.5-WACCM6 histSST 1996-2014 |
 | Scored period | 1996-2014 |
-| Produced | 2026-08-20 |
+| Produced | 2026-08-25 |
 | Anchor | CESM 1970-2014, 45 JJA / 42 DJF seasons, 44 annual years |
 | Estimator | `aide_val_common.tem_residual` |
 | Anchor σ | detrended within the window where the trend has p < 0.05 |
@@ -61,17 +61,6 @@
 | R1 wave->vortex | -0.936 | -1.345 | -1.287 – -0.622 | **FAIL** |
 | R2 thermal wind | -2.062 | -2.194 | -2.529 – -1.491 | PASS |
 
-## Trends, and whether n = 19 resolves them
-
-| Trend, per decade | Anchor | Climate model | 1.96σ at this n | Resolvable |
-|---|---|---|---|---|
-| Mass flux, 70 hPa | +0.1945 | +0.0913 | ±0.1766 | yes |
-| w*, 10S-10N | +0.0058 | +0.0019 | ±0.0120 | no |
-| Vortex NH, DJF | +0.5984 | +0.1847 | ±4.9973 | no |
-| Vortex SH, JJA | +0.3511 | +0.9590 | ±2.0039 | no |
-| Polar cap T, NH | -0.5616 | +0.2432 | ±1.7122 | no |
-| Polar cap T, SH | +0.3004 | +1.6134 | ±1.6436 | no |
-
 ## Flags
 
 | Check | Reading |
@@ -90,10 +79,9 @@
 
 | Figure | Covers |
 |---|---|
-| [tier1_screening__CESM2.1.5-WACCM6-histSST-1996-2014__2026-08-20.png](tier1_screening__CESM2.1.5-WACCM6-histSST-1996-2014__2026-08-20.png) | tier 1 — every climate-model year against the ±3σ band, six diagnostics |
-| [tier2_mean__CESM2.1.5-WACCM6-histSST-1996-2014__2026-08-20.png](tier2_mean__CESM2.1.5-WACCM6-histSST-1996-2014__2026-08-20.png) | tier 2 mean — offset from the anchor against the ±0.5σ tolerance |
-| [tier2_variance__CESM2.1.5-WACCM6-histSST-1996-2014__2026-08-20.png](tier2_variance__CESM2.1.5-WACCM6-histSST-1996-2014__2026-08-20.png) | tier 2 variance — σ ratios against their 95% windows, interannual and daily |
-| [counts_and_relations__CESM2.1.5-WACCM6-histSST-1996-2014__2026-08-20.png](counts_and_relations__CESM2.1.5-WACCM6-histSST-1996-2014__2026-08-20.png) | SSW count against its Poisson interval; R1 and R2 slopes against the anchor fit |
-| [trends__CESM2.1.5-WACCM6-histSST-1996-2014__2026-08-20.png](trends__CESM2.1.5-WACCM6-histSST-1996-2014__2026-08-20.png) | trends per decade, anchor against climate model, with what this n resolves |
+| [tier1_screening__CESM2.1.5-WACCM6-histSST-1996-2014__2026-08-25.png](tier1_screening__CESM2.1.5-WACCM6-histSST-1996-2014__2026-08-25.png) | tier 1 — every climate-model year against the ±3σ band, six diagnostics |
+| [tier2_mean__CESM2.1.5-WACCM6-histSST-1996-2014__2026-08-25.png](tier2_mean__CESM2.1.5-WACCM6-histSST-1996-2014__2026-08-25.png) | tier 2 mean — offset from the anchor against the ±0.5σ tolerance |
+| [tier2_variance__CESM2.1.5-WACCM6-histSST-1996-2014__2026-08-25.png](tier2_variance__CESM2.1.5-WACCM6-histSST-1996-2014__2026-08-25.png) | tier 2 variance — σ ratios against their 95% windows, interannual and daily |
+| [counts_and_relations__CESM2.1.5-WACCM6-histSST-1996-2014__2026-08-25.png](counts_and_relations__CESM2.1.5-WACCM6-histSST-1996-2014__2026-08-25.png) | SSW count against its Poisson interval; R1 and R2 slopes against the anchor fit |
 
 Figures are written by `scripts/18_validation_figures.py`, from the same two JSON files as the tables above.

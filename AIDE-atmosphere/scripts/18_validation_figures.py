@@ -8,7 +8,6 @@ at rather than a number to trust:
   tier2_mean.png            offset from the anchor against the +/-0.5 sigma tolerance
   tier2_variance.png        sigma ratios against their 95% windows
   counts_and_relations.png  the SSW count, and the two mechanism slopes
-  trends.png                anchor and model trends, and what this n resolves
 
 Reads output/16_anchors_45yr__<stamp>.json, written by 17, plus the series in
 output/07_period_split.json. Run after 17.
@@ -288,58 +287,6 @@ def fig_counts(A, res, S, segs):
     save(fig, "counts_and_relations.png", res["stamp"])
 
 
-# ---------------------------------------------------------------------- trends
-def fig_trends(A, res):
-    n = res["tier2_mean"]["mass_flux"]["n"]
-    fig = newfig(9.2, 5.4, f"Trends, and what n = {n} resolves",
-                 "Anchor and climate-model trend per decade, each scaled by the 1.96σ "
-                 f"that n = {n} resolves. Shaded: the band in which a trend is not "
-                 "distinguishable from zero.",
-                 "inside the band, neither agreement nor disagreement is evidence.")
-    ax = style(fig.add_subplot(111))
-    keys = [k for k, *_ in SERIES][::-1]
-    labels = [l for _, _, l, _ in SERIES][::-1]
-    ax.axvspan(-1, 1, color=RULE, alpha=0.5, lw=0)
-    for x in (-1, 1):
-        ax.axvline(x, color=MUTED, lw=0.7, ls=(0, (4, 3)))
-    ax.axvline(0, color=MUTED, lw=0.8)
-    for i, k in enumerate(keys):
-        t = res["trend"][k]
-        h = 1.96 * t["se_at_climate_model_n"]
-        ax.axhline(i, color=RULE, lw=0.5, zorder=0)
-        ax.plot(t["anchor"] / h, i, "s", ms=6.5, color=INK2, mec="none", zorder=3)
-        ax.plot(t["climate_model"] / h, i, "o", ms=7.5,
-                mfc=BLUE if t["resolvable"] else "none",
-                mec=BLUE, mew=1.3, zorder=3)
-        ax.annotate("resolvable" if t["resolvable"] else "not resolvable",
-                    (1.01, i), xycoords=("axes fraction", "data"),
-                    va="center", fontsize=6.5,
-                    color=INK2 if t["resolvable"] else MUTED)
-    ax.plot([], [], "s", ms=6.5, color=INK2, label="anchor trend")
-    ax.plot([], [], "o", ms=7.5, mfc=BLUE, mec=BLUE, label="climate-model trend")
-    lg = ax.legend(frameon=False, fontsize=7.5, loc="lower left",
-                   bbox_to_anchor=(0.0, 1.01), ncol=2, handletextpad=0.4,
-                   columnspacing=1.6)
-    for t_ in lg.get_texts():
-        t_.set_color(INK2)
-    ax.set_yticks(range(len(keys)))
-    ax.set_yticklabels(labels, fontsize=8, color=INK)
-    ax.set_xlabel(f"trend per decade, in units of the 1.96σ resolvable at n = {n}",
-                  color=INK2, fontsize=8)
-    ax.set_ylim(-0.7, len(keys) - 0.3)
-    zs = [res["trend"][k]["anchor"] / (1.96 * res["trend"][k]["se_at_climate_model_n"])
-          for k in keys] + \
-         [res["trend"][k]["climate_model"] / (1.96 * res["trend"][k]["se_at_climate_model_n"])
-          for k in keys]
-    lim = 1.25 * max(1.2, max(abs(z) for z in zs))
-    ax.set_xlim(-lim, lim)
-    ax.text(-0.5 * lim, -0.52, "shaded: not distinguishable from zero at this n",
-            color=MUTED, fontsize=7, ha="center")
-    fig.subplots_adjust(left=0.20, right=0.845, top=fig.text_bottom - 0.065, bottom=0.135)
-    footer(fig, res)
-    save(fig, "trends.png", res["stamp"])
-
-
 def latest_validation(climate_model=None):
     """The newest 17_validation__*.json, optionally restricted to one model."""
     hits = sorted(glob.glob(os.path.join(C.OUTDIR, "17_validation__*.json")),
@@ -371,7 +318,6 @@ def main():
     fig_mean(A, res)
     fig_variance(A, res)
     fig_counts(A, res, S, segs)
-    fig_trends(A, res)
 
 
 if __name__ == "__main__":

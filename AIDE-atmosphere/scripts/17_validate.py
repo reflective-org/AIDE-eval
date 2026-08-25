@@ -74,8 +74,6 @@ FIGURES = [
      "tier 2 variance — σ ratios against their 95% windows, interannual and daily"),
     ("counts_and_relations.png",
      "SSW count against its Poisson interval; R1 and R2 slopes against the anchor fit"),
-    ("trends.png",
-     "trends per decade, anchor against climate model, with what this n resolves"),
 ]
 
 
@@ -145,7 +143,7 @@ def main():
            "estimator": "aide_val_common.tem_residual",
            "inside_anchor": bool(lo >= A["anchor_years"][0] and hi <= A["anchor_years"][1]),
            "tier1": {}, "tier2_mean": {}, "tier2_variance": {}, "counts": {},
-           "mechanism": {}, "trend": {}}
+           "mechanism": {}}
 
     print(f"CLIMATE MODEL {climate_model}  {lo}-{hi}  vs  ANCHOR {A['anchor_period']}")
     if res["inside_anchor"]:
@@ -199,13 +197,6 @@ def main():
             climate_model_sigma=T["sigma_used"], climate_model_detrended=T["detrended"],
             ratio=float(ratio), window=[rlo, rhi],
             passes=bool(rlo <= ratio <= rhi))
-        res["trend"][key] = dict(
-            units=unit + " per decade", anchor=a["trend_per_decade"],
-            climate_model=T["trend_per_decade"],
-            se_at_climate_model_n=float(a["trend_se_per_decade"]
-                                    * (a["n"] / n) ** 1.5),
-            resolvable=bool(abs(a["trend_per_decade"])
-                            > 1.96 * a["trend_se_per_decade"] * (a["n"] / n) ** 1.5))
         m, vr = res["tier2_mean"][key], res["tier2_variance"][key]
         print(f"  {label:20s} mean {m['offset_in_sigma']:+5.2f}s / "
               f"{m['tolerance_in_sigma']:.2f}s  {'PASS' if m['passes'] else 'FAIL'}"
@@ -375,16 +366,6 @@ def write_markdown(res, A, out_m):
         w(f"| {tag} | {m['anchor_slope']:+.3f} | {m['climate_model_slope']:+.3f} | "
           f"{m['anchor_ci95'][0]:+.3f} – {m['anchor_ci95'][1]:+.3f} | "
           f"{verdict(m['passes'])} |")
-    w("")
-    w(f"## Trends, and whether n = {res['tier2_mean']['mass_flux']['n']} resolves them")
-    w("")
-    w("| Trend, per decade | Anchor | Climate model | 1.96σ at this n | Resolvable |")
-    w("|---|---|---|---|---|")
-    for key, _, label, unit, dp in SERIES:
-        t = res["trend"][key]
-        w(f"| {label} | {t['anchor']:+.4f} | {t['climate_model']:+.4f} | "
-          f"±{1.96 * t['se_at_climate_model_n']:.4f} | "
-          f"{'yes' if t['resolvable'] else 'no'} |")
     w("")
     w("## Flags")
     w("")
