@@ -287,6 +287,186 @@ def fig_counts(A, res, S, segs):
     save(fig, "counts_and_relations.png", res["stamp"])
 
 
+# ------------------------------------------------------------------ shape: cycle
+MONTH_INITIALS = "JFMAMJJASOND"
+
+
+def _offset_row(ax, i, off, ok, fmt="{:+.2f}σ"):
+    c = PASS if ok else FAIL
+    ax.plot([0, off], [i, i], color=c, lw=1.2, alpha=0.5)
+    ax.plot(off, i, "o", ms=8, color=c, mec="none")
+    ax.annotate(fmt.format(off), (off, i), textcoords="offset points",
+                xytext=(0, 11), ha="center", color=c, fontsize=7.5)
+
+
+def _tolerance_axis(ax, offsets, xlabel, n):
+    ax.axvspan(-0.5, 0.5, color=AQUA, alpha=0.10, lw=0)
+    for x in (-0.5, 0.5):
+        ax.axvline(x, color=AQUA, lw=0.9, ls=(0, (4, 3)))
+    ax.axvline(0, color=MUTED, lw=0.8)
+    ax.set_xlabel(xlabel, color=INK2, fontsize=8)
+    ax.set_ylim(-0.7, n - 0.3)
+    lim = max(1.3, 1.15 * max(abs(o) for o in offsets))
+    ax.set_xlim(-lim, lim)
+
+
+def fig_seasonal(A, res):
+    fig = newfig(11.0, 7.4, "Tier 2 shape — the seasonal cycle",
+                 "Left: the 12-month climatology, anchor in grey and climate model "
+                 "in blue. Right: the amplitude and phase of the annual harmonic "
+                 "fitted to each year, as an offset from the anchor in units of the "
+                 "anchor σ, against the ±0.5σ tolerance.",
+                 "the twelve monthly means are not scored individually - that would "
+                 "be a twelve-way multiplicity problem. Amplitude and phase are two "
+                 "numbers that summarise the annual march, and a model can reproduce "
+                 "the annual mean while getting either of them wrong.")
+    gs = fig.add_gridspec(3, 4, hspace=0.62, wspace=0.42)
+    x = np.arange(1, 13)
+    for i, (key, _, label, unit) in enumerate(SERIES):
+        ax = style(fig.add_subplot(gs[i // 2, i % 2]), label)
+        r = res["shape_seasonal"][key]
+        ax.plot(x, r["anchor_climatology"], "-o", color=MUTED, lw=1.3, ms=2.8,
+                label="anchor")
+        ax.plot(x, r["climate_model_climatology"], "-o", color=BLUE, lw=1.5, ms=2.8,
+                label="climate model")
+        ax.set_xticks(x)
+        ax.set_xticklabels(list(MONTH_INITIALS), fontsize=6)
+        ax.set_ylabel(unit, color=INK2, fontsize=7)
+        if i == 0:
+            ax.legend(fontsize=6.2, frameon=False, loc="best")
+
+    for j, (which, title) in enumerate((("amplitude", "amplitude"),
+                                        ("phase", "phase, month of max"))):
+        ax = style(fig.add_subplot(gs[j if j == 0 else 1, 2:]),
+                   f"harmonic {title}")
+        keys = [k for k, *_ in SERIES][::-1]
+        offs = [res["shape_seasonal"][k][which]["offset_in_sigma"] for k in keys]
+        for i, k in enumerate(keys):
+            d = res["shape_seasonal"][k][which]
+            _offset_row(ax, i, d["offset_in_sigma"], d["passes"])
+        _tolerance_axis(ax, offs, "offset from the anchor, in anchor σ", len(keys))
+        # ticks on the right: on the left they run back into the climatology column
+        ax.yaxis.tick_right()
+        ax.set_yticks(range(len(keys)))
+        ax.set_yticklabels([l for _, _, l, _ in SERIES][::-1], fontsize=7,
+                           color=INK)
+
+    ax = style(fig.add_subplot(gs[2, 2:]), "where the curve actually peaks")
+    ax.axis("off")
+    lines = ["The harmonic phase is not the observed maximum where the annual march",
+             "carries a strong semi-annual component. Anchor, by month:"]
+    for key, _, label, _ in SERIES:
+        r = res["shape_seasonal"][key]
+        lines.append(f"   {label:18s} harmonic {r['phase']['anchor'] + 1:5.2f}   "
+                     f"observed {r['month_of_max_observed']:2d}")
+    ax.text(0, 1.0, "\n".join(lines), transform=ax.transAxes, va="top",
+            color=MUTED, fontsize=6.6, family="DejaVu Sans Mono", linespacing=1.6)
+
+    fig.subplots_adjust(left=0.075, right=0.975, top=fig.text_bottom - 0.035,
+                        bottom=0.095)
+    footer(fig, res)
+    save(fig, "shape_seasonal.png", res["stamp"])
+
+
+# ------------------------------------------------------- shape: daily distribution
+def fig_daily_distribution(A, res):
+    tau = A["daily_DJF_u60N"]["tau_days"]
+    fig = newfig(9.6, 5.6, "Tier 2 shape — the daily distribution",
+                 "Percentiles of daily u at 60°N, 10 hPa, taken within each DJF "
+                 "winter and then averaged across winters. Left: the ladder, with "
+                 "the anchor's tolerance as a bar. Right: the offsets.",
+                 f"the per-winter reduction is the point. Winters are independent, "
+                 f"so the sample is winters and the {tau:.0f}-day decorrelation time "
+                 f"of the daily series never enters. A model that has smoothed away "
+                 f"its own weather shows p5 too high and p95 too low at once, which "
+                 f"no test of the mean can see.")
+    gs = fig.add_gridspec(1, 2, wspace=0.30, width_ratios=[1.0, 1.0])
+    qs = list(A["daily_distribution"]["percentiles"].keys())
+
+    ax = style(fig.add_subplot(gs[0, 0]), "the winter-percentile ladder")
+    xs = np.arange(len(qs))
+    a_mu = [res["shape_daily_distribution"][q]["anchor"] for q in qs]
+    t_mu = [res["shape_daily_distribution"][q]["climate_model"] for q in qs]
+    tol = [res["shape_daily_distribution"][q]["tolerance"] for q in qs]
+    ax.errorbar(xs - 0.08, a_mu, yerr=tol, fmt="o", color=MUTED, ms=5, capsize=4,
+                lw=1.1, label="anchor ± tolerance")
+    ax.plot(xs + 0.08, t_mu, "s", color=BLUE, ms=5, label="climate model")
+    ax.set_xticks(xs); ax.set_xticklabels(qs, fontsize=7)
+    ax.set_ylabel("u 60°N, 10 hPa  (m s⁻¹)", color=INK2, fontsize=8)
+    ax.legend(fontsize=6.5, frameon=False, loc="upper left")
+
+    ax2 = style(fig.add_subplot(gs[0, 1]), "offsets")
+    keys = qs[::-1]
+    offs = [res["shape_daily_distribution"][q]["offset_in_sigma"] for q in keys]
+    for i, q in enumerate(keys):
+        d = res["shape_daily_distribution"][q]
+        _offset_row(ax2, i, d["offset_in_sigma"], d["passes"])
+    _tolerance_axis(ax2, offs, "offset from the anchor, in anchor σ", len(keys))
+    ax2.set_yticks(range(len(keys)))
+    ax2.set_yticklabels(keys, fontsize=7.5, color=INK)
+
+    fig.subplots_adjust(left=0.085, right=0.975, top=fig.text_bottom - 0.035,
+                        bottom=0.115)
+    footer(fig, res)
+    save(fig, "shape_daily_distribution.png", res["stamp"])
+
+
+# ------------------------------------------------------------- shape: w* profile
+def fig_w_star_profile(A, res):
+    fig = newfig(11.0, 5.8, "Tier 2 shape — the tropical w* profile",
+                 "10°S–10°N w* at six pressure levels. Left: absolute, which is "
+                 "ADVISORY only. Centre: each level divided by the profile's own "
+                 "vertical mean, which is what the gate is set on, with the "
+                 "tolerance shaded. Right: the offsets.",
+                 "the absolute profile cannot carry a gate - the grid error on w* at "
+                 "70 hPa is larger than the tier-2 tolerance, so an absolute target "
+                 "would fail a correct model on grid choice alone. Normalising "
+                 "cancels a multiplicative bias that is uniform in height, and that "
+                 "uniformity is assumed, not measured. The profile is non-monotonic, "
+                 "so a single 70 hPa value constrains none of this structure.")
+    gs = fig.add_gridspec(1, 3, wspace=0.36)
+    keys = [k for k in A["w_star_profile"]["levels"]]
+    levs = [float(k) for k in keys]
+    L = res["shape_w_star_profile"]["levels"]
+
+    ax = style(fig.add_subplot(gs[0, 0]), "absolute — advisory")
+    ax.plot([L[k]["absolute_advisory"]["anchor"] for k in keys], levs, "-o",
+            color=MUTED, lw=1.4, ms=4, label="anchor")
+    ax.plot([L[k]["absolute_advisory"]["climate_model"] for k in keys], levs, "-s",
+            color=BLUE, lw=1.4, ms=4, label="climate model")
+    ax.set_yscale("log"); ax.invert_yaxis()
+    ax.set_yticks(levs); ax.set_yticklabels([f"{v:g}" for v in levs], fontsize=7)
+    ax.set_ylabel("hPa", color=INK2, fontsize=8)
+    ax.set_xlabel("w*  (mm s⁻¹)", color=INK2, fontsize=8)
+    ax.legend(fontsize=6.5, frameon=False, loc="upper left")
+
+    ax2 = style(fig.add_subplot(gs[0, 1]), "normalised — gated")
+    an = np.array([L[k]["normalised"]["anchor"] for k in keys])
+    tl = np.array([L[k]["normalised"]["tolerance"] for k in keys])
+    ax2.fill_betweenx(levs, an - tl, an + tl, color=AQUA, alpha=0.13, lw=0)
+    ax2.plot(an, levs, "-o", color=MUTED, lw=1.4, ms=4)
+    ax2.plot([L[k]["normalised"]["climate_model"] for k in keys], levs, "-s",
+             color=BLUE, lw=1.4, ms=4)
+    ax2.set_yscale("log"); ax2.invert_yaxis()
+    ax2.set_yticks(levs); ax2.set_yticklabels([f"{v:g}" for v in levs], fontsize=7)
+    ax2.set_xlabel("w* ÷ profile mean", color=INK2, fontsize=8)
+
+    ax3 = style(fig.add_subplot(gs[0, 2]), "offsets")
+    rk = keys[::-1]
+    offs = [L[k]["normalised"]["offset_in_sigma"] for k in rk]
+    for i, k in enumerate(rk):
+        d = L[k]["normalised"]
+        _offset_row(ax3, i, d["offset_in_sigma"], d["passes"])
+    _tolerance_axis(ax3, offs, "offset from the anchor, in anchor σ", len(rk))
+    ax3.set_yticks(range(len(rk)))
+    ax3.set_yticklabels([f"{k} hPa" for k in rk], fontsize=7.5, color=INK)
+
+    fig.subplots_adjust(left=0.070, right=0.975, top=fig.text_bottom - 0.035,
+                        bottom=0.125)
+    footer(fig, res)
+    save(fig, "shape_w_star_profile.png", res["stamp"])
+
+
 def latest_validation(climate_model=None):
     """The newest 17_validation__*.json, optionally restricted to one model."""
     hits = sorted(glob.glob(os.path.join(C.OUTDIR, "17_validation__*.json")),
@@ -318,6 +498,9 @@ def main():
     fig_mean(A, res)
     fig_variance(A, res)
     fig_counts(A, res, S, segs)
+    fig_seasonal(A, res)
+    fig_daily_distribution(A, res)
+    fig_w_star_profile(A, res)
 
 
 if __name__ == "__main__":

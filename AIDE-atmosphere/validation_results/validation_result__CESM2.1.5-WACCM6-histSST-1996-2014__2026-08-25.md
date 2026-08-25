@@ -18,6 +18,7 @@
 | 2 · variance | 7/7 |
 | 2 · SSW count | PASS |
 | 2 · mechanism slopes | 1/2 |
+| 2 · shape — cycle, distribution, profile | 23/23 |
 
 ## Tier 1 — individual years, ±3σ
 
@@ -53,6 +54,48 @@
 | Polar cap T, SH | 2.02 | 2.29 | 1.13 | 0.61 – 1.39 | PASS |
 | Daily DJF u, 60°N | 11.76 | 11.48 | 0.98 | 0.85 – 1.15 | PASS |
 
+## Tier 2 — shape
+
+Three things the mean and variance tests cannot see: the annual march, the shape of the daily distribution, and the vertical structure of the tropical upwelling.
+
+### Seasonal cycle — annual harmonic
+
+Amplitude is the harmonic's half range. Phase is its month of maximum, in months from mid-January, compared circularly. The twelve monthly means are not scored individually — that would be a twelve-way multiplicity problem.
+
+| Diagnostic | Unit | Amp anchor | Amp offset | Amp | Phase anchor | Phase offset | Phase |
+|---|---|---|---|---|---|---|---|
+| Mass flux, 70 hPa | 10^9 kg/s | 1.7227 | +0.41σ | PASS | 11.51 | +0.13σ | PASS |
+| w*, 10S-10N | mm/s | 0.0801 | +0.02σ | PASS | 11.83 | +0.14σ | PASS |
+| Vortex NH, DJF | m/s | 18.71 | -0.05σ | PASS | 11.38 | -0.17σ | PASS |
+| Vortex SH, JJA | m/s | 47.05 | -0.29σ | PASS | 0.25 | +0.34σ | PASS |
+| Polar cap T, NH | K | 10.94 | -0.04σ | PASS | 5.49 | -0.08σ | PASS |
+| Polar cap T, SH | K | 23.78 | -0.13σ | PASS | 11.72 | +0.09σ | PASS |
+
+### Daily distribution — per-winter percentiles of u at 60°N
+
+Each percentile is taken **within** each DJF winter, so the sample is winters and the 14-day decorrelation time of the daily series never enters. A squashed model shows p5 too high and p95 too low at once, which no mean test sees.
+
+| Percentile | Anchor | σ | Tolerance | Climate model | Offset | Verdict |
+|---|---|---|---|---|---|---|
+| p5 | 6.74 | 8.96 | ±4.48 | 7.79 | +0.12σ | PASS |
+| p25 | 18.33 | 7.50 | ±3.75 | 18.34 | +0.00σ | PASS |
+| p50 | 25.58 | 6.30 | ±3.15 | 25.25 | -0.05σ | PASS |
+| p75 | 32.29 | 5.02 | ±2.51 | 32.75 | +0.09σ | PASS |
+| p95 | 39.62 | 5.06 | ±2.53 | 39.26 | -0.07σ | PASS |
+
+### Tropical w* profile — 10°S–10°N
+
+The gate is on the profile divided by its own vertical mean, which cancels a multiplicative estimator bias that is uniform in height. The absolute values are **advisory**: appendix C records a grid error on w* at 70 hPa larger than the tier-2 tolerance, so an absolute per-level target would fail a correct model on grid choice alone. Height-uniformity is assumed, not measured.
+
+| Level | Normalised anchor | Tolerance | Normalised model | Offset | Verdict | Absolute anchor (advisory) | Absolute model |
+|---|---|---|---|---|---|---|---|
+| 100 hPa | 1.4679 | ±0.0624 | 1.5100 | +0.34σ | PASS | 0.4743 mm/s | 0.4948 mm/s |
+| 70 hPa | 0.5933 | ±0.0267 | 0.5978 | +0.08σ | PASS | 0.1917 mm/s | 0.1956 mm/s |
+| 50 hPa | 0.5309 | ±0.0288 | 0.5282 | -0.05σ | PASS | 0.1711 mm/s | 0.1724 mm/s |
+| 30 hPa | 0.7984 | ±0.0489 | 0.7991 | +0.01σ | PASS | 0.2579 mm/s | 0.2611 mm/s |
+| 20 hPa | 1.1132 | ±0.0616 | 1.1130 | -0.00σ | PASS | 0.3621 mm/s | 0.3659 mm/s |
+| 10 hPa | 1.4962 | ±0.1378 | 1.4519 | -0.16σ | PASS | 0.4903 mm/s | 0.4818 mm/s |
+
 ## Tier 2 — counts and relations
 
 | Check | Anchor | Climate model | Accept | Verdict |
@@ -60,6 +103,17 @@
 | Major NH SSW, count | 0.69/winter | 15 in 19 winters | 7–21 (expect 13.1) | PASS |
 | R1 wave->vortex | -0.936 | -1.345 | -1.287 – -0.622 | **FAIL** |
 | R2 thermal wind | -2.062 | -2.194 | -2.529 – -1.491 | PASS |
+
+## Trends, and whether n = 19 resolves them
+
+| Trend, per decade | Anchor | Climate model | 1.96σ at this n | Resolvable |
+|---|---|---|---|---|
+| Mass flux, 70 hPa | +0.1945 | +0.0913 | ±0.1766 | yes |
+| w*, 10S-10N | +0.0058 | +0.0019 | ±0.0120 | no |
+| Vortex NH, DJF | +0.5984 | +0.1847 | ±4.9973 | no |
+| Vortex SH, JJA | +0.3511 | +0.9590 | ±2.0039 | no |
+| Polar cap T, NH | -0.5616 | +0.2432 | ±1.7122 | no |
+| Polar cap T, SH | +0.3004 | +1.6134 | ±1.6436 | no |
 
 ## Flags
 
@@ -83,5 +137,9 @@
 | [tier2_mean__CESM2.1.5-WACCM6-histSST-1996-2014__2026-08-25.png](tier2_mean__CESM2.1.5-WACCM6-histSST-1996-2014__2026-08-25.png) | tier 2 mean — offset from the anchor against the ±0.5σ tolerance |
 | [tier2_variance__CESM2.1.5-WACCM6-histSST-1996-2014__2026-08-25.png](tier2_variance__CESM2.1.5-WACCM6-histSST-1996-2014__2026-08-25.png) | tier 2 variance — σ ratios against their 95% windows, interannual and daily |
 | [counts_and_relations__CESM2.1.5-WACCM6-histSST-1996-2014__2026-08-25.png](counts_and_relations__CESM2.1.5-WACCM6-histSST-1996-2014__2026-08-25.png) | SSW count against its Poisson interval; R1 and R2 slopes against the anchor fit |
+| [trends__CESM2.1.5-WACCM6-histSST-1996-2014__2026-08-25.png](trends__CESM2.1.5-WACCM6-histSST-1996-2014__2026-08-25.png) | trends per decade, anchor against climate model, with what this n resolves |
+| [shape_seasonal__CESM2.1.5-WACCM6-histSST-1996-2014__2026-08-25.png](shape_seasonal__CESM2.1.5-WACCM6-histSST-1996-2014__2026-08-25.png) | seasonal cycle — the 12-month climatology, and the annual-harmonic amplitude and phase against their tolerances |
+| [shape_daily_distribution__CESM2.1.5-WACCM6-histSST-1996-2014__2026-08-25.png](shape_daily_distribution__CESM2.1.5-WACCM6-histSST-1996-2014__2026-08-25.png) | daily distribution — per-winter percentiles of u at 60°N against the anchor |
+| [shape_w_star_profile__CESM2.1.5-WACCM6-histSST-1996-2014__2026-08-25.png](shape_w_star_profile__CESM2.1.5-WACCM6-histSST-1996-2014__2026-08-25.png) | tropical w* profile — absolute (advisory) and normalised (gated) |
 
 Figures are written by `scripts/18_validation_figures.py`, from the same two JSON files as the tables above.

@@ -74,6 +74,13 @@ FIGURES = [
      "tier 2 variance — σ ratios against their 95% windows, interannual and daily"),
     ("counts_and_relations.png",
      "SSW count against its Poisson interval; R1 and R2 slopes against the anchor fit"),
+    ("shape_seasonal.png",
+     "seasonal cycle — the 12-month climatology, and the annual-harmonic "
+     "amplitude and phase against their tolerances"),
+    ("shape_daily_distribution.png",
+     "daily distribution — per-winter percentiles of u at 60°N against the anchor"),
+    ("shape_w_star_profile.png",
+     "tropical w* profile — absolute (advisory) and normalised (gated)"),
 ]
 
 
@@ -99,6 +106,22 @@ def climate_model_series(ps, lo, hi):
                 y, v = C.join_segments(S, segs, k, ykey)
                 m = (y >= lo) & (y <= hi)
                 out[k] = (y[m], v[m])
+
+    # Shape checks. All three are year-labelled, so unlike the daily series below
+    # they subset cleanly to any window. A rollout returns the same keys: the
+    # per-year 12-month climatology of each diagnostic, the per-year tropical w*
+    # at each profile level, and the per-winter DJF percentiles of u at 60N.
+    for key, _, _, _, _ in SERIES:
+        y, v = C.join_segments(S, segs, f"_monthly_{key}", "_monthly_years")
+        m = (y >= lo) & (y <= hi)
+        out[f"_monthly_{key}"] = (y[m], np.asarray(v, float)[m])
+    for pl in C.PROFILE_LEVELS:
+        y, v = C.join_segments(S, segs, f"_profile_{pl:g}", "_profile_years")
+        m = (y >= lo) & (y <= hi)
+        out[f"_profile_{pl:g}"] = (y[m], np.asarray(v, float)[m])
+    y, v = C.join_segments(S, segs, "_djf_pctl", "_djf_pctl_years")
+    m = (y >= lo) & (y <= hi)
+    out["_djf_pctl"] = (y[m], np.asarray(v, float)[m])
 
     # Daily DJF is stored per segment with no year labels, so it can only be
     # subset when the window lines up with whole segments.
@@ -228,6 +251,88 @@ def main():
         print(f"  {'daily DJF u 60N':20s} not available - window is not "
               f"segment-aligned")
 
+    # ------------------------------------------------------------- shape checks
+    # Reported at tier 1, gated at tier 2. The tolerance is always taken at the
+    # climate model's own n, as for the mean above.
+    print(f"\nSHAPE CHECKS - seasonal cycle, daily distribution, w* profile")
+
+    res["shape_seasonal"] = {}
+    for key, ykey, label, unit, dp in SERIES:
+        a = A["seasonal_cycle"][key]
+        y, m12 = cm[f"_monthly_{key}"]
+        amp = np.array([C.first_harmonic(r)[0] for r in m12])
+        pha = np.array([C.first_harmonic(r)[1] for r in m12])
+        n = len(amp)
+
+        sa, ma = a["amplitude"]["sigma_used"], a["amplitude"]["mean"]
+        tol_a = C.bias_target(sa, n)
+        off_a = float(amp.mean() - ma)
+
+        sp, mp = a["phase"]["sigma_used"], a["phase"]["mean"]
+        tol_p = C.bias_target(sp, n)
+        off_p = float(C.wrap_months(C.circ_mean_months(pha) - mp))
+
+        res["shape_seasonal"][key] = dict(
+            units=unit, n=int(n),
+            climate_model_climatology=[float(v) for v in m12.mean(0)],
+            anchor_climatology=a["monthly_climatology"],
+            month_of_max_observed=int(np.argmax(m12.mean(0)) + 1),
+            amplitude=dict(anchor=ma, sigma=sa, climate_model=float(amp.mean()),
+                           tolerance=float(tol_a), offset=off_a,
+                           offset_in_sigma=float(off_a / sa),
+                           passes=bool(abs(off_a) <= tol_a)),
+            phase=dict(units="months, 0 = mid-January", anchor=mp, sigma=sp,
+                       climate_model=C.circ_mean_months(pha),
+                       tolerance=float(tol_p), offset=off_p,
+                       offset_in_sigma=float(off_p / sp),
+                       passes=bool(abs(off_p) <= tol_p)))
+        r = res["shape_seasonal"][key]
+        print(f"  {label:20s} amp {r['amplitude']['offset_in_sigma']:+5.2f}s "
+              f"{'PASS' if r['amplitude']['passes'] else 'FAIL'}   "
+              f"phase {r['phase']['offset_in_sigma']:+5.2f}s "
+              f"{'PASS' if r['phase']['passes'] else 'FAIL'}")
+
+    res["shape_daily_distribution"] = {}
+    ywq, wq = cm["_djf_pctl"]
+    for i, q in enumerate(C.DJF_PCTL):
+        a = A["daily_distribution"]["percentiles"][f"p{q}"]
+        v = wq[:, i]
+        n = len(v)
+        tol = C.bias_target(a["sigma_used"], n)
+        off = float(v.mean() - a["mean"])
+        res["shape_daily_distribution"][f"p{q}"] = dict(
+            units="m/s", anchor=a["mean"], sigma=a["sigma_used"], n=int(n),
+            climate_model=float(v.mean()), tolerance=float(tol), offset=off,
+            offset_in_sigma=float(off / a["sigma_used"]),
+            passes=bool(abs(off) <= tol))
+        r = res["shape_daily_distribution"][f"p{q}"]
+        print(f"  {'u 60N DJF p' + str(q):20s} {r['offset_in_sigma']:+5.2f}s / "
+              f"{tol / a['sigma_used']:.2f}s  {'PASS' if r['passes'] else 'FAIL'}")
+
+    res["shape_w_star_profile"] = dict(
+        normalisation=A["w_star_profile"]["normalisation"],
+        absolute_is_advisory=True, levels={})
+    mat = np.array([cm[f"_profile_{pl:g}"][1] for pl in C.PROFILE_LEVELS])
+    norm = mat / mat.mean(axis=0, keepdims=True)
+    for i, pl in enumerate(C.PROFILE_LEVELS):
+        a = A["w_star_profile"]["levels"][f"{pl:g}"]
+        an, aa = a["normalised_gated"], a["absolute_advisory"]
+        n = mat.shape[1]
+        tol = C.bias_target(an["sigma_used"], n)
+        off = float(norm[i].mean() - an["mean"])
+        res["shape_w_star_profile"]["levels"][f"{pl:g}"] = dict(
+            normalised=dict(anchor=an["mean"], sigma=an["sigma_used"], n=int(n),
+                            climate_model=float(norm[i].mean()),
+                            tolerance=float(tol), offset=off,
+                            offset_in_sigma=float(off / an["sigma_used"]),
+                            passes=bool(abs(off) <= tol)),
+            absolute_advisory=dict(units="mm/s", anchor=aa["mean"],
+                                   climate_model=float(mat[i].mean()),
+                                   offset=float(mat[i].mean() - aa["mean"])))
+        r = res["shape_w_star_profile"]["levels"][f"{pl:g}"]["normalised"]
+        print(f"  {'w* ' + f'{pl:g}' + ' hPa norm':20s} {r['offset_in_sigma']:+5.2f}s / "
+              f"{tol / an['sigma_used']:.2f}s  {'PASS' if r['passes'] else 'FAIL'}")
+
     # ------------------------------------------------------------------ counts
     s = A["ssw_NH"]
     k = int(((ssw_years >= lo) & (ssw_years <= hi)).sum())
@@ -259,18 +364,25 @@ def main():
     t1 = [v["passes"] for v in res["tier1"].values()]
     t2m = [v["passes"] for v in res["tier2_mean"].values()]
     t2v = [v["passes"] for v in res["tier2_variance"].values() if "passes" in v]
+    shape = ([v["amplitude"]["passes"] for v in res["shape_seasonal"].values()]
+             + [v["phase"]["passes"] for v in res["shape_seasonal"].values()]
+             + [v["passes"] for v in res["shape_daily_distribution"].values()]
+             + [v["normalised"]["passes"]
+                for v in res["shape_w_star_profile"]["levels"].values()])
     res["summary"] = dict(
         tier1_pass=int(sum(t1)), tier1_total=len(t1),
         tier2_mean_pass=int(sum(t2m)), tier2_mean_total=len(t2m),
         tier2_variance_pass=int(sum(t2v)), tier2_variance_total=len(t2v),
         ssw_pass=res["counts"]["ssw_NH"]["passes"],
         mechanism_pass=int(sum(v["passes"] for v in res["mechanism"].values())),
-        mechanism_total=len(res["mechanism"]))
+        mechanism_total=len(res["mechanism"]),
+        shape_pass=int(sum(shape)), shape_total=len(shape))
     S = res["summary"]
     print(f"\n  tier 1 {S['tier1_pass']}/{S['tier1_total']}   "
           f"tier 2 mean {S['tier2_mean_pass']}/{S['tier2_mean_total']}   "
           f"tier 2 variance {S['tier2_variance_pass']}/{S['tier2_variance_total']}   "
-          f"mechanism {S['mechanism_pass']}/{S['mechanism_total']}")
+          f"mechanism {S['mechanism_pass']}/{S['mechanism_total']}   "
+          f"shape {S['shape_pass']}/{S['shape_total']}")
 
     with open(out_j, "w") as f:
         json.dump(res, f, indent=2)
@@ -312,6 +424,8 @@ def write_markdown(res, A, out_m):
     w(f"| 2 · variance | {S['tier2_variance_pass']}/{S['tier2_variance_total']} |")
     w(f"| 2 · SSW count | {verdict(S['ssw_pass'])} |")
     w(f"| 2 · mechanism slopes | {S['mechanism_pass']}/{S['mechanism_total']} |")
+    w(f"| 2 · shape — cycle, distribution, profile | "
+      f"{S['shape_pass']}/{S['shape_total']} |")
     w("")
     w(f"## Tier 1 — individual years, ±{A['k_screen']:.0f}σ")
     w("")
@@ -351,6 +465,62 @@ def write_markdown(res, A, out_m):
           f"{d['window'][0]:.2f} – {d['window'][1]:.2f} | {verdict(d['passes'])} |")
     else:
         w(f"| Daily DJF u, 60°N | — | — | — | — | n/a: {d['reason']} |")
+    w("")
+    w("## Tier 2 — shape")
+    w("")
+    w("Three things the mean and variance tests cannot see: the annual march, the "
+      "shape of the daily distribution, and the vertical structure of the tropical "
+      "upwelling.")
+    w("")
+    w("### Seasonal cycle — annual harmonic")
+    w("")
+    w("Amplitude is the harmonic's half range. Phase is its month of maximum, in "
+      "months from mid-January, compared circularly. The twelve monthly means are "
+      "not scored individually — that would be a twelve-way multiplicity problem.")
+    w("")
+    w("| Diagnostic | Unit | Amp anchor | Amp offset | Amp | Phase anchor | "
+      "Phase offset | Phase |")
+    w("|---|---|---|---|---|---|---|---|")
+    for key, _, label, unit, dp in SERIES:
+        r = res["shape_seasonal"][key]
+        a, p = r["amplitude"], r["phase"]
+        w(f"| {label} | {unit} | {a['anchor']:.{dp}f} | "
+          f"{a['offset_in_sigma']:+.2f}σ | {verdict(a['passes'])} | "
+          f"{p['anchor']:.2f} | {p['offset_in_sigma']:+.2f}σ | "
+          f"{verdict(p['passes'])} |")
+    w("")
+    w("### Daily distribution — per-winter percentiles of u at 60°N")
+    w("")
+    w("Each percentile is taken **within** each DJF winter, so the sample is winters "
+      "and the 14-day decorrelation time of the daily series never enters. A squashed "
+      "model shows p5 too high and p95 too low at once, which no mean test sees.")
+    w("")
+    w("| Percentile | Anchor | σ | Tolerance | Climate model | Offset | Verdict |")
+    w("|---|---|---|---|---|---|---|")
+    for q in C.DJF_PCTL:
+        r = res["shape_daily_distribution"][f"p{q}"]
+        w(f"| p{q} | {r['anchor']:.2f} | {r['sigma']:.2f} | ±{r['tolerance']:.2f} | "
+          f"{r['climate_model']:.2f} | {r['offset_in_sigma']:+.2f}σ | "
+          f"{verdict(r['passes'])} |")
+    w("")
+    w("### Tropical w* profile — 10°S–10°N")
+    w("")
+    w("The gate is on the profile divided by its own vertical mean, which cancels a "
+      "multiplicative estimator bias that is uniform in height. The absolute values "
+      "are **advisory**: appendix C records a grid error on w* at 70 hPa larger than "
+      "the tier-2 tolerance, so an absolute per-level target would fail a correct "
+      "model on grid choice alone. Height-uniformity is assumed, not measured.")
+    w("")
+    w("| Level | Normalised anchor | Tolerance | Normalised model | Offset | "
+      "Verdict | Absolute anchor (advisory) | Absolute model |")
+    w("|---|---|---|---|---|---|---|---|")
+    for pl in C.PROFILE_LEVELS:
+        r = res["shape_w_star_profile"]["levels"][f"{pl:g}"]
+        nm, ab = r["normalised"], r["absolute_advisory"]
+        w(f"| {pl:g} hPa | {nm['anchor']:.4f} | ±{nm['tolerance']:.4f} | "
+          f"{nm['climate_model']:.4f} | {nm['offset_in_sigma']:+.2f}σ | "
+          f"{verdict(nm['passes'])} | {ab['anchor']:.4f} mm/s | "
+          f"{ab['climate_model']:.4f} mm/s |")
     w("")
     w("## Tier 2 — counts and relations")
     w("")
