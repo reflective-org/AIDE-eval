@@ -34,6 +34,10 @@ import traceback
 
 DATASET = "derived-era5-pressure-levels-daily-statistics"
 LEVELS = ["3", "5", "7", "10", "20", "30", "50", "70", "100", "125", "150", "175"]
+# The protocol minimum (section 4.4): brackets 10-100 with one further level
+# beyond each end. 4 vars x 10 levels x 10 days = 400, exactly the CDS cost cap.
+LEVELS_MIN = ["5", "7", "10", "20", "30", "50", "70", "100", "125", "150"]
+BATCH_DAYS = 10
 VARIABLES = ["u_component_of_wind", "v_component_of_wind",
              "vertical_velocity", "temperature"]
 
@@ -181,6 +185,27 @@ def main():
         got["c"] = fetch(client, req, path, w)
         if got["c"]:
             describe(path, w)
+        w()
+
+    # -- D: the real batch shape. Stage A timed ONE day; the pull uses 10-day
+    #       requests, and whether CDS charges per request or per field is a
+    #       factor of 10 on the schedule. This is the only stage that answers it.
+    if "d" in stages:
+        w(f"D. {BATCH_DAYS} days, {len(LEVELS_MIN)} levels, native - THE REAL BATCH SHAPE")
+        req = base_request()
+        req["pressure_level"] = LEVELS_MIN
+        req["day"] = [f"{d:02d}" for d in range(1, BATCH_DAYS + 1)]
+        path = os.path.join(SCRATCH, "probe_batch.nc")
+        t0 = time.time()
+        got["d"] = fetch(client, req, path, w)
+        if got["d"]:
+            dt = time.time() - t0
+            describe(path, w)
+            w(f"  -> {dt / 60:.1f} min per {BATCH_DAYS}-day request")
+            for label, ndays in (("1 year", 365), ("1990-2025", 13149)):
+                nreq = -(-ndays // BATCH_DAYS)
+                w(f"  -> {label:10s} {nreq:5d} requests, {nreq * dt / 3600:6.1f} h serial,"
+                  f" {got['d'] * nreq / 1e9:7.1f} GB")
         w()
 
     w("IMPLICATIONS for 1990-2025 (36 years, 13149 days, 432 months)")
