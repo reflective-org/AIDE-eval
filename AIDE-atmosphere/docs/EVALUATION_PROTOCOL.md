@@ -495,7 +495,34 @@ $PY scripts/18_validation_figures.py      # reads 16, 07 and the newest 17 outpu
       [--climate-model NAME]              # writes validation_results/*__<stamp>.png
 ```
 
-Those six scripts in that order, plus `aide_val_common.py` and `report_layout.py`. `16`,
+### Scoring something that is not this CESM run
+
+The same `17` and `18` score any source. What changes is where the series come from:
+`07` derives them from the CESM h6 tape, and `20` derives the identical series from any
+zonal-mean source — a reanalysis, another GCM, an emulator rollout.
+
+```bash
+$PY scripts/20_series_from_zonal_mean.py --list      # the sources it knows
+$PY scripts/20_series_from_zonal_mean.py ERA5 2004 2023
+                                          # writes output/20_series__ERA5.json
+$PY scripts/17_validate.py --source ERA5  # writes validation_results/ERA5/
+$PY scripts/18_validation_figures.py --climate-model "ERA5 (CLaMS v3.1 zonal mean)"
+```
+
+The contract a source has to meet is small: **zonal-mean u and T on pressure levels,
+with a time axis.** That yields the two vortex and two polar-cap diagnostics and their
+seasonal cycle. A source that also carries v and omega would add the TEM residual
+circulation; one at daily resolution would add the SSW count and the daily
+distribution. Whatever a source cannot supply, `17` reports as **not evaluable** rather
+than omitting — a partial scorecard can never be mistaken for a complete one.
+
+> **Interpretation** — independence is a property of the *source*, not of its *period*.
+> A reanalysis whose years lie inside the anchor's is still an independent product; a
+> window of the anchor's own model is not, whatever its years. Each source declares
+> this and it is carried into the report and the figure footers, so a self-consistency
+> check cannot be read as a validation.
+
+Those scripts in that order, plus `aide_val_common.py` and `report_layout.py`. `16`,
 `17` and `18` read only existing JSON and take seconds; if `output/` is empty, `02`, `02b`
 and `07` rebuild it from the tape in about five minutes. See the pipeline order in
 [../CLAUDE.md](../../CLAUDE.md).

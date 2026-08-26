@@ -130,6 +130,7 @@ AIDE-atmosphere/       everything else lives here
                        01, 01b, 01c, 01d — convention evidence, outside the pipeline
   docs/                the protocol
   validation_results/  a scored climate model: validation_result__<stamp>.md and seven figures
+                       ERA5/, ERA-Interim/, JRA-55/, MERRA-2/ — one folder per source
   stale/               superseded material, kept — see stale/README.md
   output/              JSON results            — generated, gitignored
   logs/                stdout of every run     — generated, gitignored

@@ -159,12 +159,42 @@ def climate_model_series(ps, lo, hi):
     return out, (np.array(daily, float) if aligned else None), ssw, winters
 
 
+def source_series(name):
+    """Load a series JSON built by 20 and shape it the way main() expects.
+
+    The generic path. `20` reduces any zonal-mean source to these series; what a
+    source cannot supply is simply absent, and every block in main() skips what
+    is missing rather than assuming a full CESM record.
+    """
+    path = os.path.join(C.OUTDIR, f"20_series__{name}.json")
+    if not os.path.exists(path):
+        raise SystemExit(f"no {os.path.basename(path)} - run "
+                         f"20_series_from_zonal_mean.py {name} first")
+    src = json.load(open(path))
+    S = src["series"]
+    out = {}
+    for key, ykey, _, _, _ in SERIES:
+        if key in S:
+            out[key] = (np.asarray(S[ykey], int), np.asarray(S[key], float))
+    for key, _, _, _, _ in SERIES:
+        k = f"_monthly_{key}"
+        if k in S:
+            out[k] = (np.asarray(S["_monthly_years"], int),
+                      np.asarray(S[k], float))
+    # daily series, SSW seasons and the w* profile are absent unless the source
+    # carries them; main() reports each as not evaluable.
+    return src, out, None, None, 0
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[1].strip())
     ap.add_argument("--climate-model", dest="climate_model", default=None,
                     help="name of the model being scored; default from the window")
     ap.add_argument("years", nargs="*", type=int, default=[],
                     help="first_year last_year (default 1996 2014)")
+    ap.add_argument("--source", default=None,
+                    help="score a series JSON built by 20 (its NAME), instead of "
+                         "a window of the CESM record")
     args = ap.parse_args()
     lo, hi = (args.years[0], args.years[1]) if len(args.years) > 1 else (1996, 2014)
 
@@ -175,24 +205,43 @@ def main():
     out_m = os.path.join(RESULTS, stamped("validation_result.md", stamp))
 
     A = json.load(open(os.path.join(C.OUTDIR, "16_anchors_45yr.json")))
-    ps = json.load(open(os.path.join(C.OUTDIR, "07_period_split.json")))
-    cm, daily, ssw_years, winters = climate_model_series(ps, lo, hi)
+    if args.source:
+        src, cm, daily, ssw_years, winters = source_series(args.source)
+        lo, hi = src["period"]
+        climate_model = args.climate_model or src["long_name"]
+        stamp = stamp_for(climate_model, produced)
+        out_j = os.path.join(C.OUTDIR, stamped("17_validation.json", stamp))
+        out_m = os.path.join(RESULTS, src["name"], stamped("validation_result.md", stamp))
+        os.makedirs(os.path.dirname(out_m), exist_ok=True)
+    else:
+        src = None
+        ps = json.load(open(os.path.join(C.OUTDIR, "07_period_split.json")))
+        cm, daily, ssw_years, winters = climate_model_series(ps, lo, hi)
 
     res = {"climate_model": climate_model, "produced": produced, "stamp": stamp,
            "climate_model_period": [lo, hi], "anchor_period": A["anchor_period"],
            "estimator": "aide_val_common.tem_residual",
            "inside_anchor": bool(lo >= A["anchor_years"][0] and hi <= A["anchor_years"][1]),
+           "independent": bool(src["independent"]) if src else False,
+           "source": (src["long_name"] if src else "a window of the anchor's own CESM record"),
+           "not_evaluable": (src["not_evaluable"] if src else {}),
+           "results_dir": (src["name"] if src else ""),
            "tier1": {}, "tier2_mean": {}, "tier2_variance": {}, "counts": {},
            "mechanism": {}}
 
     print(f"CLIMATE MODEL {climate_model}  {lo}-{hi}  vs  ANCHOR {A['anchor_period']}")
-    if res["inside_anchor"]:
+    if res["not_evaluable"]:
+        print(f"  {len(res['not_evaluable'])} diagnostics NOT EVALUABLE from this "
+              f"source; they are reported, not omitted.")
+    if res["inside_anchor"] and not res["independent"]:
         print("  NOTE the climate model lies inside the anchor: self-consistency check, "
               "not an independent validation.")
 
     # ------------------------------------------------------------------ tier 1
     print(f"\nTIER 1 - individual years vs the +/-{A['k_screen']:.0f} sigma band")
     for key, ykey, label, unit, dp in SERIES:
+        if key not in cm:
+            continue
         a = A["diagnostics"][key]
         y, v = cm[key]
         band = a["screening_band"]
@@ -218,6 +267,8 @@ def main():
     # ------------------------------------------------------------------ tier 2
     print(f"\nTIER 2 - rollout mean and variance")
     for key, ykey, label, unit, dp in SERIES:
+        if key not in cm:
+            continue
         a = A["diagnostics"][key]
         y, v = cm[key]
         T = C.window_stats(y, v, lo, hi)
@@ -276,6 +327,8 @@ def main():
 
     res["shape_seasonal"] = {}
     for key, ykey, label, unit, dp in SERIES:
+        if f"_monthly_{key}" not in cm:
+            continue
         a = A["seasonal_cycle"][key]
         y, m12 = cm[f"_monthly_{key}"]
         amp = np.array([C.first_harmonic(r)[0] for r in m12])
@@ -313,8 +366,8 @@ def main():
               f"{mark(r['phase']):>8}")
 
     res["shape_daily_distribution"] = {}
-    ywq, wq = cm["_djf_pctl"]
-    for i, q in enumerate(C.DJF_PCTL):
+    ywq, wq = cm.get("_djf_pctl", (None, None))
+    for i, q in enumerate(C.DJF_PCTL if wq is not None else []):
         a = A["daily_distribution"]["percentiles"][f"p{q}"]
         v = wq[:, i]
         n = len(v)
@@ -332,9 +385,11 @@ def main():
     res["shape_w_star_profile"] = dict(
         normalisation=A["w_star_profile"]["normalisation"],
         absolute_is_advisory=True, levels={})
-    mat = np.array([cm[f"_profile_{pl:g}"][1] for pl in C.PROFILE_LEVELS])
-    norm = mat / mat.mean(axis=0, keepdims=True)
-    for i, pl in enumerate(C.PROFILE_LEVELS):
+    has_profile = all(f"_profile_{pl:g}" in cm for pl in C.PROFILE_LEVELS)
+    mat = (np.array([cm[f"_profile_{pl:g}"][1] for pl in C.PROFILE_LEVELS])
+           if has_profile else None)
+    norm = mat / mat.mean(axis=0, keepdims=True) if has_profile else None
+    for i, pl in enumerate(C.PROFILE_LEVELS if has_profile else []):
         a = A["w_star_profile"]["levels"][f"{pl:g}"]
         an, aa = a["normalised_gated"], a["absolute_advisory"]
         n = mat.shape[1]
@@ -356,18 +411,28 @@ def main():
 
     # ------------------------------------------------------------------ counts
     s = A["ssw_NH"]
-    k = int(((ssw_years >= lo) & (ssw_years <= hi)).sum())
-    exp = s["rate_per_winter"] * winters
-    ilo, ihi = int(stats.poisson.ppf(0.025, exp)), int(stats.poisson.ppf(0.975, exp))
-    res["counts"]["ssw_NH"] = dict(
-        climate_model_count=k, climate_model_winters=int(winters),
-        anchor_rate=s["rate_per_winter"], expected=float(exp),
-        interval=[ilo, ihi], passes=bool(ilo <= k <= ihi))
-    print(f"\n  major NH SSW: {k} in {winters} winters, expected {exp:.1f} "
-          f"[{ilo}, {ihi}]  {'PASS' if res['counts']['ssw_NH']['passes'] else 'FAIL'}")
+    if ssw_years is None or winters == 0:
+        res["counts"]["ssw_NH"] = dict(
+            available=False,
+            reason="the source cannot resolve the day the wind reverses")
+        print("\n  major NH SSW: not evaluable from this source")
+    else:
+        k = int(((ssw_years >= lo) & (ssw_years <= hi)).sum())
+        exp = s["rate_per_winter"] * winters
+        ilo = int(stats.poisson.ppf(0.025, exp))
+        ihi = int(stats.poisson.ppf(0.975, exp))
+        res["counts"]["ssw_NH"] = dict(
+            climate_model_count=k, climate_model_winters=int(winters),
+            anchor_rate=s["rate_per_winter"], expected=float(exp),
+            interval=[ilo, ihi], passes=bool(ilo <= k <= ihi))
+        print(f"\n  major NH SSW: {k} in {winters} winters, expected {exp:.1f} "
+              f"[{ilo}, {ihi}]  "
+              f"{'PASS' if res['counts']['ssw_NH']['passes'] else 'FAIL'}")
 
     # -------------------------------------------------------------- mechanism
     for tag, xk, yk, ykey in MECHANISM:
+        if xk not in cm or yk not in cm:
+            continue
         M = A["mechanism"][tag]
         x, yv = cm[xk][1], cm[yk][1]
         n = min(len(x), len(yv))
@@ -400,13 +465,14 @@ def main():
         tier1_pass=int(sum(t1)), tier1_total=len(t1),
         tier2_mean_pass=int(sum(t2m)), tier2_mean_total=len(t2m),
         tier2_variance_pass=int(sum(t2v)), tier2_variance_total=len(t2v),
-        ssw_pass=res["counts"]["ssw_NH"]["passes"],
+        ssw_pass=res["counts"]["ssw_NH"].get("passes"),
         mechanism_pass=int(sum(v["passes"] for v in res["mechanism"].values())),
         mechanism_total=len(res["mechanism"]),
         shape_pass=int(sum(shape)), shape_total=len(shape),
         advisory_not_counted=int(n_adv),
         crossover_n=float(C.CROSSOVER_N))
     S = res["summary"]
+    res["summary"]["not_evaluable"] = sorted(res["not_evaluable"])
     print(f"\n  tier 1 {S['tier1_pass']}/{S['tier1_total']}   "
           f"tier 2 mean {S['tier2_mean_pass']}/{S['tier2_mean_total']}   "
           f"tier 2 variance {S['tier2_variance_pass']}/{S['tier2_variance_total']}   "
@@ -447,6 +513,9 @@ def write_markdown(res, A, out_m):
       f"{A['diagnostics']['vortex_NH']['n']} DJF seasons, "
       f"{A['diagnostics']['mass_flux']['n']} annual years |")
     w(f"| Estimator | `{res['estimator']}` |")
+    w(f"| Source | {res['source']} |")
+    w(f"| Independent of the anchor | "
+      f"{'yes' if res['independent'] else 'no — a window of the anchor’s own model'} |")
     w(f"| Anchor σ | {A['sigma_rule']} |")
     w(f"| Independent of anchor | {'no — the model lies inside the anchor' if res['inside_anchor'] else 'yes'} |")
     w("| Generated by | `scripts/17_validate.py`, from "
@@ -473,11 +542,24 @@ def write_markdown(res, A, out_m):
           f"tolerates (appendix A). A pass there would mean *too short to tell*, so "
           f"it is neither reported as a pass nor counted.")
         w("")
+    if res["not_evaluable"]:
+        w("## Not evaluable from this source")
+        w("")
+        w("Reported rather than omitted, so the scorecard cannot be mistaken for a "
+          "complete one.")
+        w("")
+        w("| Diagnostic | Why |")
+        w("|---|---|")
+        for k in sorted(res["not_evaluable"]):
+            w(f"| {k} | {res['not_evaluable'][k]} |")
+        w("")
     w(f"## Tier 1 — individual years, ±{A['k_screen']:.0f}σ")
     w("")
     w("| Diagnostic | Unit | Accept | Years | Outside | Worst | 5-yr blocks failed | Verdict |")
     w("|---|---|---|---|---|---|---|---|")
     for key, _, label, unit, dp in SERIES:
+        if key not in res["tier1"]:
+            continue
         r, a = res["tier1"][key], A["diagnostics"][key]
         w(f"| {label} | {unit} | {a['screening_band'][0]:.{dp}f} – "
           f"{a['screening_band'][1]:.{dp}f} | {r['n_years']} | {r['n_outside']} | "
@@ -489,6 +571,8 @@ def write_markdown(res, A, out_m):
     w("| Diagnostic | Unit | Anchor mean | σ | Tolerance | Climate model | Offset | Verdict |")
     w("|---|---|---|---|---|---|---|---|")
     for key, _, label, unit, dp in SERIES:
+        if key not in res["tier2_mean"]:
+            continue
         m = res["tier2_mean"][key]
         w(f"| {label} | {unit} | {m['anchor_mean']:.{dp}f} | {m['sigma']:.{dp}f} | "
           f"±{m['tolerance']:.{dp}f} ({m['tolerance_in_sigma']:.2f}σ) | "
@@ -500,6 +584,8 @@ def write_markdown(res, A, out_m):
     w("| Metric | Anchor σ | Climate-model σ | Ratio | 95% window | Verdict |")
     w("|---|---|---|---|---|---|")
     for key, _, label, unit, dp in SERIES:
+        if key not in res["tier2_variance"]:
+            continue
         v, a = res["tier2_variance"][key], A["diagnostics"][key]
         w(f"| {label} | {a['sigma_used']:.{dp}f} | {v['climate_model_sigma']:.{dp}f} | "
           f"{v['ratio']:.2f} | {v['window'][0]:.2f} – {v['window'][1]:.2f} | "
@@ -528,6 +614,8 @@ def write_markdown(res, A, out_m):
       "Phase offset | Phase |")
     w("|---|---|---|---|---|---|---|---|")
     for key, _, label, unit, dp in SERIES:
+        if key not in res["shape_seasonal"]:
+            continue
         r = res["shape_seasonal"][key]
         a, p = r["amplitude"], r["phase"]
         w(f"| {label} | {unit} | {a['anchor']:.{dp}f} | "
@@ -543,7 +631,7 @@ def write_markdown(res, A, out_m):
     w("")
     w("| Percentile | Anchor | σ | Tolerance | Climate model | Offset | Verdict |")
     w("|---|---|---|---|---|---|---|")
-    for q in C.DJF_PCTL:
+    for q in (C.DJF_PCTL if res["shape_daily_distribution"] else []):
         r = res["shape_daily_distribution"][f"p{q}"]
         w(f"| p{q} | {r['anchor']:.2f} | {r['sigma']:.2f} | ±{r['tolerance']:.2f} | "
           f"{r['climate_model']:.2f} | {r['offset_in_sigma']:+.2f}σ | "
@@ -560,7 +648,7 @@ def write_markdown(res, A, out_m):
     w("| Level | Normalised anchor | Tolerance | Normalised model | Offset | "
       "Verdict | Absolute anchor (advisory) | Absolute model |")
     w("|---|---|---|---|---|---|---|---|")
-    for pl in C.PROFILE_LEVELS:
+    for pl in (C.PROFILE_LEVELS if res["shape_w_star_profile"]["levels"] else []):
         r = res["shape_w_star_profile"]["levels"][f"{pl:g}"]
         nm, ab = r["normalised"], r["absolute_advisory"]
         w(f"| {pl:g} hPa | {nm['anchor']:.4f} | ±{nm['tolerance']:.4f} | "
@@ -573,7 +661,8 @@ def write_markdown(res, A, out_m):
     w("| Check | Anchor | Climate model | Accept | Verdict |")
     w("|---|---|---|---|---|")
     s = res["counts"]["ssw_NH"]
-    w(f"| Major NH SSW, count | {s['anchor_rate']:.2f}/winter | "
+    if res["counts"]["ssw_NH"].get("available", True):
+        w(f"| Major NH SSW, count | {s['anchor_rate']:.2f}/winter | "
       f"{s['climate_model_count']} in {s['climate_model_winters']} winters | "
       f"{s['interval'][0]}–{s['interval'][1]} (expect {s['expected']:.1f}) | "
       f"{verdict(s['passes'])} |")
@@ -589,6 +678,8 @@ def write_markdown(res, A, out_m):
     w("|---|---|")
     any_flag = False
     for key, _, label, unit, dp in SERIES:
+        if key not in res["tier1"]:
+            continue
         if not res["tier1"][key]["passes"]:
             r = res["tier1"][key]
             any_flag = True
@@ -608,7 +699,8 @@ def write_markdown(res, A, out_m):
             any_flag = True
             w(f"| Tier 2 variance, {label} | ratio {v['ratio']:.2f}, outside "
               f"{v['window'][0]:.2f}–{v['window'][1]:.2f} |")
-    if not res["counts"]["ssw_NH"]["passes"]:
+    if res["counts"]["ssw_NH"].get("available", True) \
+            and not res["counts"]["ssw_NH"]["passes"]:
         s_ = res["counts"]["ssw_NH"]
         any_flag = True
         w(f"| Tier 2 SSW count | {s_['climate_model_count']} in "

@@ -34,3 +34,37 @@ PYTHONPATH=../scripts $PY 15_screen_out_of_sample.py
 `14` reads `output/07_period_split.json` and `output/02b_trends.json`; `15` reads `14`'s
 output. Both still run and still reproduce their JSON, and their output paths were
 repointed here so that running them cannot write into `docs/` or overwrite anything live.
+
+---
+
+## `22_era5_monthly_series.py` and `23_era5_monthly_tier1.py`
+
+Retired 2026-08-26, superseded by the general scoring path.
+
+They were the first route from a reanalysis to a scorecard: `22` reduced an ERA5
+monthly tape to the four diagnostics a monthly archive supports, and `23` scored
+them against the anchor and drew the figures. Both worked. The problem was
+duplication — `23`'s `score()` reproduced `17_validate.py`'s tier-1 block, its
+`score_seasonal()` reproduced 17's shape block, and it overrode 18's footer. Two
+scoring paths meant two places to keep a threshold change in step.
+
+What replaced them:
+
+- `20_series_from_zonal_mean.py` takes **any** zonal-mean source — reanalysis,
+  another GCM, an emulator rollout — and writes the standard series JSON. Adding a
+  source is a few lines of spec, not a new script.
+- `17_validate.py --source NAME` scores it. Diagnostics the source cannot supply
+  are reported as **not evaluable** rather than omitted, and results go to
+  `validation_results/<NAME>/`.
+
+Two ideas from these scripts survive in the replacement and are worth keeping
+attached to their origin. The first is *why monthly means are exact* for the four
+diagnostics that survive: each is a chain of linear operations, and linear
+operators commute with time averaging, so a day-weighted mean of monthly means
+equals the mean of the daily series — `20.expand_to_days` recovers that weighting.
+The second is that **independence is a property of the source, not of its period**:
+`23` had to override 18's footer because a reanalysis whose years lie inside the
+anchor is still an independent product. `20` now declares it and `17` carries it.
+
+Neither script runs any more: the tape `22` read is not rebuilt, and `23` imports
+`18` under its old signatures. They are kept for the reasoning, not to execute.

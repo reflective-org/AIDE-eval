@@ -101,14 +101,23 @@ def footer(fig, res):
     fig.text(0.045, 0.014,
              f"anchor CESM {res['anchor_period']}  ·  "
              f"estimator {res['estimator']}  ·  "
-             + ("model lies INSIDE the anchor: self-consistency check"
-                if res["inside_anchor"] else "model independent of the anchor"),
+             + ("independent of the anchor"
+                + ("; its period lies inside the anchor's"
+                   if res.get("inside_anchor") else "")
+                if res.get("independent")
+                else "model lies INSIDE the anchor: self-consistency check"),
              color=MUTED, fontsize=6.5)
 
 
-def save(fig, name, stamp):
+SUBDIR = ""
+
+
+def save(fig, name, stamp, subdir=None):
     root, ext = os.path.splitext(name)
-    p = os.path.join(RESULTS, f"{root}__{stamp}{ext}")
+    sd = SUBDIR if subdir is None else subdir
+    d = os.path.join(RESULTS, sd) if sd else RESULTS
+    os.makedirs(d, exist_ok=True)
+    p = os.path.join(d, f"{root}__{stamp}{ext}")
     fig.savefig(p, dpi=200, facecolor=SURFACE)
     plt.close(fig)
     print(f"wrote {p}")
@@ -121,7 +130,8 @@ def fig_tier1(A, res, S, segs):
                  "years. Band: anchor mean ±3σ.",
                  "a year outside the band is a flag, not a verdict.")
     lo, hi = res["climate_model_period"]
-    for i, (key, ykey, label, unit) in enumerate(SERIES):
+    drawn = [x for x in SERIES if x[0] in res["tier1"]]
+    for i, (key, ykey, label, unit) in enumerate(drawn):
         ax = style(fig.add_subplot(3, 2, i + 1))
         a, r = A["diagnostics"][key], res["tier1"][key]
         y, v = C.join_segments(S, segs, key, ykey)
@@ -160,8 +170,8 @@ def fig_mean(A, res):
                  "anchor σ. Shaded: the ±0.5σ tolerance. All six diagnostics are "
                  "scaled by σ, so they share one axis.")
     ax = style(fig.add_subplot(111))
-    keys = [k for k, *_ in SERIES][::-1]
-    labels = [l for _, _, l, _ in SERIES][::-1]
+    keys = [k for k, *_ in SERIES if k in res["tier2_mean"]][::-1]
+    labels = [l for k, _, l, _ in SERIES if k in res["tier2_mean"]][::-1]
     ax.axvspan(-0.5, 0.5, color=AQUA, alpha=0.10, lw=0)
     for x in (-0.5, 0.5):
         ax.axvline(x, color=AQUA, lw=0.9, ls=(0, (4, 3)))
@@ -194,7 +204,8 @@ def fig_variance(A, res):
                  f"samples per winter, at a {tau:.0f}-day decorrelation time, "
                  "against one for the annual series.")
     ax = style(fig.add_subplot(111))
-    rows = [(l, res["tier2_variance"][k]) for k, _, l, _ in SERIES]
+    rows = [(l, res["tier2_variance"][k]) for k, _, l, _ in SERIES
+            if k in res["tier2_variance"]]
     d = res["tier2_variance"]["daily_DJF_u60N"]
     if d.get("available", True):
         rows.append(("Daily DJF u, 60°N", d))
@@ -296,7 +307,8 @@ def fig_seasonal(A, res):
                  "scored; they are in the report tables, not drawn here.")
     gs = fig.add_gridspec(2, 3, hspace=0.52, wspace=0.28)
     x = np.arange(1, 13)
-    for i, (key, _, label, unit) in enumerate(SERIES):
+    drawn = [x for x in SERIES if x[0] in res["shape_seasonal"]]
+    for i, (key, _, label, unit) in enumerate(drawn):
         ax = style(fig.add_subplot(gs[i // 3, i % 3]), f"{'abcdef'[i]}   {label}")
         r = res["shape_seasonal"][key]
         ax.plot(x, r["anchor_climatology"], "-o", color=MUTED, lw=1.3, ms=3.0,
@@ -456,14 +468,25 @@ def main():
     res = json.load(open(src))
     ps = json.load(open(os.path.join(C.OUTDIR, "07_period_split.json")))
     S, segs = ps["series"], [ps["test"], ps["train"]]
-    os.makedirs(RESULTS, exist_ok=True)
-    fig_tier1(A, res, S, segs)
-    fig_mean(A, res)
-    fig_variance(A, res)
-    fig_counts(A, res)
-    fig_seasonal(A, res)
-    fig_daily_distribution(A, res, S, segs)
-    fig_w_star_profile(A, res)
+    global SUBDIR
+    SUBDIR = res.get("results_dir", "")
+    os.makedirs(os.path.join(RESULTS, SUBDIR) if SUBDIR else RESULTS, exist_ok=True)
+    # Draw only what the source supported; 17 has already reported the rest as
+    # not evaluable, and an empty axes would say less than its absence.
+    if res["tier1"]:
+        fig_tier1(A, res, S, segs)
+    if res["tier2_mean"]:
+        fig_mean(A, res)
+    if res["tier2_variance"]:
+        fig_variance(A, res)
+    if res["counts"]["ssw_NH"].get("available", True):
+        fig_counts(A, res)
+    if res["shape_seasonal"]:
+        fig_seasonal(A, res)
+    if res["shape_daily_distribution"]:
+        fig_daily_distribution(A, res, S, segs)
+    if res["shape_w_star_profile"]["levels"]:
+        fig_w_star_profile(A, res)
 
 
 if __name__ == "__main__":

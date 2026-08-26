@@ -66,7 +66,8 @@ CESM 1970–2014) and `output/17_validation__<stamp>.json` (a scored climate mod
 The protocol is `docs/EVALUATION_PROTOCOL.md`, and it is self-contained — thresholds,
 derivation (appendix A), decisions (appendix B) and limitations (appendix C) in one file.
 `validation_results/` holds a scored climate model as `validation_result__<stamp>.md` plus seven figures,
-all generated from the same JSON, so they cannot drift apart.
+all generated from the same JSON, so they cannot drift apart. One subfolder per non-CESM
+source (`ERA5/`, `ERA-Interim/`, `JRA-55/`, `MERRA-2/`), written by the same `17`/`18`.
 
 The repo was trimmed to this protocol on 2026-08-19. Removed and **not retained**: the
 target table and CSV, the observability and mechanism diagnostics, the explainer and 10-year
