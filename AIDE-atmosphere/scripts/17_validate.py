@@ -252,6 +252,9 @@ def main():
                             if outside[b * BLOCK:(b + 1) * BLOCK].any())
         res["tier1"][key] = dict(
             units=unit, band=band, n_years=int(len(v)),
+            # the scored series itself, so 18 plots what was scored rather than
+            # reaching back into the CESM record for every source
+            years=[int(t) for t in y], values=[float(x) for x in v],
             n_outside=int(outside.sum()),
             years_outside=[int(t) for t in y[outside]],
             worst_sigma=float(z[np.argmax(np.abs(z))]),

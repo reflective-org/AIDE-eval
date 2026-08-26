@@ -125,39 +125,52 @@ def save(fig, name, stamp, subdir=None):
 
 # ---------------------------------------------------------------- tier 1
 def fig_tier1(A, res, S, segs):
-    fig = newfig(11.0, 7.2, "Tier 1 — individual years against the ±3σ band",
-                 "Grey: anchor years outside the model window. Blue: climate-model "
-                 "years. Band: anchor mean ±3σ.",
-                 "a year outside the band is a flag, not a verdict.")
+    nd = len([x for x in SERIES if x[0] in res["tier1"]])
+    fig = newfig(11.0, 3.0 + 1.4 * max(1, -(-nd // 2)),
+                 "Tier 1 — individual years against the ±3σ band",
+                 "Grey: the anchor's own record, for context. Blue: the scored "
+                 "model's years. Band: anchor mean ±3σ.",
+                 "a year outside the band is a flag, not a verdict. Grey and blue "
+                 "are the same series only when the scored model is the anchor's "
+                 "own run; for any other source they are different datasets.")
     lo, hi = res["climate_model_period"]
     drawn = [x for x in SERIES if x[0] in res["tier1"]]
+    nrow = max(1, -(-len(drawn) // 2))
     for i, (key, ykey, label, unit) in enumerate(drawn):
-        ax = style(fig.add_subplot(3, 2, i + 1))
+        ax = style(fig.add_subplot(nrow, 2, i + 1))
         a, r = A["diagnostics"][key], res["tier1"][key]
-        y, v = C.join_segments(S, segs, key, ykey)
+        ay, av = C.join_segments(S, segs, key, ykey)      # the anchor's own record
+        y = np.asarray(r["years"], float)                 # what was actually scored
+        v = np.asarray(r["values"], float)
         band, mu = a["screening_band"], a["mean"]
         ax.axhspan(band[0], band[1], color=BLUE, alpha=0.06, lw=0)
         for b in band:
             ax.axhline(b, color=BLUE, lw=0.8, ls=(0, (4, 3)), alpha=0.7)
         ax.axhline(mu, color=MUTED, lw=0.7)
-        out = (y >= lo) & (y <= hi)
-        ax.plot(y[~out], v[~out], "o", ms=2.6, color=RULE, mec="none")
-        ax.plot(y[out], v[out], "o", ms=3.4, color=BLUE, mec="none")
+        ax.plot(ay, av, "o", ms=2.6, color=RULE, mec="none")
+        ax.plot(y, v, "o", ms=3.4, color=BLUE, mec="none")
         bad = np.isin(y, r["years_outside"])
         if bad.any():
             ax.plot(y[bad], v[bad], "o", ms=7, mfc="none", mec=FAIL, mew=1.4)
-            for t, val in zip(y[bad], v[bad]):
-                ax.annotate(f"{int(t)}", (t, val), textcoords="offset points",
-                            xytext=(7, 0), color=FAIL, fontsize=6.5, va="center")
+            # naming every flagged year is unreadable once there are many of them,
+            # and the subtitle already carries the count and the worst
+            if bad.sum() <= 5:
+                for t, val in zip(y[bad], v[bad]):
+                    ax.annotate(f"{int(t)}", (t, val), textcoords="offset points",
+                                xytext=(7, 0), color=FAIL, fontsize=6.5, va="center")
         v_ok = "PASS" if r["passes"] else "FAIL"
         style(ax, f"{'abcdef'[i]}   {label}",
               f"{unit} · {r['n_outside']}/{r['n_years']} outside · "
               f"worst {r['worst_sigma']:+.2f}σ ({r['worst_year']}) · {v_ok}")
-        ax.set_xlim(1968, 2016)
-        span = [min(band[0], v.min()), max(band[1], v.max())]
+        x0 = min(ay.min(), y.min()) - 2
+        x1 = max(ay.max(), y.max()) + 2
+        ax.set_xlim(x0, x1)
+        span = [min(band[0], v.min(), av.min()), max(band[1], v.max(), av.max())]
         pad = 0.10 * (span[1] - span[0])
         ax.set_ylim(span[0] - pad, span[1] + pad)
-    fig.subplots_adjust(left=0.075, right=0.975, top=fig.text_bottom - 0.062, bottom=0.075,
+    # a two-row figure is shorter, so the footer needs a larger fraction below
+    fig.subplots_adjust(left=0.075, right=0.975, top=fig.text_bottom - 0.062,
+                        bottom=0.075 if nrow > 2 else 0.145,
                         hspace=0.62, wspace=0.19)
     footer(fig, res)
     save(fig, "tier1_screening.png", res["stamp"])
