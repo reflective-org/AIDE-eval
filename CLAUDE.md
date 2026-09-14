@@ -58,8 +58,10 @@ For multi-step tasks, state a brief plan:
 
 A derivation suite for the **two-tier evaluation protocol**, not a model. It measures
 CESM2.1.5-WACCM6 fixed-SST output and produces the thresholds an AIDE-WACCM emulator
-rollout must meet for tropical upwelling and the polar vortex. Every number here is
-CESM-vs-CESM; nothing has yet been run against an actual emulator rollout.
+rollout must meet for tropical upwelling and the polar vortex. The thresholds are
+CESM-vs-CESM. Scored against them so far: four reanalyses (monthly, four diagnostics) and the
+`jcm-strat` phase-10 rollout 1990–2019 (daily, every diagnostic), each in its own folder
+under `validation_results/`. No AIDE-WACCM emulator rollout has been scored yet.
 
 Authoritative outputs: `output/16_anchors_45yr.json` (the thresholds, both tiers anchored on
 CESM 1970–2014) and `output/17_validation__<stamp>.json` (a scored climate model).

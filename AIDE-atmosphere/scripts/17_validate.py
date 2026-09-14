@@ -176,14 +176,29 @@ def source_series(name):
     for key, ykey, _, _, _ in SERIES:
         if key in S:
             out[key] = (np.asarray(S[ykey], int), np.asarray(S[key], float))
+    for _, xk, yk, ykey in MECHANISM:
+        if xk in S and xk not in out:
+            out[xk] = (np.asarray(S[ykey], int), np.asarray(S[xk], float))
     for key, _, _, _, _ in SERIES:
         k = f"_monthly_{key}"
         if k in S:
             out[k] = (np.asarray(S["_monthly_years"], int),
                       np.asarray(S[k], float))
-    # daily series, SSW seasons and the w* profile are absent unless the source
-    # carries them; main() reports each as not evaluable.
-    return src, out, None, None, 0
+    # The daily series, the DJF percentiles, the w* profile and the SSW seasons
+    # are present only when the source carries daily u, v, omega, T and v'T';
+    # for anything thinner main() reports each as not evaluable.
+    for pl in C.PROFILE_LEVELS:
+        k = f"_profile_{pl:g}"
+        if k in S:
+            out[k] = (np.asarray(S["_profile_years"], int), np.asarray(S[k], float))
+    if "_djf_pctl" in S:
+        out["_djf_pctl"] = (np.asarray(S["_djf_pctl_years"], int),
+                            np.asarray(S["_djf_pctl"], float))
+    daily = (np.asarray(S["_u60n_djf_daily"], float)
+             if "_u60n_djf_daily" in S else None)
+    ssw = (np.asarray(S["_ssw_seasons"], float) if "_ssw_seasons" in S else None)
+    winters = int(S.get("_ssw_winters", 0))
+    return src, out, daily, ssw, winters
 
 
 def main():
@@ -317,11 +332,10 @@ def main():
               f"[{dv['window'][0]:.2f},{dv['window'][1]:.2f}] "
               f"{'pass' if dv['passes'] else 'FAIL'}")
     else:
-        res["tier2_variance"]["daily_DJF_u60N"] = dict(
-            available=False,
-            reason="window does not line up with whole CESM segments")
-        print(f"  {'daily DJF u 60N':20s} not available - window is not "
-              f"segment-aligned")
+        reason = ("the source carries no daily series" if src else
+                  "window does not line up with whole CESM segments")
+        res["tier2_variance"]["daily_DJF_u60N"] = dict(available=False, reason=reason)
+        print(f"  {'daily DJF u 60N':20s} not available - {reason}")
 
     # ------------------------------------------------------------- shape checks
     # Reported at tier 1, gated at tier 2. The tolerance is always taken at the
