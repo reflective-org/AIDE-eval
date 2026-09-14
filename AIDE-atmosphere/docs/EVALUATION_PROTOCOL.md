@@ -9,7 +9,7 @@ Every number below is transcribed from `output/16_anchors_45yr.json`, produced b
 `scripts/16_anchors_45yr.py`. **Both tiers are anchored on CESM 1970–2014, the whole
 record** — 44 annual years, 42 DJF and 45 JJA seasons. Nothing here has been run against an
 AIDE-WACCM rollout: these are the criteria, plus the machinery exercised on a window of
-CESM's own output (§3.4).
+CESM's own output (§3.4), on four reanalyses and on one GCM rollout (§6).
 
 The anchor uses every year the run affords, which makes σ the best estimated and the
 variance windows the tightest available. It also leaves no CESM output held back to test the
@@ -511,10 +511,32 @@ $PY scripts/18_validation_figures.py --climate-model "ERA5 (CLaMS v3.1 zonal mea
 
 The contract a source has to meet is small: **zonal-mean u and T on pressure levels,
 with a time axis.** That yields the two vortex and two polar-cap diagnostics and their
-seasonal cycle. A source that also carries v and omega would add the TEM residual
-circulation; one at daily resolution would add the SSW count and the daily
-distribution. Whatever a source cannot supply, `17` reports as **not evaluable** rather
-than omitting — a partial scorecard can never be mistaken for a complete one.
+seasonal cycle. A source that also carries daily v, ω, T and the eddy heat flux v'T'
+(formed from the 3-D fields before any time averaging, §4.6) scores the full set: `20`
+derives w = −Hω/p, θ and v'θ' and hands the five fields to the same
+`aide_val_common.series_from_tem_fields` that `07` applies to the CESM tape, so the
+mass flux, w̄*, its profile, the 100 hPa heat flux, the SSW count and the daily
+distribution all come out of one code path (§5, rule 1). Whatever a source cannot
+supply, `17` reports as **not evaluable** rather than omitting — a partial scorecard
+can never be mistaken for a complete one.
+
+The first source to take the full path is a GCM rollout: `jcm-strat` phase 10, the
+stratosphere-only JCM configuration on the Dinosaur dycore (T63, 63 levels, troposphere
+and the tropical zonal-mean wind nudged to ERA5, stratospheric temperature relaxed to a
+seasonal Polvani–Kushner equilibrium), thirty chained one-year segments 1990–2019 with
+6-hourly output. `20` reads the zonal-mean cache of that output, takes daily means, and
+labels the source independent of the anchor; its result and figures are in
+`validation_results/JCM-strat-p10/`.
+
+```bash
+$PY scripts/20_series_from_zonal_mean.py JCM-strat-p10 1990 2019   # ~2 min, reads 7 GB
+$PY scripts/17_validate.py --source JCM-strat-p10
+$PY scripts/18_validation_figures.py --climate-model "jcm-strat phase 10 (T63 strat63) 1990-2019"
+```
+
+The rollout is 30 years, below the 35 tier 2 asks for, so its tier-2 tolerances sit at
+the `0.5σ` branch (n = 30 > 15.4) and every verdict counts; the σ-ratio windows are
+correspondingly a little wider than at n = 35.
 
 > **Interpretation** — independence is a property of the *source*, not of its *period*.
 > A reanalysis whose years lie inside the anchor's is still an independent product; a
@@ -707,8 +729,9 @@ see appendix C.
   harmonic phase sits away from the observed maximum — w̄*'s harmonic peaks in December while
   its 12-point curve peaks in March — so a model could reproduce the harmonic and still have
   the wrong shape between the peaks.
-- **Nothing here has been run against an actual emulator rollout.** Every number is
-  CESM-vs-CESM.
+- **No AIDE-WACCM emulator rollout has been scored.** The thresholds are CESM-vs-CESM; the
+  full path has been exercised end to end on one GCM rollout (§6), so the first emulator
+  score needs no new code, only a reader for its archive.
 
 ---
 
