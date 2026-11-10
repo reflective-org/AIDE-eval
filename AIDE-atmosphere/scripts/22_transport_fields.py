@@ -25,6 +25,7 @@ import sys
 import warnings
 
 import numpy as np
+import xarray as xr
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import aide_val_common as C
@@ -154,9 +155,82 @@ def group_B(F, R):
     return rows, dict(wstar_p=p.tolist(), wstar_tropics=T.tropical_profile(w, lat).tolist())
 
 
+# --------------------------------------------------------------------- group C
+# Polar vortex against ERA5 for the same months (jcm-strat teq_score.py): monthly
+# means of the model's daily u and T, ERA5 monthly zonal means interpolated onto
+# the model's latitudes (linear) and levels (linear in log p, clamped to ERA5's
+# range), then DJF (north) and JJA (south) means over the window's months. At the
+# model level nearest 50 and 10 hPa, as jcm-strat: ERA5 sits on the same level,
+# so the comparison is like for like. The reference depends on the model grid and
+# is computed per source.
+WINTER = {"N": ((12, 1, 2), 1.0), "S": ((6, 7, 8), -1.0)}
+
+
+def monthly(x, days):
+    """Calendar-month means of a daily (day, p, lat) field -> keys, (month, p, lat)."""
+    ym = days.astype("datetime64[M]")
+    keys = np.unique(ym)
+    return ([(int(str(k)[:4]), int(str(k)[5:7])) for k in keys],
+            np.stack([x[ym == k].mean(axis=0, dtype="f8") for k in keys]))
+
+
+def era5_monthly(var, keys, p, lat):
+    """ERA5 monthly zonal mean of `var` on (p, lat) for each (year, month) in keys."""
+    out = {}
+    for y in sorted({k[0] for k in keys}):
+        with xr.open_dataset(T.REFS["era5_zm_monthly"].format(year=y)) as ds:
+            tname = [c for c in ds.coords if c.startswith("time") or c == "valid_time"][0]
+            x = ds[var].rename({tname: "time"}).interp(lat=lat)
+            lp = np.log(ds.level.values.astype(float))
+            o = np.argsort(lp)
+            lpo = np.log(np.clip(p, np.exp(lp[o][0]), np.exp(lp[o][-1])))
+            for m in range(1, 13):
+                if (y, m) in keys:
+                    prof = x.sel(time=x.time.dt.month == m).mean("time").values[o]
+                    out[(y, m)] = np.stack([np.interp(lpo, lp[o], prof[:, j])
+                                            for j in range(lat.size)], axis=1)
+    return np.stack([out[k] for k in keys])
+
+
+def jet(u, lat, sign):
+    """Winter jet maximum poleward of 30 deg and its (grid) latitude."""
+    m = sign * lat >= 30
+    i = int(np.argmax(u[m]))
+    return float(u[m][i]), float(lat[m][i])
+
+
+def group_C(F, R):
+    p, lat = F["plev"], F["lat"]
+    keys, U = monthly(F["Uzm"], F["days"])
+    _, TT = monthly(F["T"], F["days"])
+    EU, ET = era5_monthly("uzm", keys, p, lat), era5_monthly("tzm", keys, p, lat)
+    mon = np.array([k[1] for k in keys])
+    k50, k10 = T.nearest_level(p, 50.0), T.nearest_level(p, 10.0)
+    jets, caps = [], []
+    for h, (months, sign) in WINTER.items():
+        k = np.isin(mon, months)
+        um, eu, tm, et = U[k].mean(0), EU[k].mean(0), TT[k].mean(0), ET[k].mean(0)
+        name = {"N": "NH", "S": "SH"}[h]
+        for lev, kk in (("50", k50), ("10", k10)):
+            (mj, ml), (ej, el) = jet(um[kk], lat, sign), jet(eu[kk], lat, sign)
+            jets.append((f"jet{lev}_{h}", f"{name} {lev} hPa", mj, ml, ej, el))
+        cap = sign * lat >= 60
+        w = np.cos(np.deg2rad(lat[cap]))
+        caps.append(row("C", f"C2-{h}", f"polar-cap T bias 50 hPa {h} [K]",
+                        np.sum((tm[k50] - et[k50])[cap] * w) / np.sum(w), 0.0,
+                        model_T=float(np.sum(tm[k50][cap] * w) / np.sum(w)),
+                        era5_T=float(np.sum(et[k50][cap] * w) / np.sum(w))))
+    rows = []
+    for key in ("jet50_N", "jet10_N", "jet50_S", "jet10_S"):
+        _, lab, mj, ml, ej, el = next(j for j in jets if j[0] == key)
+        rows.append(row("C", f"C1-{key}", f"jet {lab} [m/s]", mj, ej))
+        rows.append(row("C", f"C1-{key}-lat", f"jet {lab} latitude [deg]", ml, el))
+    return rows + caps, dict(level_50=float(p[k50]), level_10=float(p[k10]), n_months=len(keys))
+
+
 # --------------------------------------------------------------------- driver
 def references():
-    return dict(A=references_A(), B=references_B())
+    return dict(A=references_A(), B=references_B(), C={})
 
 
 def public(d):
@@ -169,7 +243,7 @@ def diagnose(name, R):
     spec = T.SOURCES[name]
     F = T.load_source(name, YEARS)
     rows, prof = [], {}
-    for fn, key in ((group_A, "A"), (group_B, "B")):
+    for fn, key in ((group_A, "A"), (group_B, "B"), (group_C, "C")):
         r, p = fn(F, R[key])
         rows += r
         prof.update(p)

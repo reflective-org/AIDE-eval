@@ -23,6 +23,7 @@ lists the change the interpolation makes separately.
 
 import argparse
 import datetime
+import importlib.util
 import json
 import os
 import sys
@@ -53,7 +54,16 @@ NOTES = {
           "WACCM6 h6 94.9 / 66.8 / 47.1 / 32.6 / 9.55 hPa for 100 / 70 / 50 / 30 / 10 hPa. The "
           "largest change is in the WACCM6 references at 100 hPa (w* +14 %, mass flux +14 %), "
           "where w* and Psi* grow fast below the nearest level."],
-    "C": [],
+    "C": ["jcm-strat teq_score.py takes calendar-month means of the 6-hourly frames by their "
+          "timestamp (00Z on day 1 to 18Z on the last day). The port takes them from the daily "
+          "means, and jcm-strat daily_zm.py builds each day from 06Z, 12Z, 18Z and 00Z of the next "
+          "day. Every month therefore loses the 00Z frame that opens it and gains the one that "
+          "opens the next month: one frame in about 120. The ERA5 side is identical. The shift "
+          "table above estimates the effect from the daily series; it has the sign and size of "
+          "every C2 difference.",
+          "A jet latitude is a grid latitude (argmax). Where two grid rows carry nearly the same "
+          "wind, the one-frame shift can move the maximum by one row (1.87 deg). The tie table "
+          "above lists the wind at both rows for every latitude that differs."],
     "D": [],
 }
 
@@ -150,6 +160,70 @@ def interpolation_table(g, names, P):
     return L
 
 
+def module_22():
+    spec = importlib.util.spec_from_file_location(
+        "t22", os.path.join(os.path.dirname(os.path.abspath(__file__)), "22_transport_fields.py"))
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    return m
+
+
+def c_frame_shift(names, P, J):
+    """Group C: the expected port - jcm-strat difference of the winter polar-cap T from the
+    one-frame-per-month shift, and the wind at both rows of a jet latitude that differs.
+
+    The month's mean changes by (x[00Z, day 1 of next month] - x[00Z, day 1]) / n_frames.
+    The 00Z frames are not in the daily files; the mean of the two daily values either
+    side of each stands in for it (the first and last day of the record at the edges)."""
+    m22 = module_22()
+    L = ["", "Expected effect of the one-frame-per-month shift on C2 against the observed "
+         "difference (port - jcm-strat; jcm-strat rounds C2 to 0.01 K, so the observed value "
+         "carries +-0.005 K) [K]:", "",
+         "| run | C2-N observed | C2-N expected | C2-S observed | C2-S expected |",
+         "|---|---|---|---|---|"]
+    ties = []
+    for n in names:
+        F = T.load_source(n, range(T.WINDOW[0], T.WINDOW[1] + 1))
+        p, lat, days = F["plev"], F["lat"], F["days"]
+        k50 = T.nearest_level(p, 50.0)
+        ym = days.astype("datetime64[M]")
+        keys = np.unique(ym)
+        mon = np.array([int(str(k)[5:7]) for k in keys])
+        cells = []
+        for h, (months, sign) in m22.WINTER.items():
+            cap = sign * lat >= 60
+            w = np.cos(np.deg2rad(lat[cap]))
+            tc = (F["T"][:, k50][:, cap] * w).sum(1, dtype="f8") / w.sum()
+            sh = []
+            for k in keys[np.isin(mon, months)]:
+                i = np.where(ym == k)[0]
+                a = tc[i[0]] if i[0] == 0 else 0.5 * (tc[i[0] - 1] + tc[i[0]])
+                b = tc[i[-1]] if i[-1] + 1 >= days.size else 0.5 * (tc[i[-1]] + tc[i[-1] + 1])
+                sh.append((b - a) / (4 * i.size))
+            obs = next(x for x in P[n]["metrics"] if x["id"] == f"C2-{h}")["model"] - J[n][f"C2-{h}"]["model"]
+            cells += [f"{obs:+.3f}", f"{np.mean(sh):+.3f}"]
+        L.append(f"| {n} | " + " | ".join(cells) + " |")
+        keys_m, U = m22.monthly(F["Uzm"], days)
+        sel = np.array([k[1] for k in keys_m])
+        for mid in [x["id"] for x in P[n]["metrics"] if x["id"].startswith("C1") and x["id"].endswith("-lat")]:
+            pm = next(x for x in P[n]["metrics"] if x["id"] == mid)["model"]
+            jm = J[n][mid]["model"]
+            if agrees(mid, pm, jm):
+                continue
+            lev, h = mid[6:8], mid[9]
+            months, _ = m22.WINTER[h]
+            um = U[np.isin(sel, months)].mean(0)[T.nearest_level(p, float(lev))]
+            jj = int(np.argmin(np.abs(lat - jm)))
+            jp = int(np.argmin(np.abs(lat - pm)))
+            ties.append(f"| {n} | {mid} | {lat[jj]:.2f}: {um[jj]:.3f} | {lat[jp]:.2f}: {um[jp]:.3f} | "
+                        f"{um[jp] - um[jj]:+.4f} |")
+    if ties:
+        L += ["", "Jet latitudes that differ: the port's winter-mean wind at jcm-strat's row and at "
+              "its own row [m/s]:", "",
+              "| run | metric | jcm-strat row | port row | difference |", "|---|---|---|---|---|"] + ties
+    return L
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[1].strip())
     ap.add_argument("names", nargs="*")
@@ -169,6 +243,8 @@ def main():
         L += group_table(g, names, P, J, R)
         L += interpolation_table(g, names, P)
         L += raw_table(g, names, P, J)
+        if g == "C":
+            L += c_frame_shift(names, P, J)
         if NOTES[g]:
             L += ["", "Causes of the remaining differences:", ""] + [f"- {x}" for x in NOTES[g]]
         L.append("")
