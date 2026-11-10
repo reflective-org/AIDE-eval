@@ -264,3 +264,65 @@ def waccm_age(years):
         a = w.AOA.isel(time=np.where(sel)[0]).mean("time")
         a = a.where(a >= 0)
         return np.asarray(w.lev, "f8"), np.asarray(w.lat, "f8"), a.values.astype("f8")
+
+
+# --------------------------------------------------------------------- residual circulation
+# jcm-strat strat_circulation.py: the TEM residual streamfunction from time-mean
+# [v], [v'theta'], [theta] in pressure coordinates, and w* from its latitude
+# derivative - no w-bar needed. Constants are CESM's (aide_val_common, protocol
+# section 4.6) where jcm-strat has a = 6.371e6 m, g = 9.80665 m/s2: w* scales with
+# 1/a (-0.004 %), Psi* with a/g (+0.009 %).
+def tem_streamfunction(vbar, vth, thbar, p_pa, lat_deg):
+    """(p, lat) time means on pressure p_pa [Pa, any order] -> p ascending [Pa],
+    v* [m/s] and Psi* [kg/s]:
+
+        v*  = [v] - d/dp ( [v'theta'] / d[theta]/dp )
+        Psi* = (2 pi a cos(phi) / g) * int_top^p v* dp'     (trapezoid from the top level)
+    """
+    order = np.argsort(p_pa)
+    p = p_pa[order]
+    vbar, vth, thbar = vbar[order], vth[order], thbar[order]
+    dth_dp = np.gradient(thbar, p, axis=0)
+    dth_dp = np.where(np.abs(dth_dp) < 1e-6, np.sign(dth_dp + 1e-30) * 1e-6, dth_dp)
+    vstar = vbar - np.gradient(vth / dth_dp, p, axis=0)
+    integrand = vstar * np.cos(np.deg2rad(lat_deg))[None, :]
+    psi = np.zeros_like(vstar)
+    psi[1:] = np.cumsum(0.5 * (integrand[1:] + integrand[:-1]) * np.diff(p)[:, None], axis=0)
+    psi *= 2 * np.pi * C.A_EARTH / C.G0
+    return p, vstar, psi
+
+
+def residual_w(p, psi, lat_deg):
+    """w* [mm/s] on (p, lat) from Psi*: omega* = -(g / (2 pi a^2 cos(phi))) dPsi*/dphi,
+    w* = -H omega* / p, H = 7 km. Rows poleward of 88 deg are masked (1/cos)."""
+    phi = np.deg2rad(lat_deg)
+    dpsi = np.gradient(psi, phi, axis=1)
+    omega = -(C.G0 / (2 * np.pi * C.A_EARTH ** 2 * np.cos(phi)[None, :])) * dpsi
+    w = -C.H_SCALE * omega / p[:, None] * 1e3
+    w[:, np.abs(lat_deg) > 88.0] = np.nan
+    return w
+
+
+def tropical_wstar(p_hpa, w, lat, target, nearest=False):
+    """cos(lat)-weighted w* [mm/s] over |lat| <= 15 at `target` hPa: linear in
+    log p between the bracketing levels (aide_val_common.interp_level), or at the
+    nearest level as jcm-strat does (nearest=True)."""
+    row = (w[nearest_level(p_hpa, target)] if nearest
+           else C.interp_level(w, p_hpa, target, axis=0))
+    return band_abs(lat, row, 0, 15)
+
+
+def upward_mass_flux(p_hpa, psi, lat, target, nearest=False):
+    """Tropical upward mass flux [kg/s]: max - min of Psi* over |lat| <= 60 at
+    `target` hPa, Psi* interpolated linearly in log p (or the nearest level)."""
+    row = (psi[nearest_level(p_hpa, target)] if nearest
+           else C.interp_level(psi, p_hpa, target, axis=0))
+    row = row[np.abs(lat) <= 60.0]
+    return float(row.max() - row.min())
+
+
+def tropical_profile(w, lat, lat_max=15.0):
+    """cos(lat)-weighted mean over |lat| <= lat_max at every level."""
+    m = np.abs(lat) <= lat_max
+    c = np.cos(np.deg2rad(lat[m]))
+    return np.nansum(w[:, m] * c, axis=1) / np.sum(c)

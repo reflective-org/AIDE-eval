@@ -93,9 +93,70 @@ def group_A(F, R):
     return rows, dict(age_p=p.tolist(), age_tropics=prof.tolist(), age_level_55=float(p[k55]))
 
 
+# --------------------------------------------------------------------- group B
+# Residual circulation (jcm-strat sweep_score.wstar_fields / waccm_wstar and
+# success_metrics B1, B2): Psi* and w* from the time means of [v], [v'theta'] and
+# [theta] over the window, model and WACCM6 through the same functions. Scored at
+# the exact target pressure, linear in log p; the nearest-level values jcm-strat
+# scores are kept beside them for the port check. INTERIM w* estimator, AIDE-eval
+# issue #5 (docs/TRANSPORT_SCORECARD.md).
+W_LEVELS = (100.0, 70.0, 50.0, 30.0, 10.0)
+FLUX_LEVELS = (100.0, 70.0)
+
+
+def circulation(V, VTH, TH, p_hpa, lat):
+    """Time-mean fields (time, p, lat) -> p [hPa, ascending], Psi* [kg/s], w* [mm/s]."""
+    mean = lambda x: np.nanmean(x, axis=0, dtype="f8")
+    p, _, psi = T.tem_streamfunction(mean(V), mean(VTH), mean(TH), p_hpa * 100.0, lat)
+    return p / 100.0, psi, T.residual_w(p, psi, lat)
+
+
+def circulation_metrics(p, psi, w, lat):
+    out = {}
+    for lv in W_LEVELS:
+        out[f"B1-{lv:g}"] = (T.tropical_wstar(p, w, lat, lv),
+                             T.tropical_wstar(p, w, lat, lv, nearest=True))
+    for lv in FLUX_LEVELS:
+        out[f"B2-{lv:g}"] = (T.upward_mass_flux(p, psi, lat, lv) / 1e9,
+                             T.upward_mass_flux(p, psi, lat, lv, nearest=True) / 1e9)
+    return out
+
+
+def references_B():
+    seg = T.REFS["waccm_tem_segment"]
+    V, VTH, TH = (C.load_h6(seg, v, T.WACCM_ILEV) for v in ("Vzm", "VTHzm", "THzm"))
+    yr = np.array([t.year for t in V.time.values])
+    keep = (yr >= T.WACCM_TEM_YEARS[0]) & (yr <= T.WACCM_TEM_YEARS[1])
+    lat = V.lat.values.astype("f8")
+    p, psi, w = circulation(V.values[keep], VTH.values[keep], TH.values[keep],
+                            V.ilev.values.astype("f8"), lat)
+    return dict(years=list(T.WACCM_TEM_YEARS), segment=seg, n_days=int(keep.sum()),
+                n_levels=int(p.size), top_hPa=float(p[0]),
+                metrics={k: dict(interp=v[0], nearest=v[1])
+                         for k, v in circulation_metrics(p, psi, w, lat).items()},
+                nearest_hPa={f"{lv:g}": float(p[T.nearest_level(p, lv)]) for lv in W_LEVELS},
+                profile_waccm_p=p.tolist(),
+                profile_waccm_wstar_tropics=T.tropical_profile(w, lat).tolist())
+
+
+def group_B(F, R):
+    p, lat = F["plev"], F["lat"]
+    p, psi, w = circulation(F["Vzm"], F["VTHzm"], F["THzm"], p, lat)
+    M = circulation_metrics(p, psi, w, lat)
+    rows = []
+    for mid, (vi, vn) in M.items():
+        lv = mid.split("-")[1]
+        label = (f"w* {lv} hPa [mm/s]" if mid.startswith("B1")
+                 else f"mass flux {lv} hPa [1e9 kg/s]")
+        r = R["metrics"][mid]
+        rows.append(row("B", mid, label, vi, r["interp"], model_nearest=vn, ref_nearest=r["nearest"],
+                        nearest_hPa=float(p[T.nearest_level(p, float(lv))])))
+    return rows, dict(wstar_p=p.tolist(), wstar_tropics=T.tropical_profile(w, lat).tolist())
+
+
 # --------------------------------------------------------------------- driver
 def references():
-    return dict(A=references_A())
+    return dict(A=references_A(), B=references_B())
 
 
 def public(d):
@@ -108,7 +169,7 @@ def diagnose(name, R):
     spec = T.SOURCES[name]
     F = T.load_source(name, YEARS)
     rows, prof = [], {}
-    for fn, key in ((group_A, "A"),):
+    for fn, key in ((group_A, "A"), (group_B, "B")):
         r, p = fn(F, R[key])
         rows += r
         prof.update(p)

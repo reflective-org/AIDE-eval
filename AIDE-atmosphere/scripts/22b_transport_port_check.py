@@ -44,7 +44,15 @@ GROUP_NAME = {"A": "A age of air", "B": "B residual circulation",
 # docs/TRANSPORT_SCORECARD.md section 6). Printed under each group table.
 NOTES = {
     "A": [],
-    "B": [],
+    "B": ["Nearest-level values differ by -0.003 % (w*) and +0.008 % (mass flux) in every run "
+          "and in the reference: the port uses CESM's a = 6.37122e6 m and g = 9.80616 m s-2 "
+          "(aide_val_common, protocol section 4.6) where jcm-strat uses 6.371e6 m and "
+          "9.80665 m s-2; w* scales with 1/a, Psi* with a/g.",
+          "The scored values change because w* and Psi* are interpolated linearly in log p to "
+          "the exact target pressure. Nearest levels: model 95.9 / 72.2 / 49.3 / 30.4 / 9.86 hPa, "
+          "WACCM6 h6 94.9 / 66.8 / 47.1 / 32.6 / 9.55 hPa for 100 / 70 / 50 / 30 / 10 hPa. The "
+          "largest change is in the WACCM6 references at 100 hPa (w* +14 %, mass flux +14 %), "
+          "where w* and Psi* grow fast below the nearest level."],
     "C": [],
     "D": [],
 }
