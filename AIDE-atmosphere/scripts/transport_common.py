@@ -18,7 +18,10 @@ from __future__ import annotations
 
 import glob
 import os
+import warnings
+import zipfile
 
+import netCDF4
 import numpy as np
 import xarray as xr
 
@@ -153,3 +156,111 @@ def load_source(name, years):
     """The contract fields of one registered source, levels and latitudes ascending."""
     spec = SOURCES[name]
     return READERS[spec["reader"]](spec, years)
+
+
+# --------------------------------------------------------------------- scoring
+# jcm-strat scripts/relative_scores.py: rel = model / ref - 1, err = |rel| / TOL.
+# Metrics with no meaningful relative form keep their absolute bound and are
+# reported as a difference in their own unit.
+TOL = 0.25
+A4_RANGE = (2.3, 3.2)            # yr; A4 is scored against the midpoint 2.75
+ABS_BOUND = {"A2": 0.4, "C2-N": 2.0, "C2-S": 2.0, "D4-fwN": 10.0, "D4-fwS": 10.0,
+             **{f"C1-jet{p}_{h}-lat": 4.0 for p in (50, 10) for h in "NS"}}
+ABS_UNIT = {"A2": "yr", "C2-N": "K", "C2-S": "K", "D4-fwN": "days", "D4-fwS": "days"}
+
+
+def ref_value(ref):
+    """A range reference (A4) is scored against its midpoint."""
+    return float(np.mean(ref)) if isinstance(ref, (list, tuple)) else float(ref)
+
+
+def score(mid, model, ref):
+    """(value, err) of one metric. value is % off the reference for a relative
+    metric, the difference in the metric's own unit for an absolute one (for a
+    jet latitude |model| - |ref|). A metric that could not be formed fails (err 3)."""
+    r = ref_value(ref)
+    if not np.isfinite(model):
+        return float("nan"), 3.0
+    if mid in ABS_BOUND:
+        d = abs(model) - abs(r) if mid.endswith("-lat") else model - r
+        return float(d), float(abs(d) / ABS_BOUND[mid])
+    rel = model / r - 1.0
+    return float(100.0 * rel), float(abs(rel) / TOL)
+
+
+def status(err):
+    return "pass" if err <= 1.0 else ("near" if err <= 1.5 else "fail")
+
+
+# --------------------------------------------------------------------- grid helpers
+# Ported from jcm-strat sweep_score.py, which group A and the jcm-strat numbers use.
+def nearest_level(p_hpa, target):
+    """Index of the level nearest `target` in pressure (sweep_score.at_level)."""
+    return int(np.argmin(np.abs(np.asarray(p_hpa) - target)))
+
+
+def band_abs(lat, row, lo, hi):
+    """cos(lat)-weighted mean over lo <= |lat| <= hi, both hemispheres, finite
+    points only (sweep_score.band)."""
+    m = (np.abs(lat) >= lo) & (np.abs(lat) <= hi) & np.isfinite(row)
+    w = np.cos(np.deg2rad(lat[m]))
+    return float(np.sum(row[m] * w) / np.sum(w))
+
+
+def on_grid(field, p_src, lat_src, p_dst, lat_dst):
+    """(p, lat) field onto (p_dst, lat_dst): linear in latitude, then in log p;
+    NaN outside the source range (sweep_score.on_grid)."""
+    o = np.argsort(p_src)
+    lp, lpo = np.log(p_src[o]), np.log(np.asarray(p_dst, float))
+    f = field[o]
+    ol = np.argsort(lat_src)
+    f, lat_s = f[:, ol], lat_src[ol]
+    tmp = np.stack([np.interp(lat_dst, lat_s, f[k], left=np.nan, right=np.nan)
+                    for k in range(f.shape[0])])
+    return np.stack([np.interp(lpo, lp, tmp[:, j], left=np.nan, right=np.nan)
+                     for j in range(tmp.shape[1])], axis=1)
+
+
+def weighted_rmse(diff, lat, mask):
+    """cos(lat)-weighted RMSE over the finite points of `mask` (sweep_score.weighted_rmse)."""
+    w = np.cos(np.deg2rad(lat))[None, :] * np.ones_like(diff)
+    ok = np.isfinite(diff) & mask
+    return float(np.sqrt(np.sum((w * diff ** 2)[ok]) / np.sum(w[ok])))
+
+
+# --------------------------------------------------------------------- age references
+def clams_member(year):
+    """One CLaMS v3.1 year, read from the zip into memory (the extracted copies are
+    not readable by every uid; see 20_series_from_zonal_mean.read_clams_zip)."""
+    with zipfile.ZipFile(REFS["clams_zip"]) as z:
+        raw = z.read(REFS["clams_member"].format(year=year))
+    return netCDF4.Dataset(f"clams_{year}", memory=raw)
+
+
+def clams_age(years):
+    """CLaMS mean AGE [yr] (press, lat): mean over months, then over years, -1e20
+    fill excluded (aoa_vs_clams.clams_age)."""
+    ages = []
+    for y in years:
+        with clams_member(y) as d:
+            a = np.ma.filled(np.ma.asarray(d.variables["AGE"][:], dtype="f8"), np.nan)
+            p = np.asarray(d.variables["press"][:], dtype="f8")
+            lat = np.asarray(d.variables["lat"][:], dtype="f8")
+        with warnings.catch_warnings():      # columns below the surface are all fill
+            warnings.simplefilter("ignore", RuntimeWarning)
+            ages.append(np.nanmean(np.where(a > -1e20, a, np.nan), axis=0))
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)
+        return p, lat, np.nanmean(np.stack(ages), axis=0)
+
+
+def waccm_age(years):
+    """WACCM6 REF-D1 entry age [yr] (lev, lat), mean over the years' records,
+    negative values (below the base point) masked (aoa_vs_clams.waccm_age).
+    The hybrid lev is taken as pressure, exact above about 150 hPa."""
+    with xr.open_dataset(REFS["waccm_aoa"], decode_times=False) as w:
+        d = w.date.values
+        sel = (d >= years[0] * 10000 + 101) & (d < (years[-1] + 1) * 10000 + 101)
+        a = w.AOA.isel(time=np.where(sel)[0]).mean("time")
+        a = a.where(a >= 0)
+        return np.asarray(w.lev, "f8"), np.asarray(w.lat, "f8"), a.values.astype("f8")
