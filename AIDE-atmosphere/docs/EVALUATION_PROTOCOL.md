@@ -341,6 +341,8 @@ resolution, on the same grid. Two forms of the request, depending on what the ar
   `tem_residual` differences them against each other level by level.
 - `VTHzm` is the eddy flux `v'θ'`, not the product of the zonal means. Passing the full
   product where the eddy flux is expected reverses the sign of tropical w̄* (§4.6).
+- The separate transport scorecard also reads an entry-age tracer; its field contract is
+  §1 of [TRANSPORT_SCORECARD.md](TRANSPORT_SCORECARD.md#1-field-contract).
 
 ### 4.3 Temporal resolution
 
