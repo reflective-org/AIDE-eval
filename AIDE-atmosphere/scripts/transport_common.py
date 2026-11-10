@@ -26,6 +26,36 @@ import aide_val_common as C
 
 DAYS_PER_YEAR = 365.25          # the jcm-strat clocks count days; the contract asks years
 
+# --------------------------------------------------------------------- references
+# Every reference the scorecard reads, and the years taken from each. Paths under
+# /data stay there; the ERA5 files are copies made by scripts/copy_era5_refs.sh
+# and checked against scripts/era5_refs.sha256.
+DATA = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data")
+REFS = dict(
+    # CLaMS v3.1 driven by ERA5: zonal-mean AGE [yr] on (month, press, lat), one
+    # member per year - A2, A3, A4 (with the entry offset) and D7
+    clams_zip="/data/CLaMS/CLaMS_v3/clams_v3.1_era5_zm_lat.zip",
+    clams_member="clams_v3.1_era5_zm_lat_press_{year}.nc",
+    # WACCM6 REF-D1 entry age [yr], base point 0.47N 103 hPa - A1
+    waccm_aoa="/data/CESM2_REFD1_AOA/AoA_waccm6_refd1.04_AOA1mf_1970-2019_ba_0_100.0_ck_0_50.0.nc",
+    # CESM2.1.5-WACCM6 histSST h6 tape (Vzm, VTHzm, THzm) through aide_val_common - B1, B2
+    waccm_tem_segment="1996-2014",
+    # ERA5 monthly zonal means of u and T, 25 levels - C1, C2
+    era5_zm_monthly=os.path.join(DATA, "era5", "era5_zm_monthly_{year}.nc"),
+    # ERA5 CDS daily zonal means u, v, T, theta, v'theta', 17 levels 1-250 hPa - D1-D7
+    era5_daily=os.path.join(DATA, "era5", "era5_{year}.npz"),
+)
+WINDOW = (2006, 2010)            # scored years; ERA5 (C, D) and CLaMS (D7) are these years
+AGE_REF_YEARS = (2005, 2009)     # CLaMS and WACCM6 age climatology for A1-A4: the years
+                                 # jcm-strat sweep_score.CLAMS_YEARS uses
+WACCM_TEM_YEARS = (1996, 2014)   # all of the 1996-2014 h6 segment
+WACCM_ILEV = slice(0, 61)        # h6 interfaces from the model top to 652 hPa: Psi* is
+                                 # integrated from the top, so the top is kept
+# jcm-strat's own phase-29 result, for the port check only (22b)
+JCM_STRAT_OUT = "/data/JCM_stripped/jcm-strat-phase29/docs/outputs/29_lqbo10d"
+JCM_STRAT_RELATIVE = os.path.join(JCM_STRAT_OUT, "relative", "relative_metrics.json")
+JCM_STRAT_SUCCESS = os.path.join(JCM_STRAT_OUT, "success_0610", "success_metrics.json")
+
 # The contract (docs/TRANSPORT_SCORECARD.md section 1): required, then optional.
 CONTRACT = ("Uzm", "Vzm", "THzm", "VTHzm", "AOA150")
 OPTIONAL = ("T", "Wzm")
