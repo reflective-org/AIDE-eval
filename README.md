@@ -26,6 +26,8 @@ and so scores every diagnostic. No AIDE-WACCM emulator rollout has been scored y
 | Where the tolerances come from | [docs/EVALUATION_PROTOCOL.md](AIDE-atmosphere/docs/EVALUATION_PROTOCOL.md) appendix A |
 | Why a choice was made | [docs/EVALUATION_PROTOCOL.md](AIDE-atmosphere/docs/EVALUATION_PROTOCOL.md) appendix B |
 | What is knowingly not covered | [docs/EVALUATION_PROTOCOL.md](AIDE-atmosphere/docs/EVALUATION_PROTOCOL.md) appendix C, §7 |
+| The transport scorecard — age of air, residual circulation, vortex, variability | [docs/TRANSPORT_SCORECARD.md](AIDE-atmosphere/docs/TRANSPORT_SCORECARD.md) |
+| How to score a new model on it | [docs/TRANSPORT_SCORECARD.md](AIDE-atmosphere/docs/TRANSPORT_SCORECARD.md) §9 |
 | Settled data conventions and working rules | [CLAUDE.md](CLAUDE.md) |
 | The evidence for those conventions | `scripts/01*`, `logs/01*` |
 | Superseded material, kept | [stale/](AIDE-atmosphere/stale/README.md) |
@@ -53,6 +55,16 @@ test the thresholds against, so §2 of the protocol cites the archived split-anc
 [stale/](AIDE-atmosphere/stale/README.md) instead: on anchors that did not include the scored period, 28 of
 30 tier-1 block verdicts and 4 of 6 tier-2 mean tests pass, the failures being the upwelling
 pair and the forced BDC trend behind them. The method carries over; the numbers do not.
+
+## The transport scorecard
+
+A separate scorecard beside the two tiers, ported from `jcm-strat` phase 29: age of air,
+residual circulation, polar vortex and variability, each metric scored as its relative
+deviation from CLaMS, WACCM6 or ERA5 (tolerance ±25 %). It changes no tier threshold. Scored so
+far: the eight jcm-strat phase-29 runs over 2006–2010, in
+[validation_results/transport/](AIDE-atmosphere/validation_results/transport/). Its w*
+estimator is interim (AIDE-eval issue #5). Method, field contract and decisions:
+[docs/TRANSPORT_SCORECARD.md](AIDE-atmosphere/docs/TRANSPORT_SCORECARD.md).
 
 ## Input requirements
 
@@ -130,12 +142,15 @@ requirements.txt       pinned dependencies
 AIDE-atmosphere/       everything else lives here
   scripts/             02, 02b, 07, 16, 17, 18 + aide_val_common.py, report_layout.py
                        01, 01b, 01c, 01d — convention evidence, outside the pipeline
-  docs/                the protocol
+                       22, 22b, 23, 24 + transport_common.py, copy_era5_refs.sh — transport scorecard
+  docs/                the protocol; TRANSPORT_SCORECARD.md
   validation_results/  a scored climate model: validation_result__<stamp>.md and seven figures
                        ERA5/, ERA-Interim/, JRA-55/, MERRA-2/ — one folder per source
+                       transport/ — the transport scorecard and its port check
   stale/               superseded material, kept — see stale/README.md
   output/              JSON results            — generated, gitignored
   logs/                stdout of every run     — generated, gitignored
+  data/                ERA5 reference copies   — copy_era5_refs.sh, gitignored
 ```
 
 Paths written bare below — `scripts/`, `output/`, `docs/` — are relative to
