@@ -64,7 +64,12 @@ NOTES = {
           "A jet latitude is a grid latitude (argmax). Where two grid rows carry nearly the same "
           "wind, the one-frame shift can move the maximum by one row (1.87 deg). The tie table "
           "above lists the wind at both rows for every latitude that differs."],
-    "D": [],
+    "D": ["D5 and D6 differ by 0.008 %: v'T' = v'theta' (p/1000)^kappa uses kappa = R/c_p = "
+          "0.28573 (aide_val_common, protocol section 4.6) where jcm-strat hard-codes 0.2857. "
+          "D4-w and D7 differ by 0.003 % through a (group B note).",
+          "D4-w and D7 are scored on w* interpolated in log p to 70 hPa. ERA5's CDS levels include "
+          "70 hPa, so its reference does not change; the model's nearest level is 72.2 hPa, so its "
+          "value does (table above)."],
 }
 
 

@@ -228,9 +228,266 @@ def group_C(F, R):
     return rows + caps, dict(level_50=float(p[k50]), level_10=float(p[k10]), n_months=len(keys))
 
 
+# --------------------------------------------------------------------- group D
+# Variability and two relations against ERA5 (CDS daily zonal means) and CLaMS for
+# the same days (jcm-strat variability_score.py, quantities and errors). Every
+# anomaly is taken against the dataset's own smoothed day-of-year climatology.
+# Levels are the nearest in log p, as jcm-strat's Z.ilev. The monthly tropical w*
+# of D4-w and D7 goes through the group-B estimator, interpolated to 70 hPa
+# (nearest-level values kept for the port check).
+HEMI = {"N": dict(lat=60.0, band=(55, 65), win=(12, 1, 2), rel=(1, 2, 3), hf=(45, 75),
+                  cap=(60, 90), sign=1.0),
+        "S": dict(lat=-60.0, band=(-65, -55), win=(6, 7, 8), rel=(7, 8, 9, 10), hf=(-75, -45),
+                  cap=(-90, -60), sign=-1.0)}
+
+
+class Daily:
+    """Daily zonal means (day, lev, lat) of one source, jcm-strat variability_score.Z."""
+
+    def __init__(self, days, p, lat, fields):
+        self.days, self.p, self.lat, self.f = days, p, lat, fields
+
+    @classmethod
+    def from_contract(cls, F):
+        return cls(F["days"], F["plev"], F["lat"],
+                   dict(u=F["Uzm"], v=F["Vzm"], T=F["T"], th=F["THzm"], vth=F["VTHzm"],
+                        aoa150=F["AOA150"]))
+
+    @classmethod
+    def era5(cls, years):
+        zs = [dict(np.load(T.REFS["era5_daily"].format(year=y))) for y in years]
+        cat = lambda k: np.concatenate([z[k] for z in zs])
+        return cls(cat("days").astype("datetime64[D]"), zs[0]["p_hpa"], zs[0]["lat"],
+                   {k: cat(k) for k in ("u", "v", "T", "th", "vth")})
+
+    def ilev(self, p):
+        return int(np.argmin(np.abs(np.log(self.p / p))))
+
+    def band(self, var, p, lo, hi):
+        x = self.f[var][:, self.ilev(p)]
+        m = (self.lat >= lo) & (self.lat <= hi)
+        w = np.cos(np.deg2rad(self.lat[m]))
+        return (x[:, m] * w).sum(1) / w.sum()
+
+    def at_lat(self, var, p, lat):
+        x = self.f[var][:, self.ilev(p)]
+        return np.array([np.interp(lat, self.lat, r) for r in x])
+
+    def vT(self, p, lo, hi):
+        """v'T' from v'theta' on the pressure level."""
+        return self.band("vth", p, lo, hi) / (C.P_REF_HPA / self.p[self.ilev(p)]) ** C.KAPPA
+
+    def months(self):
+        return (self.days.astype("datetime64[Y]").astype(int) + 1970,
+                self.days.astype("datetime64[M]").astype(int) % 12 + 1)
+
+
+def doy(days):
+    """Day of year 0..364, 29 February folded onto 28 February."""
+    d = (days - days.astype("datetime64[Y]")).astype(int)
+    leap = (days.astype("datetime64[Y]").astype(int) + 1970) % 4 == 0
+    return np.where(leap & (d >= 59), d - 1, d).clip(0, 364)
+
+
+def anomaly(x, days, smooth=31):
+    """x minus its own day-of-year climatology, smoothed by a 31-day running mean."""
+    k = doy(days)
+    clim = np.array([np.nanmean(x[k == i]) if np.any(k == i) else np.nan for i in range(365)])
+    clim = np.where(np.isnan(clim), np.nanmean(clim), clim)
+    pad = np.concatenate([clim[-smooth:], clim, clim[:smooth]])
+    clim = np.convolve(pad, np.ones(smooth) / smooth, "same")[smooth:-smooth]
+    return x - clim[k]
+
+
+def monthly_tem_wstar(z, plev=70.0):
+    """Monthly tropical w* (15S-15N) from monthly means of the daily [v], [v'theta'],
+    [theta]: months, interpolated to plev, at the nearest level."""
+    ym = z.days.astype("datetime64[M]")
+    t, wi, wn = [], [], []
+    for m in np.unique(ym):
+        k = ym == m
+        if k.sum() < 25:
+            continue
+        mean = lambda v: z.f[v][k].mean(0, dtype="f8")
+        p, _, psi = T.tem_streamfunction(mean("v"), mean("vth"), mean("th"), z.p * 100.0, z.lat)
+        w = T.residual_w(p, psi, z.lat)
+        t.append(m)
+        wi.append(T.tropical_wstar(p / 100.0, w, z.lat, plev))
+        wn.append(T.tropical_wstar(p / 100.0, w, z.lat, plev, nearest=True))
+    return np.array(t), np.array(wi), np.array(wn)
+
+
+def deseason_detrend(t_month, x):
+    m = t_month.astype(int) % 12
+    clim = np.array([x[m == i].mean() for i in range(12)])
+    a = x - clim[m]
+    tt = np.arange(a.size)
+    return a - np.polyval(np.polyfit(tt, a, 1), tt)
+
+
+def clams_monthly_age(years, plev=55.0):
+    """CLaMS monthly AGE [yr], 10S-10N, linear in log p to plev."""
+    t, a = [], []
+    for y in years:
+        with T.clams_member(y) as d:
+            A = np.ma.filled(np.ma.asarray(d.variables["AGE"][:], dtype="f8"), np.nan)
+            press = np.asarray(d.variables["press"][:], dtype="f8")
+            lat = np.asarray(d.variables["lat"][:], dtype="f8")
+        A = np.where(A > -1e20, A, np.nan)
+        lp = np.log(press)
+        o = np.argsort(lp)
+        m = np.abs(lat) <= 10
+        w = np.cos(np.deg2rad(lat[m]))
+        for mi in range(12):
+            r = np.array([np.interp(np.log(plev), lp[o], A[mi][o, j]) for j in range(lat.size)])
+            t.append(np.datetime64(f"{y}-{mi + 1:02d}"))
+            a.append(np.nansum(r[m] * w) / np.nansum(w * np.isfinite(r[m])))
+    return np.array(t), np.array(a)
+
+
+def ssw_dates(u60n, days, min_sep_days=20):
+    """Major NH SSW central dates (jcm-strat strat_compare.ssw_dates): the first
+    easterly day Nov-Mar, >= 20 days after the previous event, and not a final
+    warming (10 consecutive westerly days before 30 April)."""
+    t, u = np.asarray(days).astype("datetime64[D]"), np.asarray(u60n)
+    events, last = [], None
+    for i in range(1, len(t)):
+        month = int(str(t[i])[5:7])
+        if u[i] < 0 <= u[i - 1] and month in (11, 12, 1, 2, 3):
+            if last is not None and (t[i] - last).astype(int) < min_sep_days:
+                continue
+            yr = int(str(t[i])[:4]) + (1 if month >= 11 else 0)
+            sel = (t > t[i]) & (t <= np.datetime64(f"{yr}-04-30"))
+            run_start, ok = None, False
+            for v, tt in zip(u[sel], t[sel]):
+                if v > 0:
+                    run_start = tt if run_start is None else run_start
+                    if (tt - run_start).astype(int) >= 10:
+                        ok = True
+                        break
+                else:
+                    run_start = None
+            if ok:
+                events.append(t[i])
+                last = t[i]
+    return events
+
+
+def quantities(z, age=None):
+    """Every D quantity of one source. age = (months, tropical 55 hPa age) for a
+    reference, None to take the source's own AOA150."""
+    q = {}
+    y, mo = z.months()
+    for h, H in HEMI.items():
+        u = z.at_lat("u", 10.0, H["lat"])
+        # D1: winter means of u 55-65 deg, complete winters (DJF labelled by its January)
+        wy = np.where(mo == 12, y + 1, y) if h == "N" else y
+        win = np.isin(mo, H["win"])
+        ub = z.band("u", 10.0, *H["band"])
+        vals = [ub[win & (wy == yy)].mean() for yy in np.unique(wy[win])
+                if (win & (wy == yy)).sum() >= 85]
+        q[f"D1-{h}"] = float(np.std(vals, ddof=1)) if len(vals) > 1 else np.nan
+        q[f"winters-{h}"] = len(vals)
+        # D2: daily spread of u at 60 deg within winter
+        q[f"D2-{h}"] = float(np.std(anomaly(u, z.days)[win]))
+        # D5: daily spread of the 45-75 deg heat flux at 100 hPa, poleward positive
+        hfa = anomaly(H["sign"] * z.vT(100.0, *H["hf"]), z.days)
+        q[f"D5-{h}"] = float(np.std(hfa[win]))
+        # D6: 50 hPa polar-cap T anomaly on the trailing 40-day mean heat-flux anomaly
+        Ta = anomaly(z.band("T", 50.0, *H["cap"]), z.days)
+        c = np.concatenate([[0.0], np.cumsum(hfa)])
+        x = np.full(hfa.size, np.nan)
+        x[39:] = (c[40:] - c[:-40]) / 40
+        k = np.isin(mo, H["rel"]) & np.isfinite(x)
+        q[f"D6-{h}"] = float(np.polyfit(x[k], Ta[k], 1)[0])
+        q[f"D6r-{h}"] = float(np.corrcoef(x[k], Ta[k])[0, 1])
+        if h == "N":                                                  # D3
+            q["SSW-N"] = [str(e) for e in ssw_dates(u, z.days)]
+        # D4: final warming - first easterly crossing of the 5-day-smoothed u after
+        # which it stays below 5 m/s (Black & McDaniel), Mar-Jul N / Sep-Jan S
+        us = np.full(u.size, np.nan)
+        us[2:-2] = np.convolve(u, np.ones(5) / 5, "valid")
+        fw = []
+        for yy in np.unique(y):
+            start = np.datetime64(f"{yy}-03-01") if h == "N" else np.datetime64(f"{yy}-09-01")
+            end = np.datetime64(f"{yy}-08-01") if h == "N" else np.datetime64(f"{yy + 1}-02-01")
+            k = (z.days >= start) & (z.days < end)
+            if k.sum() < 120:
+                continue
+            s, dd = us[k], z.days[k]
+            ok = np.isfinite(s)
+            s, dd = s[ok], dd[ok]
+            cross = [i for i in np.where((s[:-1] >= 0) & (s[1:] < 0))[0] if np.all(s[i + 1:] < 5.0)]
+            if cross:
+                fw.append((int(yy), int((dd[cross[0] + 1] - start).astype(int))))
+        q[f"fw-{h}"] = fw
+    # D4-w: annual-cycle amplitude of tropical w* at 70 hPa; D7: age vs w*
+    tm, w_i, w_n = monthly_tem_wstar(z, 70.0)
+    if age is None:
+        ym = z.days.astype("datetime64[M]")
+        a55 = z.band("aoa150", 55.0, -10, 10)
+        at, av = tm, np.array([a55[ym == m].mean() for m in tm])
+    else:
+        at, av = age
+        keep = np.isin(at, tm)
+        at, av = at[keep], av[keep]
+    aa = deseason_detrend(at, av)
+    for tag, w in (("", w_i), ("_nearest", w_n)):
+        mi = tm.astype(int) % 12
+        clim = np.array([w[mi == i].mean() for i in range(12)])
+        q[f"D4w{tag}"] = float(clim.max() - clim.min())
+        q[f"w70_clim{tag}"] = clim.tolist()
+        wa = deseason_detrend(tm, w)
+        w3 = np.convolve(wa, np.ones(3) / 3, "full")[:wa.size]
+        w3[:2] = np.nan
+        ww = np.array([w3[np.where(tm == m)[0][0]] for m in at])
+        k = np.isfinite(ww)
+        q[f"D7{tag}"] = float(np.polyfit(ww[k], aa[k], 1)[0])
+        q[f"D7r{tag}"] = float(np.corrcoef(ww[k], aa[k])[0, 1])
+    return q
+
+
+def references_D():
+    years = list(range(T.WINDOW[0], T.WINDOW[1] + 1))
+    q = quantities(Daily.era5(years), age=clams_monthly_age(years))
+    return dict(years=years, q=q)
+
+
+def group_D(F, R):
+    m, r = quantities(Daily.from_contract(F)), R["q"]
+    rows = []
+    for h in "NS":
+        rows.append(row("D", f"D1-{h}", f"year-to-year std of winter u 55-65{h} 10 hPa [m/s]",
+                        m[f"D1-{h}"], r[f"D1-{h}"]))
+    for h in "NS":
+        rows.append(row("D", f"D2-{h}", f"daily std of winter u 60{h} 10 hPa [m/s]",
+                        m[f"D2-{h}"], r[f"D2-{h}"]))
+    rows.append(row("D", "D3", "NH major SSWs in the window [number]",
+                    len(m["SSW-N"]), len(r["SSW-N"]), dates=m["SSW-N"], ref_dates=r["SSW-N"]))
+    for h in "NS":
+        dm, dr = dict(map(tuple, m[f"fw-{h}"])), dict(map(tuple, r[f"fw-{h}"]))
+        yy = sorted(set(dm) & set(dr))                                # common springs
+        a = float(np.mean([dm[y] for y in yy])) if yy else np.nan
+        b = float(np.mean([dr[y] for y in yy])) if yy else np.nan
+        rows.append(row("D", f"D4-fw{h}", f"final warming {h}, days after "
+                        f"{'1 Mar' if h == 'N' else '1 Sep'}", a, b, springs=yy))
+    rows.append(row("D", "D4-w", "annual-cycle amplitude of tropical w* 70 hPa [mm/s]",
+                    m["D4w"], r["D4w"], model_nearest=m["D4w_nearest"], ref_nearest=r["D4w_nearest"]))
+    for h in "NS":
+        rows.append(row("D", f"D5-{h}", f"daily std of 100 hPa heat flux {h} [K m/s]",
+                        m[f"D5-{h}"], r[f"D5-{h}"]))
+    for h in "NS":
+        rows.append(row("D", f"D6-{h}", f"heat flux -> polar-cap T slope {h} [K per K m/s]",
+                        m[f"D6-{h}"], r[f"D6-{h}"], r_model=m[f"D6r-{h}"], r_ref=r[f"D6r-{h}"]))
+    rows.append(row("D", "D7", "age vs w* slope [yr per mm/s]", m["D7"], r["D7"],
+                    model_nearest=m["D7_nearest"], ref_nearest=r["D7_nearest"],
+                    r_model=m["D7r"], r_ref=r["D7r"]))
+    return rows, dict(w70_clim=m["w70_clim"])
+
+
 # --------------------------------------------------------------------- driver
 def references():
-    return dict(A=references_A(), B=references_B(), C={})
+    return dict(A=references_A(), B=references_B(), C={}, D=references_D())
 
 
 def public(d):
@@ -243,7 +500,7 @@ def diagnose(name, R):
     spec = T.SOURCES[name]
     F = T.load_source(name, YEARS)
     rows, prof = [], {}
-    for fn, key in ((group_A, "A"), (group_B, "B"), (group_C, "C")):
+    for fn, key in ((group_A, "A"), (group_B, "B"), (group_C, "C"), (group_D, "D")):
         r, p = fn(F, R[key])
         rows += r
         prof.update(p)
