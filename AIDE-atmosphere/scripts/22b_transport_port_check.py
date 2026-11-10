@@ -98,8 +98,9 @@ def group_table(g, names, P, J, R):
     ids = [m["id"] for m in P[names[0]]["metrics"] if m["group"] == g]
     L = [f"## {GROUP_NAME[g]}", "",
          "Scored value, jcm-strat `relative_metrics.json` → port (% off the reference; absolute "
-         "metrics in their own unit). ✓ = model and reference values agree with "
-         "`success_metrics.json` to 0.5 % or to jcm-strat's rounding.", "",
+         "metrics in their own unit); for B1, B2, D4-w and D7 the port value is the nearest-level "
+         "one, the scored change follows in the interpolation table. ✓ = model and reference values "
+         "agree with `success_metrics.json` to 0.5 % or to jcm-strat's rounding.", "",
          "| metric | " + " | ".join(names) + " |", "|---|" + "---|" * len(names)]
     n_ok = n_all = 0
     worst = {}
