@@ -61,6 +61,14 @@ WACCM_ILEV = slice(0, 61)        # h6 interfaces from the model top to 652 hPa: 
 JCM_STRAT_OUT = "/data/JCM_stripped/jcm-strat-phase29/docs/outputs/29_lqbo10d"
 JCM_STRAT_RELATIVE = os.path.join(JCM_STRAT_OUT, "relative", "relative_metrics.json")
 JCM_STRAT_SUCCESS = os.path.join(JCM_STRAT_OUT, "success_0610", "success_metrics.json")
+# jcm-strat phase 31 (AL7h 2006-2010 and 2011-2019, age references of the window's
+# years) and the phase-30 group D of AL7h 2006-2010 that phase 31 reports; 22b only
+JCM_STRAT_P31 = "/data/JCM_stripped/jcm-strat-phase31/docs/outputs/31_al7h_validation"
+JCM_STRAT_P31_RUNS = {   # port source: (success_<tag> directory, group D file)
+    "AL7h": ("success_0610", "/data/JCM_stripped/jcm-strat-phase30/docs/outputs/"
+                             "30_level_thinning/variability.json"),
+    "AL7h_1119": ("success_1119", os.path.join(JCM_STRAT_P31, "variability.json")),
+}
 
 # The contract (docs/TRANSPORT_SCORECARD.md section 1): required, then optional.
 CONTRACT = ("Uzm", "Vzm", "THzm", "VTHzm", "AOA150")
