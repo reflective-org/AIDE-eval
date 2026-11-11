@@ -173,6 +173,9 @@ is its reference (contract, metrics, references, decisions, deferred list).
   against `scripts/era5_refs.sha256`; gitignored. The jcm-strat model files are read in place.
 - Its w* (jcm-strat Ψ* route, log-p interpolated) is **interim**, AIDE-eval issue #5, and is not
   the tier estimator `tem_residual`: never read a transport B number against a tier threshold.
+- Scored: every result set of `transport_common.SETS` (phase-29 runs 2006–2010, AL7h 2011–2019)
+  under both scorings of `transport_common.SCORINGS` (extensive: 34 metrics; reduced: phase 31's
+  20, A2-WACCM for A2). References follow the scored window, except B (WACCM6 h6 1996–2014).
 - `validation_results/transport/` is generated and committed, like the other results.
 
 ## Working rules specific to this repo

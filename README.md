@@ -27,7 +27,7 @@ and so scores every diagnostic. No AIDE-WACCM emulator rollout has been scored y
 | Why a choice was made | [docs/EVALUATION_PROTOCOL.md](AIDE-atmosphere/docs/EVALUATION_PROTOCOL.md) appendix B |
 | What is knowingly not covered | [docs/EVALUATION_PROTOCOL.md](AIDE-atmosphere/docs/EVALUATION_PROTOCOL.md) appendix C, §7 |
 | The transport scorecard — age of air, residual circulation, vortex, variability | [docs/TRANSPORT_SCORECARD.md](AIDE-atmosphere/docs/TRANSPORT_SCORECARD.md) |
-| How to score a new model on it | [docs/TRANSPORT_SCORECARD.md](AIDE-atmosphere/docs/TRANSPORT_SCORECARD.md) §9 |
+| How to score a new model on it | [docs/TRANSPORT_SCORECARD.md](AIDE-atmosphere/docs/TRANSPORT_SCORECARD.md) §10 |
 | Settled data conventions and working rules | [CLAUDE.md](CLAUDE.md) |
 | The evidence for those conventions | `scripts/01*`, `logs/01*` |
 | Superseded material, kept | [stale/](AIDE-atmosphere/stale/README.md) |
@@ -61,7 +61,9 @@ pair and the forced BDC trend behind them. The method carries over; the numbers 
 A separate scorecard beside the two tiers, ported from `jcm-strat` phase 29: age of air,
 residual circulation, polar vortex and variability, each metric scored as its relative
 deviation from CLaMS, WACCM6 or ERA5 (tolerance ±25 %). It changes no tier threshold. Scored so
-far: the eight jcm-strat phase-29 runs over 2006–2010, in
+far: the eight jcm-strat phase-29 runs over 2006–2010 and AL7h over 2011–2019 (jcm-strat phase
+31, out of sample), each under two scorings — extensive (34 metrics) and reduced (phase 31's
+20) — with references of the scored years, in
 [validation_results/transport/](AIDE-atmosphere/validation_results/transport/). Its w*
 estimator is interim (AIDE-eval issue #5). Method, field contract and decisions:
 [docs/TRANSPORT_SCORECARD.md](AIDE-atmosphere/docs/TRANSPORT_SCORECARD.md).
