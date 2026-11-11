@@ -98,8 +98,9 @@ def load(names):
 
 
 def group_table(g, names, P, J, R):
-    """Scored value jcm-strat -> port, and the raw-value agreement, one row per metric."""
-    ids = [m["id"] for m in P[names[0]]["metrics"] if m["group"] == g]
+    """Scored value jcm-strat -> port, and the raw-value agreement, one row per metric
+    (the metrics jcm-strat phase 29 has)."""
+    ids = [m["id"] for m in P[names[0]]["metrics"] if m["group"] == g and m["id"] in R]
     L = [f"## {GROUP_NAME[g]}", "",
          "Scored value, jcm-strat `relative_metrics.json` → port (% off the reference; absolute "
          "metrics in their own unit); for B1, B2, D4-w and D7 the port value is the nearest-level "
@@ -131,7 +132,7 @@ def group_table(g, names, P, J, R):
 
 def raw_table(g, names, P, J):
     """Unrounded model and reference values, jcm-strat against the port."""
-    ids = [m["id"] for m in P[names[0]]["metrics"] if m["group"] == g]
+    ids = [m["id"] for m in P[names[0]]["metrics"] if m["group"] == g and m["id"] in J[names[0]]]
     L = ["", "Unrounded values: jcm-strat `success_metrics.json` / port (nearest level where "
          "the scored value is interpolated). Reference in the last column (first run's grid).", "",
          "| metric | " + " | ".join(names) + " | reference |", "|---|" + "---|" * (len(names) + 1)]

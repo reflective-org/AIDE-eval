@@ -46,6 +46,9 @@ def row(group, mid, label, model, ref, **extra):
 # every day of the window. Levels are the nearest model level to 55 hPa, as in
 # jcm-strat; A4 interpolates the tropical profile in log p. The CLaMS and WACCM6
 # references are means over `years`, the scored window's own years.
+# A2-WACCM (jcm-strat phase 31 scripts/a2_waccm_age.py) is A2 against the WACCM6
+# REF-D1 2-D entry age instead of shifted CLaMS, on the WACCM6 grid: the WACCM6
+# clock starts at its tropical ~100 hPa base point, so no offset is applied.
 def references_A(years):
     pc, latc, ac = T.clams_age(years)
     pw, latw, aw = T.waccm_age(years)
@@ -65,7 +68,7 @@ def references_A(years):
         clams_55_5070=T.band_abs(latc, ac[kc], 50, 70),
         profile_clams_p=pc.tolist(), profile_clams_entry_tropics=prof_c.tolist(),
         profile_waccm_p=pw.tolist(), profile_waccm_entry_tropics=prof_w.tolist(),
-        _clams=(pc, latc, ac))
+        _clams=(pc, latc, ac), _waccm=(pw, latw, aw))
 
 
 def group_A(F, R):
@@ -83,11 +86,19 @@ def group_A(F, R):
     dom = ((pc >= 5.0) & (pc <= 100.0))[:, None] & (np.abs(latc) <= 80.0)[None, :]
     rmse = T.weighted_rmse(am - (ac - off), latc, dom)
 
+    # A2-WACCM: model on the WACCM6 grid against the WACCM6 entry age, 100-5 hPa,
+    # |lat| <= 80
+    pw, latw, aw = R["_waccm"]
+    dw = T.on_grid(age, p, lat, pw, latw) - aw
+    domw = ((pw >= 5.0) & (pw <= 100.0))[:, None] & (np.abs(latw) <= 80.0)[None, :]
+
     prof = np.nanmean(age[:, np.abs(lat) <= 10], axis=1)
     at = lambda lv: float(np.interp(np.log(lv), np.log(p), prof))
     rows = [
         row("A", "A1", "entry age 55 hPa tropics [yr]", trop, R["waccm_55_tropics"]),
         row("A", "A2", "2-D age RMSE vs CLaMS [yr]", rmse, 0.0),
+        row("A", "A2-WACCM", "2-D entry-age RMSE vs WACCM6 [yr]", T.weighted_rmse(dw, latw, domw),
+            0.0, bias=T.weighted_bias(dw, latw, domw)),
         row("A", "A3", "age step tropics -> 50-70 deg, 55 hPa [yr]", ext - trop,
             R["clams_55_5070"] - R["clams_55_tropics"]),
         row("A", "A4", "transit 70 -> 10 hPa [yr]", at(10.0) - at(70.0), T.A4_RANGE),

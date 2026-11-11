@@ -192,9 +192,9 @@ def load_source(name, years):
 # reported as a difference in their own unit.
 TOL = 0.25
 A4_RANGE = (2.3, 3.2)            # yr; A4 is scored against the midpoint 2.75
-ABS_BOUND = {"A2": 0.4, "C2-N": 2.0, "C2-S": 2.0, "D4-fwN": 10.0, "D4-fwS": 10.0,
+ABS_BOUND = {"A2": 0.4, "A2-WACCM": 0.4, "C2-N": 2.0, "C2-S": 2.0, "D4-fwN": 10.0, "D4-fwS": 10.0,
              **{f"C1-jet{p}_{h}-lat": 4.0 for p in (50, 10) for h in "NS"}}
-ABS_UNIT = {"A2": "yr", "C2-N": "K", "C2-S": "K", "D4-fwN": "days", "D4-fwS": "days"}
+ABS_UNIT = {"A2": "yr", "A2-WACCM": "yr", "C2-N": "K", "C2-S": "K", "D4-fwN": "days", "D4-fwS": "days"}
 
 
 def ref_value(ref):
@@ -254,6 +254,14 @@ def weighted_rmse(diff, lat, mask):
     w = np.cos(np.deg2rad(lat))[None, :] * np.ones_like(diff)
     ok = np.isfinite(diff) & mask
     return float(np.sqrt(np.sum((w * diff ** 2)[ok]) / np.sum(w[ok])))
+
+
+def weighted_bias(diff, lat, mask):
+    """cos(lat)-weighted mean over the finite points of `mask` (the bias that
+    sweep_score.weighted_rmse returns beside the RMSE)."""
+    w = np.cos(np.deg2rad(lat))[None, :] * np.ones_like(diff)
+    ok = np.isfinite(diff) & mask
+    return float(np.sum((w * diff)[ok]) / np.sum(w[ok]))
 
 
 # --------------------------------------------------------------------- age references
