@@ -90,9 +90,18 @@ _RUNS = {
 SOURCES = {n: dict(JCM, path=os.path.join(JCM_CACHE, f"{n}_0610.npz"),
                    long_name=f"jcm-strat {n} (T63 L95)", note=note)
            for n, note in _RUNS.items()}
+# jcm-strat phase 31: the AL7h chain continued to 2019 in the same configuration.
+# 2011-2019 lies outside 2005-04..2008-01, the period its T_eq correction was fitted
+# to, so it is AL7h out of sample. Read in place, never copied.
+SOURCES["AL7h_1119"] = dict(
+    JCM, window=(2011, 2019),
+    path="/data/JCM_stripped/jcm-strat-phase31/cache/variability/AL7h_1119.npz",
+    long_name="jcm-strat AL7h (T63 L95), 2011-2019",
+    note="AL7h continued to 2019 in the same configuration (phase 31); out of sample")
 
 # Result sets: runs scored together over one window, one scorecard each (23, 24).
-SETS = {"jcm-strat-phase29-2006-2010": tuple(_RUNS)}
+SETS = {"jcm-strat-phase29-2006-2010": tuple(_RUNS),
+        "jcm-strat-phase31-AL7h-2011-2019": ("AL7h_1119",)}
 
 
 def years_of(window):
