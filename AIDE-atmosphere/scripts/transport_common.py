@@ -102,6 +102,11 @@ SOURCES["AL7h_1119"] = dict(
 # Result sets: runs scored together over one window, one scorecard each (23, 24).
 SETS = {"jcm-strat-phase29-2006-2010": tuple(_RUNS),
         "jcm-strat-phase31-AL7h-2011-2019": ("AL7h_1119",)}
+# A set compared run by run with one run of another set: AL7h out of sample
+# (2011-2019) against AL7h in sample (2006-2010).
+COMPARE = {"jcm-strat-phase31-AL7h-2011-2019": dict(
+    run="AL7h_1119", against=("jcm-strat-phase29-2006-2010", "AL7h"),
+    labels=("in sample", "out of sample"))}
 
 
 def years_of(window):
@@ -195,6 +200,24 @@ A4_RANGE = (2.3, 3.2)            # yr; A4 is scored against the midpoint 2.75
 ABS_BOUND = {"A2": 0.4, "A2-WACCM": 0.4, "C2-N": 2.0, "C2-S": 2.0, "D4-fwN": 10.0, "D4-fwS": 10.0,
              **{f"C1-jet{p}_{h}-lat": 4.0 for p in (50, 10) for h in "NS"}}
 ABS_UNIT = {"A2": "yr", "A2-WACCM": "yr", "C2-N": "K", "C2-S": "K", "D4-fwN": "days", "D4-fwS": "days"}
+
+
+# Two scorings of the same diagnostics, both scored as above (Susanne 2026-11-11):
+#   extensive  the 34 metrics of the phase-29 scorecard (A2 against shifted CLaMS);
+#              A2-WACCM is not part of it
+#   reduced    jcm-strat phase 31's scored set: A2-WACCM replaces A2, and the metrics
+#              of make_phase31_report.py UNSCORED stay in the table but out of every
+#              group score (winds at 10 hPa, vortex variability, final warmings, SSW
+#              count, and the two relations D6, D7). Phase 31 scored them with
+#              absolute bounds (success_metrics.py); here they get the relative scoring.
+# hidden: not shown; unscored: shown, not in the group scores.
+PHASE31_UNSCORED = ("C1-jet10_N", "C1-jet10_N-lat", "C1-jet10_S", "C1-jet10_S-lat",
+                    "D1-N", "D1-S", "D2-N", "D2-S", "D3", "D4-fwN", "D4-fwS",
+                    "D6-N", "D6-S", "D7")
+SCORINGS = {
+    "extensive": dict(hidden=("A2-WACCM",), unscored=()),
+    "reduced": dict(hidden=(), unscored=("A2",) + PHASE31_UNSCORED),
+}
 
 
 def ref_value(ref):
