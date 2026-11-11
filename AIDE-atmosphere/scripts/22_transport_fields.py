@@ -11,11 +11,14 @@ beside its reference. Scoring is 23's; this script only measures.
   22_transport_fields.py --inspect NAME      shapes, units and ranges of the
                                              contract fields, nothing written
 
-The model-independent references (CLaMS, WACCM6) are computed once per call and
-written beside the per-source results.
+Each source is diagnosed over its own window (transport_common.SOURCES). The
+model-independent references are computed once per window and call, over the
+window's years (CLaMS, WACCM6 entry age, ERA5), except the WACCM6 TEM reference
+of group B, which is 1996-2014 for every window, and written beside the
+per-source results.
 
-Output: output/22_transport__references.json
-        output/22_transport__<NAME>.json      one per source
+Output: output/22_transport__references__<Y0>-<Y1>.json   one per window
+        output/22_transport__<NAME>.json                  one per source
 """
 
 import argparse
@@ -31,9 +34,6 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import aide_val_common as C
 import transport_common as T
 
-YEARS = range(T.WINDOW[0], T.WINDOW[1] + 1)
-AGE_YEARS = list(range(T.AGE_REF_YEARS[0], T.AGE_REF_YEARS[1] + 1))
-
 
 def row(group, mid, label, model, ref, **extra):
     return dict(group=group, id=mid, label=label, model=float(model),
@@ -44,10 +44,11 @@ def row(group, mid, label, model, ref, **extra):
 # Age of air from the entry-age clock AOA150 (jcm-strat sweep_score.score, "age"
 # block, and success_metrics.metrics A1-A4). The model clock is the mean over
 # every day of the window. Levels are the nearest model level to 55 hPa, as in
-# jcm-strat; A4 interpolates the tropical profile in log p.
-def references_A():
-    pc, latc, ac = T.clams_age(AGE_YEARS)
-    pw, latw, aw = T.waccm_age(AGE_YEARS)
+# jcm-strat; A4 interpolates the tropical profile in log p. The CLaMS and WACCM6
+# references are means over `years`, the scored window's own years.
+def references_A(years):
+    pc, latc, ac = T.clams_age(years)
+    pw, latw, aw = T.waccm_age(years)
     # CLaMS counts from the surface; its own tropical age at 150 hPa is the offset
     # that turns it into an entry age comparable with AOA150
     offset = T.band_abs(latc, ac[T.nearest_level(pc, 150.0)], 0, 10)
@@ -58,7 +59,7 @@ def references_A():
         prof_c = np.nanmean(ac[:, tc], axis=1) - offset
         prof_w = np.nanmean(aw[:, tw], axis=1)
     return dict(
-        years=AGE_YEARS, clams_offset_150=offset,
+        years=list(years), clams_offset_150=offset,
         waccm_55_tropics=T.band_abs(latw, aw[kw], 0, 10),
         clams_55_tropics=T.band_abs(latc, ac[kc], 0, 10),
         clams_55_5070=T.band_abs(latc, ac[kc], 50, 70),
@@ -447,8 +448,7 @@ def quantities(z, age=None):
     return q
 
 
-def references_D():
-    years = list(range(T.WINDOW[0], T.WINDOW[1] + 1))
+def references_D(years):
     q = quantities(Daily.era5(years), age=clams_monthly_age(years))
     return dict(years=years, q=q)
 
@@ -486,8 +486,15 @@ def group_D(F, R):
 
 
 # --------------------------------------------------------------------- driver
-def references():
-    return dict(A=references_A(), B=references_B(), C={}, D=references_D())
+_B = {}
+
+
+def references(window):
+    """References for one window; B (WACCM6 1996-2014) is computed once per call."""
+    years = T.years_of(window)
+    if not _B:
+        _B.update(references_B())
+    return dict(A=references_A(years), B=_B, C={}, D=references_D(years))
 
 
 def public(d):
@@ -498,14 +505,14 @@ def public(d):
 
 def diagnose(name, R):
     spec = T.SOURCES[name]
-    F = T.load_source(name, YEARS)
+    F = T.load_source(name, T.years_of(spec["window"]))
     rows, prof = [], {}
     for fn, key in ((group_A, "A"), (group_B, "B"), (group_C, "C"), (group_D, "D")):
         r, p = fn(F, R[key])
         rows += r
         prof.update(p)
     return dict(name=name, long_name=spec["long_name"], note=spec.get("note", ""),
-                reader=spec["reader"], path=spec.get("path", ""),
+                reader=spec["reader"], path=spec.get("path", ""), window=list(spec["window"]),
                 independent=bool(spec["independent"]),
                 days=[str(F["days"][0]), str(F["days"][-1])], n_days=int(F["days"].size),
                 n_levels=int(F["plev"].size), n_lats=int(F["lat"].size),
@@ -516,7 +523,7 @@ def inspect(name):
     """Print what the reader hands the diagnostics, so a new source can be checked
     against the contract before anything is scored."""
     spec = T.SOURCES[name]
-    F = T.load_source(name, YEARS)
+    F = T.load_source(name, T.years_of(spec["window"]))
     p, lat, days = F["plev"], F["lat"], F["days"]
     print(f"{name}: {spec['long_name']}  reader {spec['reader']}  {spec['path']}")
     print(f"  days  {days.size}  {days[0]} .. {days[-1]}")
@@ -547,17 +554,18 @@ def main():
     if unknown:
         raise SystemExit(f"unknown source(s) {unknown}; registered: {list(T.SOURCES)}")
     os.makedirs(C.OUTDIR, exist_ok=True)
-    R = references()
-    out = os.path.join(C.OUTDIR, "22_transport__references.json")
-    json.dump(dict(window=list(T.WINDOW), refs={k: T.REFS[k] for k in T.REFS},
-                   **public(R)), open(out, "w"), indent=1)
-    print(f"wrote {out}")
-    for n in names:
-        res = diagnose(n, R)
-        out = os.path.join(C.OUTDIR, f"22_transport__{n}.json")
-        json.dump(res, open(out, "w"), indent=1)
-        print(f"{n}: " + "  ".join(f"{m['id']} {m['model']:.3g}" for m in res["metrics"]))
+    for window in sorted({tuple(T.SOURCES[n]["window"]) for n in names}):
+        R = references(window)
+        out = os.path.join(C.OUTDIR, f"22_transport__references__{window[0]}-{window[1]}.json")
+        json.dump(dict(window=list(window), refs={k: T.REFS[k] for k in T.REFS},
+                       **public(R)), open(out, "w"), indent=1)
         print(f"wrote {out}")
+        for n in [n for n in names if tuple(T.SOURCES[n]["window"]) == window]:
+            res = diagnose(n, R)
+            out = os.path.join(C.OUTDIR, f"22_transport__{n}.json")
+            json.dump(res, open(out, "w"), indent=1)
+            print(f"{n}: " + "  ".join(f"{m['id']} {m['model']:.3g}" for m in res["metrics"]))
+            print(f"wrote {out}")
 
 
 if __name__ == "__main__":

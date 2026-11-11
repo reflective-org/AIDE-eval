@@ -12,7 +12,8 @@ relative_scores.py does:
 Group score = mean err of the group's metrics; combined = mean of the A, B and C
 group scores; D is reported on its own.
 
-  23_transport_scorecard.py [NAME ...] [--name SET]     default: every registered source
+  23_transport_scorecard.py [NAME ...] [--name SET]     default: the first set of
+                                                       transport_common.SETS
 
 Every artefact is stamped `__<set>__<production date>`, as 17 stamps its report.
 
@@ -154,17 +155,18 @@ def T_stamped(name, stamp):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[1].strip())
-    ap.add_argument("names", nargs="*", help="sources to score (default: all)")
-    ap.add_argument("--name", default=f"jcm-strat-phase29-{T.WINDOW[0]}-{T.WINDOW[1]}",
-                    help="name of the scored set, used in the stamp")
+    first = next(iter(T.SETS))
+    ap.add_argument("names", nargs="*", help=f"sources to score (default: the set {first})")
+    ap.add_argument("--name", default=first, help="name of the scored set, used in the stamp")
     a = ap.parse_args()
-    names = a.names or list(T.SOURCES)
+    names = a.names or list(T.SETS[first])
+    window = T.window_of(names)
     P = {n: json.load(open(os.path.join(C.OUTDIR, f"22_transport__{n}.json"))) for n in names}
-    R = json.load(open(os.path.join(C.OUTDIR, "22_transport__references.json")))
+    R = json.load(open(os.path.join(C.OUTDIR, f"22_transport__references__{window[0]}-{window[1]}.json")))
     produced = datetime.date.today().isoformat()
     stamp = stamp_for(a.name, produced)
     rows, scores = score_all(P, names)
-    res = dict(name=a.name, produced=produced, stamp=stamp, runs=names, window=list(T.WINDOW),
+    res = dict(name=a.name, produced=produced, stamp=stamp, runs=names, window=list(window),
                tolerance=T.TOL, a4_range=list(T.A4_RANGE), abs_bound=T.ABS_BOUND,
                wstar_estimator="jcm-strat Psi* route, log-p interpolated; interim (AIDE-eval issue #5)",
                rows=rows, scores=scores,

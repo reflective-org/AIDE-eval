@@ -48,10 +48,13 @@ REFS = dict(
     # ERA5 CDS daily zonal means u, v, T, theta, v'theta', 17 levels 1-250 hPa - D1-D7
     era5_daily=os.path.join(DATA, "era5", "era5_{year}.npz"),
 )
-WINDOW = (2006, 2010)            # scored years; ERA5 (C, D) and CLaMS (D7) are these years
-AGE_REF_YEARS = (2005, 2009)     # CLaMS and WACCM6 age climatology for A1-A4: the years
-                                 # jcm-strat sweep_score.CLAMS_YEARS uses
+# Reference years follow the scored window (each source's `window`): the CLaMS and
+# WACCM6 age references (A), ERA5 (C, D) and CLaMS (D7) are taken over the window's
+# own years. The WACCM6 TEM reference (B) is the whole 1996-2014 h6 segment, the
+# only one, whatever the window.
 WACCM_TEM_YEARS = (1996, 2014)   # all of the 1996-2014 h6 segment
+JCM_STRAT_P29_AGE_YEARS = (2005, 2009)   # jcm-strat phase 29's age reference years
+                                 # (sweep_score.CLAMS_YEARS); 22b only, for the port check
 WACCM_ILEV = slice(0, 61)        # h6 interfaces from the model top to 652 hPa: Psi* is
                                  # integrated from the top, so the top is kept
 # jcm-strat's own phase-29 result, for the port check only (22b)
@@ -72,7 +75,7 @@ UNITS = {"Uzm": "m/s", "Vzm": "m/s", "THzm": "K", "VTHzm": "K m/s",
 # (v'theta' formed within each 6-hourly snapshot). Read in place, never copied.
 JCM_CACHE = "/data/JCM_stripped/jcm-strat-phase29/cache/variability"
 JCM = dict(reader="jcm_npz", time_resolution="daily", calendar="gregorian",
-           independent=True)
+           independent=True, window=(2006, 2010))
 _RUNS = {
     "P20b": "baseline; ERA5 nudging top 400 hPa everywhere, no T_eq correction",
     "AL7": "P20b with the AL7 equilibrium-temperature correction (jcm-strat phase 22)",
@@ -87,6 +90,22 @@ _RUNS = {
 SOURCES = {n: dict(JCM, path=os.path.join(JCM_CACHE, f"{n}_0610.npz"),
                    long_name=f"jcm-strat {n} (T63 L95)", note=note)
            for n, note in _RUNS.items()}
+
+# Result sets: runs scored together over one window, one scorecard each (23, 24).
+SETS = {"jcm-strat-phase29-2006-2010": tuple(_RUNS)}
+
+
+def years_of(window):
+    return list(range(window[0], window[1] + 1))
+
+
+def window_of(names):
+    """The common window of the named sources."""
+    w = {tuple(SOURCES[n]["window"]) for n in names}
+    if len(w) != 1:
+        raise SystemExit(f"sources {list(names)} cover different windows {sorted(w)}")
+    return w.pop()
+
 
 # jcm-strat npz names -> contract names. T is kept: C2 and D6 read it.
 JCM_NAMES = {"u": "Uzm", "v": "Vzm", "th": "THzm", "vth": "VTHzm",
