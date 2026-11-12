@@ -57,9 +57,12 @@ plt.rcParams.update({
 
 
 def window_text(res):
-    """The window, with the non-standard flag where it applies."""
-    w = f"{res['window'][0]}-{res['window'][1]}"
-    return f"{w}, {res['window_flag']}" if res["window_flag"] else w
+    return f"{res['window'][0]}-{res['window'][1]}"
+
+
+def flag_text(res):
+    """'; non-standard window (N of 14 standard years)' where it applies, else ''."""
+    return f"; {res['window_flag']}" if res["window_flag"] else ""
 
 
 def footer(fig, res):
@@ -133,7 +136,7 @@ def score_table(res):
             ax.text(j + 0.5, i + 0.5, f"{s[k]:.2f} {sym}", ha="center", va="center",
                     fontweight="bold" if bold else "normal")
     fig.text(0.01, 0.06, "✓ pass (err ≤ 1)   ~ near (≤ 1.5)   ✗ fail (> 1.5)   ·   combined = "
-             f"mean of A, B, C; D separate   ·   window {window_text(res)}", fontsize=8, color=INK2)
+             f"mean of A, B, C; D separate   ·   window {window_text(res)}{flag_text(res)}", fontsize=8, color=INK2)
     footer(fig, res)
     save(fig, res, f"score_table_{res['scoring']}.png")
 
@@ -161,7 +164,7 @@ def heatmap(res):
     W, H = LBL + CW * len(runs) + 0.3, 12.8
     fig = plt.figure(figsize=(W, H))
     top = title(fig, f"Every metric, every run: model against reference, {window_text(res)}; "
-                f"{res['name']}, {res['scoring']} scoring", W)
+                f"{res['name']}, {res['scoring']} scoring{flag_text(res)}", W)
     ax = fig.add_axes([LBL / W, 1.25 / H, CW * len(runs) / W, 1 - (1.25 + top + 0.35) / H])
     im = ax.imshow(np.clip(X, -99.9, 99.9), cmap=cmap, norm=norm, aspect="auto")
     # 2 px surface gaps between cells, wider between groups
@@ -223,9 +226,11 @@ def profile_figure(runs, title_text, n_legend, ncol):
     return fig, axes.ravel(), nc, (t_in + 0.08) / H
 
 
-def finish_panels(fig, axes, runs, legend_top, ncol):
+def finish_panels(fig, axes, runs, legend_top, ncol, nc):
     for ax in axes[len(runs):]:
         ax.axis("off")
+    for ax in axes[max(0, len(runs) - nc):len(runs)]:   # nothing below: show x tick labels
+        ax.xaxis.set_tick_params(labelbottom=True)
     h, lab = axes[0].get_legend_handles_labels()
     fig.legend(h, lab, loc="upper left", bbox_to_anchor=(0.04, 1 - legend_top), ncol=ncol,
                frameon=False, fontsize=8)
@@ -239,7 +244,7 @@ def wstar_profile(res):
     ncol = 4 if len(runs) >= 4 else 1
     text = (f"Tropical residual vertical velocity w*, {window_text(res)} mean, against WACCM6 "
             f"{B['years'][0]}-{B['years'][1]} (same estimator; interpolated linearly in log p to "
-            "100/70/50/30/10 hPa)")
+            f"100/70/50/30/10 hPa){flag_text(res)}")
     fig, axes, nc, legend_top = profile_figure(runs, text, 4, ncol)
     for ax, n in zip(axes, runs):
         P = res["profiles"][n]
@@ -266,7 +271,7 @@ def wstar_profile(res):
     for ax in axes[len(runs) - nc:len(runs)]:
         ax.set_xlabel("w* 15S-15N [mm/s]")
     footer(fig, res)
-    finish_panels(fig, axes, runs, legend_top, ncol)
+    finish_panels(fig, axes, runs, legend_top, ncol, nc)
     save(fig, res, "wstar_profile.png")
 
 
@@ -277,7 +282,7 @@ def age_profile(res):
     y0, y1 = A["years"][0], A["years"][-1]
     ncol = 3 if len(runs) >= 4 else 1
     text = (f"Tropical entry age of air, {window_text(res)} mean (grey lines: 70 and 10 hPa for "
-            "A4, 55 hPa for A1 and A3)")
+            f"A4, 55 hPa for A1 and A3){flag_text(res)}")
     fig, axes, nc, legend_top = profile_figure(runs, text, 3, ncol)
     for ax, n in zip(axes, runs):
         P = res["profiles"][n]
@@ -299,7 +304,7 @@ def age_profile(res):
     for ax in axes[len(runs) - nc:len(runs)]:
         ax.set_xlabel("entry age 10S-10N [yr]")
     footer(fig, res)
-    finish_panels(fig, axes, runs, legend_top, ncol)
+    finish_panels(fig, axes, runs, legend_top, ncol, nc)
     save(fig, res, "age_profile.png")
 
 
