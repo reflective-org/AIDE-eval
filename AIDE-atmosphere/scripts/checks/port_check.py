@@ -1,8 +1,8 @@
 """
 port_check - Check the ported diagnostics against jcm-strat's own numbers.
 
-Evidence, not a pipeline stage: it feeds nothing. It reads the
-jcm-strat's phase-29 and phase-31 results, computes the diagnostics of the same runs
+Evidence, not a pipeline stage: it feeds nothing. It reads jcm-strat's phase-29 and
+phase-31 results, computes the diagnostics of the same runs
 through 01's functions, and writes the difference tables
 validation_results/port_check.md:
 
@@ -10,8 +10,6 @@ validation_results/port_check.md:
   2. phase 31: AL7h 2006-2010 and 2011-2019, age references of the window's years,
      A2-WACCM included (success_<tag>/success_metrics.json, a2_waccm.json, and the
      group D files P31_RUNS names)
-  3. what the age-reference switch 2005-2009 -> 2006-2010 changes in the eight runs'
-     A metrics and group scores, both scorings
 
   checks/port_check.py
 
@@ -31,9 +29,8 @@ larger. B1, B2, D4-w and D7 are scored on log-p-interpolated w* and Psi*; for th
 the table checks the nearest-level values (jcm-strat's method) for agreement and
 lists the change the interpolation makes separately.
 
-Group A is recomputed here at jcm-strat phase 29's age reference years
-(P29_AGE_YEARS, 2005-2009); the scorecard itself takes
-them over the scored window (2006-2010).
+In part 1 group A is recomputed at jcm-strat phase 29's age reference years
+(P29_AGE_YEARS, 2005-2009); the scorecard and part 2 take them over the window.
 """
 
 import argparse
@@ -137,7 +134,7 @@ def diagnose_all():
             refs[w] = m01.references(w)
         P[n] = m01.diagnose(spec, n, refs[w])
         print(f"diagnosed {n} ({w[0]}-{w[1]})")
-    return P, refs
+    return P
 
 
 def load(names):
@@ -310,60 +307,6 @@ def phase31(P):
     return L
 
 
-def switch(names, P_old, P_new, off_old, off_new):
-    """Part 3: A metrics and group scores of each run with the age references of
-    2005-2009 (jcm-strat phase 29) against those of 2006-2010 (the scorecard)."""
-    m02 = module("02_scorecard.py")
-    y0, y1 = P29_AGE_YEARS
-    w = P_new[names[0]]["window"]
-    L = ["", f"## Part 3 - age references {y0}-{y1} → {w[0]}-{w[1]}", "",
-         f"The scorecard takes the CLaMS and WACCM6 age references over the scored window "
-         f"({w[0]}-{w[1]}); jcm-strat phase 29 took {y0}-{y1}. Only group A changes (B, C, D "
-         "do not read them). References:", ""]
-    ref = lambda Q, mid: SE.ref_value(next(m for m in Q[names[0]]["metrics"] if m["id"] == mid)["ref"])
-    L += ["| metric | " + f"{y0}-{y1} | {w[0]}-{w[1]} |", "|---|---|---|"]
-    for mid in ("A1", "A3", "A4"):
-        L.append(f"| {mid} | {ref(P_old, mid):.4g} | {ref(P_new, mid):.4g} |")
-    L.append(f"| A2: CLaMS 10S-10N age at 150 hPa, subtracted [yr] | {off_old:.4f} | "
-             f"{off_new:.4f} |")
-    L.append("| A2, A2-WACCM: 2-D CLaMS / WACCM6 fields | mean of the years | mean of the years |")
-    ids = ["A1", "A2", "A2-WACCM", "A3", "A4"]
-    L += ["", "Scored value per run, " f"{y0}-{y1} → {w[0]}-{w[1]} (% off the reference; A2, "
-          "A2-WACCM: RMSE in yr):", "",
-          "| run | " + " | ".join(ids) + " |", "|---|" + "---|" * len(ids)]
-    for n in names:
-        cells = []
-        for mid in ids:
-            a, b = (next(m for m in Q[n]["metrics"] if m["id"] == mid) for Q in (P_old, P_new))
-            va, vb = SE.score(mid, a["model"], a["ref"])[0], SE.score(mid, b["model"], b["ref"])[0]
-            nd = 3 if mid in SE.ABS_BOUND else 1
-            cells.append(f"{va:+.{nd}f} → {vb:+.{nd}f}")
-        L.append(f"| {n} | " + " | ".join(cells) + " |")
-    L += ["", "Group A and combined A-C score per run, both scorings:", "",
-          "| run | " + " | ".join(f"{g} {s}" for s in SE.SCORINGS for g in ("A", "combined")) + " |",
-          "|---|---|---|---|---|"]
-    S = {(s, k): {x["run"]: x for x in m02.score_all(Q, names, s)[1]}
-         for s in SE.SCORINGS for k, Q in (("old", P_old), ("new", P_new))}
-    big = 0.0
-    for n in names:
-        cells = []
-        for s in SE.SCORINGS:
-            for g in ("A", "combined"):
-                a, b = S[(s, "old")][n][g], S[(s, "new")][n][g]
-                big = max(big, abs(b - a))
-                cells.append(f"{a:.3f} → {b:.3f} ({b - a:+.3f})")
-        L.append(f"| {n} | " + " | ".join(cells) + " |")
-    L += ["", f"Largest change of a group A or combined score: {big:.3f}. Status changes of an A "
-          "metric: " + (", ".join(
-              f"{n} {mid} {SE.status(SE.score(mid, a['model'], a['ref'])[1])} → "
-              f"{SE.status(SE.score(mid, b['model'], b['ref'])[1])}"
-              for n in names for mid in ids
-              for a, b in [tuple(next(m for m in Q[n]["metrics"] if m["id"] == mid) for Q in (P_old, P_new))]
-              if SE.status(SE.score(mid, a["model"], a["ref"])[1]) != SE.status(SE.score(mid, b["model"], b["ref"])[1]))
-              or "none") + "."]
-    return L
-
-
 def c_frame_shift(names, P, J):
     """Group C: the expected port - jcm-strat difference of the winter polar-cap T from the
     one-frame-per-month shift, and the wind at both rows of a jet latitude that differs.
@@ -425,11 +368,10 @@ def main():
     ap.parse_args()
     names = list(P29_RUNS["runs"])
     window = P29_RUNS["window"]
-    P_all, refs = diagnose_all()
+    P_all = diagnose_all()
     J, R = load(names)
     P = {n: copy.deepcopy(P_all[n]) for n in names}
-    P_window = copy.deepcopy(P)                   # group A against the window's years
-    R29 = phase29_age(names, P)                   # group A against 2005-2009
+    phase29_age(names, P)                         # group A against 2005-2009
     groups = [g for g in "ABCD" if any(m["group"] == g for m in P[names[0]]["metrics"])]
     L = ["# Port check: transport diagnostics against jcm-strat phases 29 and 31", "",
          f"Generated by `scripts/checks/port_check.py` on {datetime.date.today()}, from the "
@@ -453,8 +395,6 @@ def main():
             L += ["", "Causes of the remaining differences:", ""] + [f"- {x}" for x in NOTES[g]]
         L.append("")
     L += phase31({n: P_all[n] for n in P31_RUNS})
-    L += switch(names, P, P_window, R29["clams_offset_150"],
-                refs[tuple(window)]["A"]["clams_offset_150"])
     os.makedirs(RESULTS, exist_ok=True)
     out = os.path.join(RESULTS, "port_check.md")
     open(out, "w").write("\n".join(L) + "\n")
