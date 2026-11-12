@@ -341,7 +341,7 @@ def switch(names, P_old, P_new, off_old, off_new):
             cells.append(f"{va:+.{nd}f} → {vb:+.{nd}f}")
         L.append(f"| {n} | " + " | ".join(cells) + " |")
     L += ["", "Group A and combined A-C score per run, both scorings:", "",
-          "| run | A extensive | combined extensive | A reduced | combined reduced |",
+          "| run | " + " | ".join(f"{g} {s}" for s in SE.SCORINGS for g in ("A", "combined")) + " |",
           "|---|---|---|---|---|"]
     S = {(s, k): {x["run"]: x for x in m02.score_all(Q, names, s)[1]}
          for s in SE.SCORINGS for k, Q in (("old", P_old), ("new", P_new))}

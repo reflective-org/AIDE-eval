@@ -11,7 +11,7 @@ stamped the same way, so the figures cannot drift from the reports:
                                metrics as a fraction of their bound, scaled so the
                                bound sits at 25 %; the colour steps at +-25 %;
                                metrics outside the scoring faded
-  per set (from the extensive scorecard)
+  per set (from the standard scorecard)
     transport_wstar_profile    tropical (15S-15N) w* profile of each run against WACCM6
     transport_age_profile      tropical (10S-10N) entry-age profile of each run against
                                CLaMS (entry offset removed) and WACCM6 REF-D1
@@ -66,7 +66,9 @@ def stamped(name, stamp):
 
 
 def window_text(res):
-    return f"{res['window'][0]}-{res['window'][1]}"
+    """The window, with the non-standard flag where it applies."""
+    w = f"{res['window'][0]}-{res['window'][1]}"
+    return f"{w}, {res['window_flag']}" if res["window_flag"] else w
 
 
 def footer(fig, res):

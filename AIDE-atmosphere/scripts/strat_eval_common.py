@@ -269,23 +269,36 @@ ABS_BOUND = {"A2": 0.4, "A2-WACCM": 0.4, "C2-N": 2.0, "C2-S": 2.0, "D4-fwN": 10.
 ABS_UNIT = {"A2": "yr", "A2-WACCM": "yr", "C2-N": "K", "C2-S": "K", "D4-fwN": "days", "D4-fwS": "days"}
 
 
-# Two scorings of the same diagnostics, both scored as above (Susanne 2026-11-11):
-#   extensive  the 34 metrics of the phase-29 scorecard (A2 against shifted CLaMS);
-#              A2-WACCM is not part of it
-#   reduced    jcm-strat phase 31's scored set: A2-WACCM replaces A2, and the metrics
-#              of make_phase31_report.py UNSCORED stay in the table but out of every
-#              group score (winds at 10 hPa, vortex variability, final warmings, SSW
-#              count, and the two relations D6, D7). Phase 31 scored them with
-#              absolute bounds (success_metrics.py); here they get the relative scoring.
+# Two scorings of the same diagnostics, both scored as above (Susanne 2026-11-11,
+# renamed 2026-11-12):
+#   standard   the headline score and ranking: jcm-strat phase 31's scored set (the
+#              former "reduced" scoring). A2-WACCM replaces A2, and the metrics of
+#              make_phase31_report.py UNSCORED stay in the table but out of every group
+#              score (winds at 10 hPa, vortex variability, final warmings, SSW count, and
+#              the two relations D6, D7). Phase 31 scored them with absolute bounds
+#              (success_metrics.py); here they get the relative scoring.
+#   extensive  the full listing: the 34 metrics of the phase-29 scorecard (A2 against
+#              shifted CLaMS); A2-WACCM is not part of it
 # hidden: not shown; unscored: shown, not in the group scores.
 PHASE31_UNSCORED = ("C1-jet10_N", "C1-jet10_N-lat", "C1-jet10_S", "C1-jet10_S-lat",
                     "D1-N", "D1-S", "D2-N", "D2-S", "D3", "D4-fwN", "D4-fwS",
                     "D6-N", "D6-S", "D7")
 SCORINGS = {
+    "standard": dict(hidden=(), unscored=("A2",) + PHASE31_UNSCORED),
     "extensive": dict(hidden=("A2-WACCM",), unscored=()),
-    "reduced": dict(hidden=(), unscored=("A2",) + PHASE31_UNSCORED),
 }
 
+# The standard window (Susanne 2026-11-12). A set scored on any other window is flagged
+# in its reports and in both summaries.
+STANDARD_WINDOW = (2006, 2019)
+
+
+def window_flag(window):
+    """'' on the standard window, else 'non-standard window (N of 14 standard years)'."""
+    if tuple(window) == STANDARD_WINDOW:
+        return ""
+    n = len(set(years_of(window)) & set(years_of(STANDARD_WINDOW)))
+    return f"non-standard window ({n} of {len(years_of(STANDARD_WINDOW))} standard years)"
 
 def ref_value(ref):
     """A range reference (A4) is scored against its midpoint."""

@@ -13,11 +13,13 @@ Group score = mean err of the group's scored metrics; combined = mean of the A, 
 and C group scores; D is reported on its own.
 
 Every result set (sources/<set>.json) is scored twice (strat_eval_common.SCORINGS):
-  extensive  the 34 metrics of the phase-29 scorecard
-  reduced    jcm-strat phase 31's scored set: A2-WACCM for A2, 14 metrics shown but
-             not scored
+  standard   the headline score and ranking: jcm-strat phase 31's scored set (the
+             former "reduced" scoring), A2-WACCM for A2, 15 metrics shown but not scored
+  extensive  the full listing: the 34 metrics of the phase-29 scorecard
+A set whose window is not the standard 2006-2019 is flagged "non-standard window
+(N of 14 standard years)" in its reports and in both summaries.
 
-  02_scorecard.py [SET ...] [--scoring extensive|reduced]
+  02_scorecard.py [SET ...] [--scoring standard|extensive]
                                          default: every set, both scorings
 
 Every artefact is stamped `__<set>__<scoring>__<production date>`, as 17 stamps its
@@ -25,7 +27,7 @@ report.
 
 Output: validation_results/transport/transport_scorecard__<stamp>.json
         validation_results/transport/transport_scorecard__<stamp>.md
-        validation_results/transport/SCORING_EXTENSIVE.md, SCORING_REDUCED.md
+        validation_results/transport/SCORING_STANDARD.md, SCORING_EXTENSIVE.md
             one-page summary per scoring over every set (written when every set is scored)
 """
 
@@ -49,10 +51,12 @@ BASIS = {"A2": "< 0.4 yr", "A2-WACCM": "< 0.4 yr", "C2-N": "± 2 K", "C2-S": "±
 GROUPS = (("A", "A age of air"), ("B", "B residual circulation"), ("C", "C polar vortex"),
           ("combined", "**combined A-C**"), ("D", "D variability"))
 SCORING_TEXT = {
-    "extensive": "**extensive**: the 34 metrics of the phase-29 scorecard, every one scored",
-    "reduced": "**reduced**: jcm-strat phase 31's scored set — A2-WACCM replaces A2; A2 and "
-               f"{', '.join(SE.PHASE31_UNSCORED)} are listed but not scored. Phase 31 scored with "
-               "absolute bounds; here the relative scoring applies to the reduced set",
+    "standard": "**standard** (the headline score and ranking): jcm-strat phase 31's scored set, "
+                "the former \"reduced\" scoring — A2-WACCM replaces A2; A2 and "
+                f"{', '.join(SE.PHASE31_UNSCORED)} are listed but not scored. Phase 31 scored with "
+                "absolute bounds; here the relative scoring applies to that set",
+    "extensive": "**extensive** (the full listing): the 34 metrics of the phase-29 scorecard, "
+                 "every one scored",
 }
 FIGURES = [
     ("transport_score_table.png", "scoring", "group scores and passes per run"),
@@ -61,7 +65,7 @@ FIGURES = [
     ("transport_wstar_profile.png", "set", "tropical w* profiles against WACCM6"),
     ("transport_age_profile.png", "set", "tropical entry-age profiles against CLaMS and WACCM6"),
 ]
-SUMMARY = {"extensive": "SCORING_EXTENSIVE.md", "reduced": "SCORING_REDUCED.md"}
+SUMMARY = {"standard": "SCORING_STANDARD.md", "extensive": "SCORING_EXTENSIVE.md"}
 
 
 def stamp_for(*parts):
@@ -145,12 +149,17 @@ def markdown(res, P, R):
     names = res["runs"]
     first = P[names[0]]
     A, B, D = R["A"], R["B"], R["D"]
-    L = [f"# Transport scorecard: {res['name']}, {res['scoring']} scoring", "",
-         "| | |", "|---|---|",
+    flag = f" — **{res['window_flag']}**" if res["window_flag"] else ""
+    L = [f"# Transport scorecard: {res['name']}, {res['scoring']} scoring", ""]
+    if res["window_flag"]:
+        L += [f"> **{res['window_flag'][0].upper() + res['window_flag'][1:]}**: scored on "
+              f"{res['window'][0]}–{res['window'][1]}, not on the standard window "
+              f"{SE.STANDARD_WINDOW[0]}–{SE.STANDARD_WINDOW[1]}.", ""]
+    L += ["| | |", "|---|---|",
          f"| Scored | {', '.join(names)} |",
          f"| Read by | reader `{'`, `'.join(sorted({P[n]['reader'] for n in names}))}`; "
          f"{'; '.join(sorted({os.path.dirname(f) for n in names for f in P[n]['paths']}))} |",
-         f"| Window | {first['days'][0]} – {first['days'][1]} ({first['n_days']} days) |",
+         f"| Window | {first['days'][0]} – {first['days'][1]} ({first['n_days']} days){flag} |",
          f"| Reference years | A, D, D7: {A['years'][0]}–{A['years'][-1]} (the window); "
          f"B: WACCM6 h6 {B['years'][0]}–{B['years'][1]}, the only h6 segment |",
          f"| Produced | {res['produced']} |",
@@ -232,9 +241,26 @@ def summary_md(scoring, results):
           "- References follow each set's window (A, C, D); B is WACCM6 h6 1996–2014 for every set.",
           "- w*: jcm-strat Ψ* route, log-p interpolated — interim, AIDE-eval issue #5. "
           "Group C input from daily means — AIDE-eval issue #7."]
+    if scoring == "standard":
+        ranked = sorted(((s["combined"], set_name, s) for set_name, res in results.items()
+                         for s in res["scores"]), key=lambda x: (x[0], x[1], x[2]["run"]))
+        L += ["", "## Ranking", "",
+              "Every run of every set by its combined A–C score (lower is better). Runs on "
+              "different windows are compared with references of their own years.", "",
+              "| rank | run | set | window | combined A–C | A | B | C | D |",
+              "|---|---|---|---|---|---|---|---|---|"]
+        for i, (_, set_name, s) in enumerate(ranked, 1):
+            res = results[set_name]
+            w = f"{res['window'][0]}–{res['window'][1]}"
+            w += f" — {res['window_flag']}" if res["window_flag"] else ""
+            L.append(f"| {i} | {s['run']} | {set_name} | {w} | **{s['combined']:.2f}** | "
+                     f"{s['A']:.2f} | {s['B']:.2f} | {s['C']:.2f} | {s['D']:.2f} |")
+    else:
+        L += ["", f"Ranking: the standard scoring ([{SUMMARY['standard']}]({SUMMARY['standard']}))."]
     for set_name, res in results.items():
         names, w = res["runs"], res["window"]
-        L += ["", f"## {set_name} ({w[0]}–{w[1]})", "",
+        flag = f" — **{res['window_flag']}**" if res["window_flag"] else ""
+        L += ["", f"## {set_name} ({w[0]}–{w[1]}){flag}", "",
               "| | " + " | ".join(names) + " |", "|---|" + "---|" * len(names)]
         for k, lab in GROUPS:
             L.append(f"| {lab} | " + " | ".join(
@@ -277,6 +303,7 @@ def main():
             res = dict(name=set_name, scoring=scoring, produced=produced,
                        stamp=stamp_for(set_name, scoring, produced),
                        set_stamp=stamp_for(set_name, produced), runs=names, window=list(window),
+                       window_flag=SE.window_flag(window),
                        tolerance=SE.TOL, a4_range=list(SE.A4_RANGE), abs_bound=SE.ABS_BOUND,
                        scoring_definition={k: list(v) for k, v in SE.SCORINGS[scoring].items()},
                        wstar_estimator="jcm-strat Psi* route, log-p interpolated; interim "
