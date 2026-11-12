@@ -27,6 +27,8 @@ report.
 
 Output: validation_results/transport/transport_scorecard__<stamp>.json
         validation_results/transport/transport_scorecard__<stamp>.md
+        validation_results/transport/SCORING_EXTENSIVE.md, SCORING_REDUCED.md
+            one-page summary per scoring over every set (written when every set is scored)
 """
 
 import argparse
@@ -62,6 +64,7 @@ FIGURES = [
     ("transport_wstar_profile.png", "set", "tropical w* profiles against WACCM6"),
     ("transport_age_profile.png", "set", "tropical entry-age profiles against CLaMS and WACCM6"),
 ]
+SUMMARY = {"extensive": "SCORING_EXTENSIVE.md", "reduced": "SCORING_REDUCED.md"}
 COMPARE_FIGURE = ("transport_window_comparison.png", "set",
                   "AL7h metric by metric, in sample against out of sample, both scorings")
 
@@ -265,6 +268,78 @@ def markdown(res, P, R):
     return "\n".join(L) + "\n"
 
 
+def link(name):
+    return f"[`{name}`]({name})"
+
+
+def summary_md(scoring, results):
+    """One page per scoring over every result set: what is scored, the group scores,
+    the metrics that pass or fail in every run, the AL7h window comparison, links."""
+    first = next(iter(results.values()))
+    rows0 = first["rows"]
+    L = [f"# Transport scorecard — {scoring} scoring", "",
+         f"Summary over every result set, produced {first['produced']}. Full tables: the reports "
+         "linked below. Method, contract and decisions: "
+         "[docs/TRANSPORT_SCORECARD.md](../../docs/TRANSPORT_SCORECARD.md).", "",
+         "## What is scored", "",
+         f"- {SCORING_TEXT[scoring]}."]
+    for g, lab in GROUPS:
+        if g == "combined":
+            continue
+        ids = [r["id"] for r in rows0 if r["group"] == g and r["scored"]]
+        L.append(f"- {lab}: {len(ids)} scored — {', '.join(ids)}")
+    off = [r["id"] for r in rows0 if not r["scored"]]
+    if off:
+        L.append(f"- Listed, not scored: {', '.join(off)}")
+    L += [f"- Score: rel = model / ref − 1, err = \\|rel\\| / {T.TOL:g}; pass err ≤ 1, near ≤ 1.5, "
+          "fail above. A2, A2-WACCM, C1 latitudes, C2 and D4 final warming keep absolute bounds; "
+          "A4 against the midpoint 2.75 yr.",
+          "- Group score = mean err of its scored metrics; combined = mean of A, B, C; D separate.",
+          "- References follow each set's window (A, C, D); B is WACCM6 h6 1996–2014 for every set.",
+          "- w*: jcm-strat Ψ* route, log-p interpolated — interim, AIDE-eval issue #5. "
+          "Group C input from daily means — AIDE-eval issue #7."]
+    for set_name, res in results.items():
+        names, w = res["runs"], res["window"]
+        L += ["", f"## {set_name} ({w[0]}–{w[1]})", "",
+              "| | " + " | ".join(names) + " |", "|---|" + "---|" * len(names)]
+        for k, lab in GROUPS:
+            L.append(f"| {lab} | " + " | ".join(
+                (f"**{s[k]:.2f}**" if k == "combined" else f"{s[k]:.2f}") for s in res["scores"]) + " |")
+        L.append("| passed A-C | " + " | ".join(f"{s['passed']} / {s['total']}" for s in res["scores"]) + " |")
+        L.append("| passed D | " + " | ".join(f"{s['D_passed']} / {s['D_total']}" for s in res["scores"]) + " |")
+        scored = [r for r in res["rows"] if r["scored"]]
+        L.append("")
+        if len(names) == 1:
+            for st, word in (("fail", "Fail"), ("near", "Near")):
+                ids = [r["id"] for r in scored if r["runs"][names[0]]["status"] == st]
+                L.append(f"- {word}: {', '.join(ids) if ids else 'none'}")
+        else:
+            for st, word in (("fail", "Fail in every run"), ("pass", "Pass in every run")):
+                ids = [r["id"] for r in scored if all(c["status"] == st for c in r["runs"].values())]
+                L.append(f"- {word}: {', '.join(ids) if ids else 'none'}")
+        L.append(f"- Report: {link(stamped('transport_scorecard.md', res['stamp']))}; figures "
+                 f"{link(stamped('transport_score_table.png', res['stamp']))}, "
+                 f"{link(stamped('transport_heatmap.png', res['stamp']))}")
+        cmp = res.get("comparison")
+        if cmp:
+            G = cmp["groups"][scoring]
+            (lab_in, lab_out), wi, wo = cmp["labels"], cmp["windows"]["in"], cmp["windows"]["out"]
+            L += ["", f"### {cmp['run']} against {cmp['against']['run']}: {lab_in} "
+                  f"{wi[0]}–{wi[1]} vs {lab_out} {wo[0]}–{wo[1]}", "",
+                  f"| | {wi[0]}–{wi[1]} | {wo[0]}–{wo[1]} |", "|---|---|---|"]
+            for k, lab in GROUPS:
+                f = (lambda x: f"**{x:.2f}**") if k == "combined" else (lambda x: f"{x:.2f}")
+                L.append(f"| {lab} | {f(G['in'][k])} | {f(G['out'][k])} |")
+            L.append(f"| passed A-C | {G['in']['passed']} / {G['in']['total']} | "
+                     f"{G['out']['passed']} / {G['out']['total']} |")
+            changed = [e["id"] for e in cmp["metrics"] if e["scored"][scoring]
+                       and e["in"]["status"] != e["out"]["status"]]
+            L += ["", f"- Scored metrics changing status: {', '.join(changed) if changed else 'none'}",
+                  f"- Metric by metric: {link(stamped('transport_scorecard.md', res['stamp']))}; figure "
+                  f"{link(stamped(COMPARE_FIGURE[0], res['set_stamp']))}"]
+    return "\n".join(L) + "\n"
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[1].strip())
     ap.add_argument("sets", nargs="*", help="result sets to score (default: every set)")
@@ -277,6 +352,7 @@ def main():
     scorings = [a.scoring] if a.scoring else list(T.SCORINGS)
     produced = datetime.date.today().isoformat()
     os.makedirs(RESULTS, exist_ok=True)
+    done = {s: {} for s in scorings}
     for set_name in sets:
         names = list(T.SETS[set_name])
         window = T.window_of(names)
@@ -301,12 +377,20 @@ def main():
             out_m = os.path.join(RESULTS, stamped("transport_scorecard.md", res["stamp"]))
             json.dump(res, open(out_j, "w"), indent=1)
             open(out_m, "w").write(markdown(res, P, R))
+            done[scoring][set_name] = res
             print(f"{set_name}, {scoring}")
             for s in scores:
                 print(f"  {s['run']:9s} A {s['A']:.2f}  B {s['B']:.2f}  C {s['C']:.2f}  combined "
                       f"{s['combined']:.2f}  passed {s['passed']}/{s['total']}  D {s['D']:.2f} "
                       f"({s['D_passed']}/{s['D_total']})")
             print(f"wrote {out_j}\nwrote {out_m}")
+    if set(sets) != set(T.SETS):
+        print("summaries not written: they cover every set (run 23 without set names)")
+        return
+    for scoring in scorings:
+        out_s = os.path.join(RESULTS, SUMMARY[scoring])
+        open(out_s, "w").write(summary_md(scoring, done[scoring]))
+        print(f"wrote {out_s}")
 
 
 if __name__ == "__main__":
