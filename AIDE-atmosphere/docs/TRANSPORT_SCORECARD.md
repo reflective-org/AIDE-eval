@@ -10,6 +10,7 @@ repository: the diagnostics are recomputed here from daily zonal means, not copi
 |---|---|
 | Scored so far | the eight jcm-strat phase-29 runs, 2006–2010, and AL7h 2011–2019 (jcm-strat phase 31, out of sample), each under two scorings → [validation_results/transport/](../validation_results/transport/) |
 | Scorings | **extensive** (the 34 phase-29 metrics) and **reduced** (jcm-strat phase 31's scored set) — §4 |
+| One-page summaries | [SCORING_EXTENSIVE.md](../validation_results/transport/SCORING_EXTENSIVE.md), [SCORING_REDUCED.md](../validation_results/transport/SCORING_REDUCED.md) — every set, one scoring each |
 | Scripts | `scripts/transport_common.py`, `22_transport_fields.py`, `23_transport_scorecard.py`, `24_transport_figures.py`; evidence `22b_transport_port_check.py`; `copy_era5_refs.sh` |
 | Agreement with jcm-strat | [port_check.md](../validation_results/transport/port_check.md), summarised in §7 |
 | w* estimator | **interim** — AIDE-eval issue #5 is open (§5) |
@@ -218,6 +219,8 @@ $PY 22_transport_fields.py                 # every registered source; or name th
 $PY 22b_transport_port_check.py            # evidence only -> validation_results/transport/port_check.md
 $PY 23_transport_scorecard.py              # every set, both scorings; or: SET ... [--scoring extensive|reduced]
                                            #   -> transport_scorecard__<set>__<scoring>__<date>.md / .json
+                                           #   -> SCORING_EXTENSIVE.md, SCORING_REDUCED.md (one page per
+                                           #      scoring over every set; only when every set is scored)
 $PY 24_transport_figures.py                # every scorecard of the newest date [--date YYYY-MM-DD]
 ```
 
@@ -229,8 +232,8 @@ $PY 24_transport_figures.py                # every scorecard of the newest date 
 - `output/` is gitignored; `validation_results/transport/` is generated and committed. Never
   edit either by hand.
 - Re-running the chain (copy, 22, 22b, 23, 24) from an empty `output/` reproduces every
-  committed artefact bit for bit under the pinned `requirements.txt` (checked 2026-11-11, two
-  runs).
+  committed artefact bit for bit under the pinned `requirements.txt` (checked 2026-11-11 and
+  2026-11-12, two runs each).
 
 ---
 
@@ -304,9 +307,9 @@ applied before scoring. B, D4-w and D7 are checked at the nearest level.
 ## 8. Result, 2006–2010
 
 Transcribed from the two reports
-[extensive](../validation_results/transport/transport_scorecard__jcm-strat-phase29-2006-2010__extensive__2026-11-11.md)
+[extensive](../validation_results/transport/transport_scorecard__jcm-strat-phase29-2006-2010__extensive__2026-11-12.md)
 and
-[reduced](../validation_results/transport/transport_scorecard__jcm-strat-phase29-2006-2010__reduced__2026-11-11.md);
+[reduced](../validation_results/transport/transport_scorecard__jcm-strat-phase29-2006-2010__reduced__2026-11-12.md);
 the metric tables and figures are beside them.
 
 Extensive:
@@ -355,9 +358,9 @@ Reduced:
 AL7h's T_eq correction was fitted to ERA5 extratropical T over 2005-04..2008-01. jcm-strat
 phase 31 continued the same AL7h chain to 2019; 2011–2019 is out of sample, 2006–2010 overlaps
 the fit. Transcribed from the comparison section of
-[transport_scorecard__jcm-strat-phase31-AL7h-2011-2019__extensive__2026-11-11.md](../validation_results/transport/transport_scorecard__jcm-strat-phase31-AL7h-2011-2019__extensive__2026-11-11.md)
+[transport_scorecard__jcm-strat-phase31-AL7h-2011-2019__extensive__2026-11-12.md](../validation_results/transport/transport_scorecard__jcm-strat-phase31-AL7h-2011-2019__extensive__2026-11-12.md)
 (the same table is in the reduced report) and its figure
-`transport_window_comparison__jcm-strat-phase31-AL7h-2011-2019__2026-11-11.png`.
+`transport_window_comparison__jcm-strat-phase31-AL7h-2011-2019__2026-11-12.png`.
 
 | | extensive 2006–2010 | extensive 2011–2019 | reduced 2006–2010 | reduced 2011–2019 |
 |---|---|---|---|---|

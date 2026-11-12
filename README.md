@@ -67,6 +67,9 @@ far: the eight jcm-strat phase-29 runs over 2006–2010 and AL7h over 2011–201
 [validation_results/transport/](AIDE-atmosphere/validation_results/transport/). Its w*
 estimator is interim (AIDE-eval issue #5). Method, field contract and decisions:
 [docs/TRANSPORT_SCORECARD.md](AIDE-atmosphere/docs/TRANSPORT_SCORECARD.md).
+One-page summary per scoring:
+[SCORING_EXTENSIVE.md](AIDE-atmosphere/validation_results/transport/SCORING_EXTENSIVE.md),
+[SCORING_REDUCED.md](AIDE-atmosphere/validation_results/transport/SCORING_REDUCED.md).
 
 ## Input requirements
 
