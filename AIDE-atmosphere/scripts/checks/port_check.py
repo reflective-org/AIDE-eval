@@ -4,7 +4,7 @@ port_check - Check the ported diagnostics against jcm-strat's own numbers.
 Evidence, not a pipeline stage: it feeds nothing. It reads the
 jcm-strat's phase-29 and phase-31 results, computes the diagnostics of the same runs
 through 01's functions, and writes the difference tables
-validation_results/transport/port_check.md:
+validation_results/port_check.md:
 
   1. phase 29: the eight runs, 2006-2010, group A at phase 29's 2005-2009 age years
   2. phase 31: AL7h 2006-2010 and 2011-2019, age references of the window's years,
@@ -51,8 +51,7 @@ HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # scripts/
 sys.path.insert(0, HERE)
 import strat_eval_common as SE
 
-RESULTS = os.path.join(os.path.dirname(HERE),
-                       "validation_results", "transport")
+RESULTS = os.path.join(os.path.dirname(HERE), "validation_results")
 # jcm-strat's own results and the runs they were computed from. Model files are read
 # in place.
 JCM = "/data/JCM_stripped"

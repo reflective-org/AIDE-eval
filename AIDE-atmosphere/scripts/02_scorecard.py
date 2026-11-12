@@ -22,20 +22,18 @@ A set whose window is not the standard 2006-2019 is flagged "non-standard window
   02_scorecard.py [SET ...] [--scoring standard|extensive]
                                          default: every set, both scorings
 
-Every artefact is stamped `__<set>__<scoring>__<production date>`, as 17 stamps its
-report.
+After scoring, the two summaries are rewritten from the scorecard JSON of every set
+registered in sources/ (so scoring one set updates them).
 
-Output: validation_results/transport/transport_scorecard__<stamp>.json
-        validation_results/transport/transport_scorecard__<stamp>.md
-        validation_results/transport/SCORING_STANDARD.md, SCORING_EXTENSIVE.md
-            one-page summary per scoring over every set (written when every set is scored)
+Output: validation_results/<set>/scorecard_<scoring>.json, scorecard_<scoring>.md
+        validation_results/SCORING_STANDARD.md, SCORING_EXTENSIVE.md
+            one page per scoring comparing every set
 """
 
 import argparse
 import datetime
 import json
 import os
-import re
 import sys
 
 import numpy as np
@@ -44,7 +42,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import strat_eval_common as SE
 
 RESULTS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                       "validation_results", "transport")
+                       "validation_results")
 SYMBOL = {"pass": "✅", "near": "⚠️", "fail": "❌"}
 BASIS = {"A2": "< 0.4 yr", "A2-WACCM": "< 0.4 yr", "C2-N": "± 2 K", "C2-S": "± 2 K",
          "D4-fwN": "± 10 days", "D4-fwS": "± 10 days"}
@@ -58,25 +56,15 @@ SCORING_TEXT = {
     "extensive": "**extensive** (the full listing): the 34 metrics of the phase-29 scorecard, "
                  "every one scored",
 }
+# Figures of a set (03_figures.py); {scoring} filled per report
 FIGURES = [
-    ("transport_score_table.png", "scoring", "group scores and passes per run"),
-    ("transport_heatmap.png", "scoring", "every metric, % off its reference (absolute metrics "
-     "as a fraction of their bound), ±25 % marked; unscored metrics faded"),
-    ("transport_wstar_profile.png", "set", "tropical w* profiles against WACCM6"),
-    ("transport_age_profile.png", "set", "tropical entry-age profiles against CLaMS and WACCM6"),
+    ("score_table_{scoring}.png", "group scores and passes per run"),
+    ("heatmap_{scoring}.png", "every metric, % off its reference (absolute metrics as a "
+     "fraction of their bound), ±25 % marked; unscored metrics faded"),
+    ("wstar_profile.png", "tropical w* profiles against WACCM6"),
+    ("age_profile.png", "tropical entry-age profiles against CLaMS and WACCM6"),
 ]
 SUMMARY = {"standard": "SCORING_STANDARD.md", "extensive": "SCORING_EXTENSIVE.md"}
-
-
-def stamp_for(*parts):
-    """`<set>[__<scoring>]__<date>`, each part reduced to characters that are safe in a
-    path (as 17)."""
-    return "__".join(re.sub(r"[^A-Za-z0-9.+-]+", "-", p).strip("-") for p in parts)
-
-
-def stamped(name, stamp):
-    root, ext = os.path.splitext(name)
-    return f"{root}__{stamp}{ext}"
 
 
 def ref_text(ref):
@@ -203,11 +191,10 @@ def markdown(res, P, R):
           f"- **D1–D6** ERA5 CDS daily zonal means {D['years'][0]}–{D['years'][-1]}; **D7** CLaMS "
           "v3.1 monthly age at 55 hPa, same years"]
     L += ["", "## Figures", ""]
-    figs = FIGURES
-    L += [f"- `{stamped(f, res['stamp'] if kind == 'scoring' else res['set_stamp'])}` — {d}"
-          for f, kind, d in figs]
-    L += ["", "Method, contract and decisions: `docs/TRANSPORT_SCORECARD.md`. Agreement with "
-          "jcm-strat's own numbers: `port_check.md` in this folder."]
+    L += [f"- {link(f.format(scoring=res['scoring']))} — {d}" for f, d in FIGURES]
+    L += ["", "Method, contract and decisions: "
+          "[docs/EVALUATION_PROTOCOL.md](../../docs/EVALUATION_PROTOCOL.md). Agreement with "
+          "jcm-strat's own numbers: [port_check.md](../port_check.md)."]
     return "\n".join(L) + "\n"
 
 
@@ -215,15 +202,16 @@ def link(name):
     return f"[`{name}`]({name})"
 
 
-def summary_md(scoring, results):
+def summary_md(scoring, results, missing):
     """One page per scoring over every result set: what is scored, the group scores,
-    the metrics that pass or fail in every run, links."""
+    the metrics that pass or fail in every run, links. `missing`: registered sets with
+    no scorecard yet."""
     first = next(iter(results.values()))
     rows0 = first["rows"]
     L = [f"# Transport scorecard — {scoring} scoring", "",
-         f"Summary over every result set, produced {first['produced']}. Full tables: the reports "
+         "Summary over every result set registered in `sources/`. Full tables: the reports "
          "linked below. Method, contract and decisions: "
-         "[docs/TRANSPORT_SCORECARD.md](../../docs/TRANSPORT_SCORECARD.md).", "",
+         "[docs/EVALUATION_PROTOCOL.md](../docs/EVALUATION_PROTOCOL.md).", "",
          "## What is scored", "",
          f"- {SCORING_TEXT[scoring]}."]
     for g, lab in GROUPS:
@@ -277,9 +265,11 @@ def summary_md(scoring, results):
             for st, word in (("fail", "Fail in every run"), ("pass", "Pass in every run")):
                 ids = [r["id"] for r in scored if all(c["status"] == st for c in r["runs"].values())]
                 L.append(f"- {word}: {', '.join(ids) if ids else 'none'}")
-        L.append(f"- Report: {link(stamped('transport_scorecard.md', res['stamp']))}; figures "
-                 f"{link(stamped('transport_score_table.png', res['stamp']))}, "
-                 f"{link(stamped('transport_heatmap.png', res['stamp']))}")
+        d = f"{set_name}/"
+        L.append(f"- Produced {res['produced']}. Report: {link(d + f'scorecard_{scoring}.md')}; figures "
+                 f"{link(d + f'score_table_{scoring}.png')}, {link(d + f'heatmap_{scoring}.png')}")
+    if missing:
+        L += ["", f"Registered in `sources/`, not yet scored: {', '.join(missing)}."]
     return "\n".join(L) + "\n"
 
 
@@ -291,18 +281,17 @@ def main():
     sets = a.sets or SE.set_names()
     scorings = [a.scoring] if a.scoring else list(SE.SCORINGS)
     produced = datetime.date.today().isoformat()
-    os.makedirs(RESULTS, exist_ok=True)
-    done = {s: {} for s in scorings}
     for set_name in sets:
         spec = SE.load_set(set_name)
         names, window = list(spec["runs"]), spec["window"]
         P = {n: json.load(open(os.path.join(SE.OUTDIR, set_name, f"{n}.json"))) for n in names}
         R = json.load(open(os.path.join(SE.OUTDIR, set_name, "references.json")))
+        out_dir = os.path.join(RESULTS, set_name)
+        os.makedirs(out_dir, exist_ok=True)
         for scoring in scorings:
             rows, scores = score_all(P, names, scoring)
-            res = dict(name=set_name, scoring=scoring, produced=produced,
-                       stamp=stamp_for(set_name, scoring, produced),
-                       set_stamp=stamp_for(set_name, produced), runs=names, window=list(window),
+            res = dict(name=set_name, description=spec["description"], scoring=scoring,
+                       produced=produced, runs=names, window=list(window),
                        window_flag=SE.window_flag(window),
                        tolerance=SE.TOL, a4_range=list(SE.A4_RANGE), abs_bound=SE.ABS_BOUND,
                        scoring_definition={k: list(v) for k, v in SE.SCORINGS[scoring].items()},
@@ -311,23 +300,33 @@ def main():
                        rows=rows, scores=scores,
                        profiles={n: P[n]["profiles"] for n in names},
                        references=R)
-            out_j = os.path.join(RESULTS, stamped("transport_scorecard.json", res["stamp"]))
-            out_m = os.path.join(RESULTS, stamped("transport_scorecard.md", res["stamp"]))
+            out_j = os.path.join(out_dir, f"scorecard_{scoring}.json")
+            out_m = os.path.join(out_dir, f"scorecard_{scoring}.md")
             json.dump(res, open(out_j, "w"), indent=1)
             open(out_m, "w").write(markdown(res, P, R))
-            done[scoring][set_name] = res
             print(f"{set_name}, {scoring}")
             for s in scores:
                 print(f"  {s['run']:9s} A {s['A']:.2f}  B {s['B']:.2f}  C {s['C']:.2f}  combined "
                       f"{s['combined']:.2f}  passed {s['passed']}/{s['total']}  D {s['D']:.2f} "
                       f"({s['D_passed']}/{s['D_total']})")
             print(f"wrote {out_j}\nwrote {out_m}")
-    if set(sets) != set(SE.set_names()):
-        print("summaries not written: they cover every set (run 02 without set names)")
-        return
+    write_summaries(scorings)
+
+
+def write_summaries(scorings):
+    """Both summaries over every registered set that has a scorecard on disk."""
     for scoring in scorings:
+        results, missing = {}, []
+        for set_name in SE.set_names():
+            f = os.path.join(RESULTS, set_name, f"scorecard_{scoring}.json")
+            if os.path.exists(f):
+                results[set_name] = json.load(open(f))
+            else:
+                missing.append(set_name)
+        if not results:
+            continue
         out_s = os.path.join(RESULTS, SUMMARY[scoring])
-        open(out_s, "w").write(summary_md(scoring, done[scoring]))
+        open(out_s, "w").write(summary_md(scoring, results, missing))
         print(f"wrote {out_s}")
 
 

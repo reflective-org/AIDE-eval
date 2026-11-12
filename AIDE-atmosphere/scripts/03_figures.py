@@ -1,29 +1,25 @@
 """
 03 - Figures of the scorecard.
 
-Reads the transport_scorecard__<set>__<scoring>__<date>.json files of one production
-date (the newest, or the one named with --date) and writes the PNGs beside them,
-stamped the same way, so the figures cannot drift from the reports:
+Reads validation_results/<set>/scorecard_<scoring>.json and writes the PNGs beside
+them, so the figures cannot drift from the reports:
 
   per set and scoring
-    transport_score_table      group scores and passes per run
-    transport_heatmap          every metric x run, % off the reference; absolute
-                               metrics as a fraction of their bound, scaled so the
-                               bound sits at 25 %; the colour steps at +-25 %;
-                               metrics outside the scoring faded
+    score_table_<scoring>   group scores and passes per run
+    heatmap_<scoring>       every metric x run, % off the reference; absolute metrics as
+                            a fraction of their bound, scaled so the bound sits at 25 %;
+                            the colour steps at +-25 %; metrics outside the scoring faded
   per set (from the standard scorecard)
-    transport_wstar_profile    tropical (15S-15N) w* profile of each run against WACCM6
-    transport_age_profile      tropical (10S-10N) entry-age profile of each run against
-                               CLaMS (entry offset removed) and WACCM6 REF-D1
+    wstar_profile           tropical (15S-15N) w* profile of each run against WACCM6
+    age_profile             tropical (10S-10N) entry-age profile of each run against
+                            CLaMS (entry offset removed) and WACCM6 REF-D1
 
-  03_figures.py [--date YYYY-MM-DD]
+  03_figures.py [SET ...]   default: every set in sources/
 """
 
 import argparse
-import glob
 import json
 import os
-import re
 import sys
 import textwrap
 
@@ -37,7 +33,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import strat_eval_common as SE
 
 RESULTS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                       "validation_results", "transport")
+                       "validation_results")
 
 # Colours: one series hue (categorical slot 1) against neutral-ink references; a
 # blue - gray - red diverging ramp, lightness monotonic on each arm; status tints
@@ -60,11 +56,6 @@ plt.rcParams.update({
 })
 
 
-def stamped(name, stamp):
-    root, ext = os.path.splitext(name)
-    return f"{root}__{stamp}{ext}"
-
-
 def window_text(res):
     """The window, with the non-standard flag where it applies."""
     w = f"{res['window'][0]}-{res['window'][1]}"
@@ -73,7 +64,8 @@ def window_text(res):
 
 def footer(fig, res):
     """Source line at the bottom, broken at its separators if the figure is narrow."""
-    parts = [f"transport_scorecard__{res['stamp']}.json", "w* interim (AIDE-eval issue #5)",
+    parts = [f"validation_results/{res['name']}/scorecard_{res['scoring']}.json",
+             "w* interim (AIDE-eval issue #5)",
              "scripts/03_figures.py"]
     width = int(fig.get_figwidth() * 72 / (0.55 * 7))
     lines = [parts[0]]
@@ -98,8 +90,8 @@ def title(fig, text, width_in, y_in=0.12, size=10):
     return y_in + len(lines) * size * 1.35 / 72
 
 
-def save(fig, stamp, name):
-    out = os.path.join(RESULTS, stamped(name, stamp))
+def save(fig, res, name):
+    out = os.path.join(RESULTS, res["name"], name)
     fig.savefig(out, dpi=150)
     plt.close(fig)
     print(f"wrote {out}")
@@ -143,7 +135,7 @@ def score_table(res):
     fig.text(0.01, 0.06, "✓ pass (err ≤ 1)   ~ near (≤ 1.5)   ✗ fail (> 1.5)   ·   combined = "
              f"mean of A, B, C; D separate   ·   window {window_text(res)}", fontsize=8, color=INK2)
     footer(fig, res)
-    save(fig, res["stamp"], "transport_score_table.png")
+    save(fig, res, f"score_table_{res['scoring']}.png")
 
 
 # --------------------------------------------------------------------- heatmap
@@ -212,7 +204,7 @@ def heatmap(res):
                         "[abs]: text in own unit, colour scaled so the bound = 25 %",
                         fontsize=7.5, color=INK2, loc="left", pad=4)
     footer(fig, res)
-    save(fig, res["stamp"], "transport_heatmap.png")
+    save(fig, res, f"heatmap_{res['scoring']}.png")
 
 
 # --------------------------------------------------------------------- profiles
@@ -275,7 +267,7 @@ def wstar_profile(res):
         ax.set_xlabel("w* 15S-15N [mm/s]")
     footer(fig, res)
     finish_panels(fig, axes, runs, legend_top, ncol)
-    save(fig, res["set_stamp"], "transport_wstar_profile.png")
+    save(fig, res, "wstar_profile.png")
 
 
 def age_profile(res):
@@ -308,29 +300,24 @@ def age_profile(res):
         ax.set_xlabel("entry age 10S-10N [yr]")
     footer(fig, res)
     finish_panels(fig, axes, runs, legend_top, ncol)
-    save(fig, res["set_stamp"], "transport_age_profile.png")
+    save(fig, res, "age_profile.png")
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[1].strip())
-    ap.add_argument("--date", help="production date of the scorecards to draw (default: the newest)")
+    ap.add_argument("sets", nargs="*", help="result sets to draw (default: every set)")
     a = ap.parse_args()
-    found = sorted(glob.glob(os.path.join(RESULTS, "transport_scorecard__*__*__*.json")))
-    dates = sorted({re.search(r"__(\d{4}-\d{2}-\d{2})\.json$", f).group(1) for f in found})
-    if not dates:
-        raise SystemExit(f"no transport_scorecard__<set>__<scoring>__<date>.json in {RESULTS}; "
-                         "run 02_scorecard.py first")
-    date = a.date or dates[-1]
-    drawn = set()
-    for f in [f for f in found if f.endswith(f"__{date}.json")]:
-        res = json.load(open(f))
-        score_table(res)
-        heatmap(res)
-        if res["set_stamp"] in drawn:
-            continue
-        drawn.add(res["set_stamp"])
-        wstar_profile(res)
-        age_profile(res)
+    for set_name in a.sets or SE.set_names():
+        for scoring in SE.SCORINGS:
+            f = os.path.join(RESULTS, set_name, f"scorecard_{scoring}.json")
+            if not os.path.exists(f):
+                raise SystemExit(f"{f} missing; run 02_scorecard.py {set_name} first")
+            res = json.load(open(f))
+            score_table(res)
+            heatmap(res)
+            if scoring == "standard":
+                wstar_profile(res)
+                age_profile(res)
 
 
 if __name__ == "__main__":
