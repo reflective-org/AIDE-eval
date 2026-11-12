@@ -12,11 +12,11 @@ relative_scores.py does:
 Group score = mean err of the group's scored metrics; combined = mean of the A, B
 and C group scores; D is reported on its own.
 
-Every result set (transport_common.SETS) is scored twice (transport_common.SCORINGS):
+Every result set (strat_eval_common.SETS) is scored twice (strat_eval_common.SCORINGS):
   extensive  the 34 metrics of the phase-29 scorecard
   reduced    jcm-strat phase 31's scored set: A2-WACCM for A2, 14 metrics shown but
              not scored
-A set listed in transport_common.COMPARE also gets a run-by-run comparison with
+A set listed in strat_eval_common.COMPARE also gets a run-by-run comparison with
 one run of another set (AL7h 2011-2019 against AL7h 2006-2010), both scorings.
 
   23_transport_scorecard.py [SET ...] [--scoring extensive|reduced]
@@ -41,8 +41,7 @@ import sys
 import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import aide_val_common as C
-import transport_common as T
+import strat_eval_common as SE
 
 RESULTS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                        "validation_results", "transport")
@@ -54,7 +53,7 @@ GROUPS = (("A", "A age of air"), ("B", "B residual circulation"), ("C", "C polar
 SCORING_TEXT = {
     "extensive": "**extensive**: the 34 metrics of the phase-29 scorecard, every one scored",
     "reduced": "**reduced**: jcm-strat phase 31's scored set — A2-WACCM replaces A2; A2 and "
-               f"{', '.join(T.PHASE31_UNSCORED)} are listed but not scored. Phase 31 scored with "
+               f"{', '.join(SE.PHASE31_UNSCORED)} are listed but not scored. Phase 31 scored with "
                "absolute bounds; here the relative scoring applies to the reduced set",
 }
 FIGURES = [
@@ -82,37 +81,37 @@ def stamped(name, stamp):
 
 def ref_text(ref):
     if isinstance(ref, list):
-        return f"{ref[0]:g}-{ref[1]:g} (mid {T.ref_value(ref):.2f})"
+        return f"{ref[0]:g}-{ref[1]:g} (mid {SE.ref_value(ref):.2f})"
     return f"{ref:.3g}"
 
 
 def basis(mid):
-    if mid in T.ABS_BOUND:
+    if mid in SE.ABS_BOUND:
         return BASIS.get(mid, "± 4 deg")
-    return f"± {T.TOL:.0%} of reference"
+    return f"± {SE.TOL:.0%} of reference"
 
 
 def score_all(P, names, scoring):
     """Rows (one per shown metric, every run scored, `scored` False for a metric
     outside the scoring) and per-run group scores over the scored metrics."""
-    sc = T.SCORINGS[scoring]
+    sc = SE.SCORINGS[scoring]
     rows, per = [], {n: {g: [] for g in "ABCD"} for n in names}
     for m0 in P[names[0]]["metrics"]:
         mid = m0["id"]
         if mid in sc["hidden"]:
             continue
-        absolute, scored = mid in T.ABS_BOUND, mid not in sc["unscored"]
+        absolute, scored = mid in SE.ABS_BOUND, mid not in sc["unscored"]
         refs = {n: next(x for x in P[n]["metrics"] if x["id"] == mid)["ref"] for n in names}
         same = len({json.dumps(r) for r in refs.values()}) == 1
         r = dict(id=mid, group=m0["group"], label=m0["label"], scored=scored,
-                 unit=T.ABS_UNIT.get(mid, "deg") if absolute else "%", basis=basis(mid),
+                 unit=SE.ABS_UNIT.get(mid, "deg") if absolute else "%", basis=basis(mid),
                  reference=ref_text(m0["ref"]) + ("" if same else " (first run; per model grid)"),
                  runs={})
         for n in names:
             m = next(x for x in P[n]["metrics"] if x["id"] == mid)
-            val, err = T.score(mid, m["model"], m["ref"])
+            val, err = SE.score(mid, m["model"], m["ref"])
             r["runs"][n] = dict(model=m["model"], ref=m["ref"], value=val, err=err,
-                                status=T.status(err))
+                                status=SE.status(err))
             if scored:
                 per[n][m0["group"]].append(err)
         rows.append(r)
@@ -131,7 +130,7 @@ def score_all(P, names, scoring):
 def comparison(set_name, P):
     """One run of this set against one run of another set, every metric of either
     scoring, and the group scores of both runs under both scorings."""
-    cfg = T.COMPARE[set_name]
+    cfg = SE.COMPARE[set_name]
     other_set, other = cfg["against"]
     pair = {"in": other, "out": cfg["run"]}
     Q = {k: P[n] for k, n in pair.items()}
@@ -139,16 +138,16 @@ def comparison(set_name, P):
     for m0 in Q["out"]["metrics"]:
         mid = m0["id"]
         e = dict(id=mid, group=m0["group"], label=m0["label"],
-                 unit=T.ABS_UNIT.get(mid, "deg") if mid in T.ABS_BOUND else "%",
+                 unit=SE.ABS_UNIT.get(mid, "deg") if mid in SE.ABS_BOUND else "%",
                  scored={s: mid not in d["hidden"] and mid not in d["unscored"]
-                         for s, d in T.SCORINGS.items()})
+                         for s, d in SE.SCORINGS.items()})
         for k in pair:
             m = next(x for x in Q[k]["metrics"] if x["id"] == mid)
-            val, err = T.score(mid, m["model"], m["ref"])
-            e[k] = dict(model=m["model"], ref=m["ref"], value=val, err=err, status=T.status(err))
+            val, err = SE.score(mid, m["model"], m["ref"])
+            e[k] = dict(model=m["model"], ref=m["ref"], value=val, err=err, status=SE.status(err))
         metrics.append(e)
     groups = {s: {k: score_all({pair[k]: Q[k]}, [pair[k]], s)[1][0] for k in pair}
-              for s in T.SCORINGS}
+              for s in SE.SCORINGS}
     return dict(run=cfg["run"], against=dict(set=other_set, run=other), labels=list(cfg["labels"]),
                 windows={k: Q[k]["window"] for k in pair}, metrics=metrics, groups=groups)
 
@@ -194,8 +193,8 @@ def comparison_md(cmp):
           f"| metric | extensive | reduced | reference {w_in} | {w_in} | reference {w_out} | {w_out} | change |",
           "|---|---|---|---|---|---|---|---|"]
     for e in cmp["metrics"]:
-        mark = {s: ("✓" if e["scored"][s] else ("–" if e["id"] in T.SCORINGS[s]["hidden"] else "◦"))
-                for s in T.SCORINGS}
+        mark = {s: ("✓" if e["scored"][s] else ("–" if e["id"] in SE.SCORINGS[s]["hidden"] else "◦"))
+                for s in SE.SCORINGS}
         d = e["out"]["value"] - e["in"]["value"]
         nd = 1 if e["unit"] == "%" else 2
         L.append(f"| **{e['id']}** {e['label']} | {mark['extensive']} | {mark['reduced']} | "
@@ -219,11 +218,11 @@ def markdown(res, P, R):
          f"B: WACCM6 h6 {B['years'][0]}–{B['years'][1]}, the only h6 segment |",
          f"| Produced | {res['produced']} |",
          f"| Scoring | {SCORING_TEXT[res['scoring']]} |",
-         f"| Score | rel = model / ref − 1, err = \\|rel\\| / {T.TOL:g}; pass err ≤ 1, near ≤ 1.5, "
+         f"| Score | rel = model / ref − 1, err = \\|rel\\| / {SE.TOL:g}; pass err ≤ 1, near ≤ 1.5, "
          "fail above; A2, A2-WACCM, C1 latitudes, C2 and D4 final warming keep absolute bounds |",
          "| Combined | mean of the A, B and C group scores (each the mean err of its scored "
          "metrics); D reported separately |",
-         "| w* estimator | jcm-strat Ψ* route (`transport_common.tem_streamfunction`, "
+         "| w* estimator | jcm-strat Ψ* route (`strat_eval_common.tem_streamfunction`, "
          "`residual_w`), linear in log p to the target pressure — **interim**, AIDE-eval issue #5 |",
          "| Generated by | `scripts/23_transport_scorecard.py`, from `output/22_transport__<run>.json` |",
          "", "## Group scores", "",
@@ -291,7 +290,7 @@ def summary_md(scoring, results):
     off = [r["id"] for r in rows0 if not r["scored"]]
     if off:
         L.append(f"- Listed, not scored: {', '.join(off)}")
-    L += [f"- Score: rel = model / ref − 1, err = \\|rel\\| / {T.TOL:g}; pass err ≤ 1, near ≤ 1.5, "
+    L += [f"- Score: rel = model / ref − 1, err = \\|rel\\| / {SE.TOL:g}; pass err ≤ 1, near ≤ 1.5, "
           "fail above. A2, A2-WACCM, C1 latitudes, C2 and D4 final warming keep absolute bounds; "
           "A4 against the midpoint 2.75 yr.",
           "- Group score = mean err of its scored metrics; combined = mean of A, B, C; D separate.",
@@ -343,31 +342,31 @@ def summary_md(scoring, results):
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[1].strip())
     ap.add_argument("sets", nargs="*", help="result sets to score (default: every set)")
-    ap.add_argument("--scoring", choices=list(T.SCORINGS), help="one scoring (default: both)")
+    ap.add_argument("--scoring", choices=list(SE.SCORINGS), help="one scoring (default: both)")
     a = ap.parse_args()
-    sets = a.sets or list(T.SETS)
-    unknown = [s for s in sets if s not in T.SETS]
+    sets = a.sets or list(SE.SETS)
+    unknown = [s for s in sets if s not in SE.SETS]
     if unknown:
-        raise SystemExit(f"unknown set(s) {unknown}; registered: {list(T.SETS)}")
-    scorings = [a.scoring] if a.scoring else list(T.SCORINGS)
+        raise SystemExit(f"unknown set(s) {unknown}; registered: {list(SE.SETS)}")
+    scorings = [a.scoring] if a.scoring else list(SE.SCORINGS)
     produced = datetime.date.today().isoformat()
     os.makedirs(RESULTS, exist_ok=True)
     done = {s: {} for s in scorings}
     for set_name in sets:
-        names = list(T.SETS[set_name])
-        window = T.window_of(names)
-        load = [*names] + ([T.COMPARE[set_name]["against"][1]] if set_name in T.COMPARE else [])
-        P = {n: json.load(open(os.path.join(C.OUTDIR, f"22_transport__{n}.json"))) for n in load}
-        R = json.load(open(os.path.join(C.OUTDIR,
+        names = list(SE.SETS[set_name])
+        window = SE.window_of(names)
+        load = [*names] + ([SE.COMPARE[set_name]["against"][1]] if set_name in SE.COMPARE else [])
+        P = {n: json.load(open(os.path.join(SE.OUTDIR, f"22_transport__{n}.json"))) for n in load}
+        R = json.load(open(os.path.join(SE.OUTDIR,
                                         f"22_transport__references__{window[0]}-{window[1]}.json")))
-        cmp = comparison(set_name, P) if set_name in T.COMPARE else None
+        cmp = comparison(set_name, P) if set_name in SE.COMPARE else None
         for scoring in scorings:
             rows, scores = score_all(P, names, scoring)
             res = dict(name=set_name, scoring=scoring, produced=produced,
                        stamp=stamp_for(set_name, scoring, produced),
                        set_stamp=stamp_for(set_name, produced), runs=names, window=list(window),
-                       tolerance=T.TOL, a4_range=list(T.A4_RANGE), abs_bound=T.ABS_BOUND,
-                       scoring_definition={k: list(v) for k, v in T.SCORINGS[scoring].items()},
+                       tolerance=SE.TOL, a4_range=list(SE.A4_RANGE), abs_bound=SE.ABS_BOUND,
+                       scoring_definition={k: list(v) for k, v in SE.SCORINGS[scoring].items()},
                        wstar_estimator="jcm-strat Psi* route, log-p interpolated; interim "
                                        "(AIDE-eval issue #5)",
                        rows=rows, scores=scores, comparison=cmp,
@@ -384,7 +383,7 @@ def main():
                       f"{s['combined']:.2f}  passed {s['passed']}/{s['total']}  D {s['D']:.2f} "
                       f"({s['D_passed']}/{s['D_total']})")
             print(f"wrote {out_j}\nwrote {out_m}")
-    if set(sets) != set(T.SETS):
+    if set(sets) != set(SE.SETS):
         print("summaries not written: they cover every set (run 23 without set names)")
         return
     for scoring in scorings:

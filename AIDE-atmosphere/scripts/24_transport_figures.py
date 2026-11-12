@@ -15,7 +15,7 @@ stamped the same way, so the figures cannot drift from the reports:
     transport_wstar_profile    tropical (15S-15N) w* profile of each run against WACCM6
     transport_age_profile      tropical (10S-10N) entry-age profile of each run against
                                CLaMS (entry offset removed) and WACCM6 REF-D1
-  per set with a comparison (transport_common.COMPARE)
+  per set with a comparison (strat_eval_common.COMPARE)
     transport_window_comparison  one run in two windows, metric by metric, both
                                scorings, with the group scores
 
@@ -37,7 +37,7 @@ from matplotlib.colors import BoundaryNorm, ListedColormap
 import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import transport_common as T
+import strat_eval_common as SE
 
 RESULTS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                        "validation_results", "transport")
@@ -110,8 +110,8 @@ def save(fig, stamp, name):
 
 def x_scaled(mid, value):
     """% off the reference; an absolute metric as a fraction of its bound, bound = 25 %."""
-    if mid in T.ABS_BOUND:
-        return 100.0 * T.TOL * value / T.ABS_BOUND[mid]
+    if mid in SE.ABS_BOUND:
+        return 100.0 * SE.TOL * value / SE.ABS_BOUND[mid]
     return value
 
 
@@ -139,7 +139,7 @@ def score_table(res):
                 tot = s["total"] if k == "passed" else s["D_total"]
                 ax.text(j + 0.5, i + 0.5, f"{s[k]} / {tot}", ha="center", va="center", color=INK2)
                 continue
-            col, sym = STATUS[T.status(s[k])]
+            col, sym = STATUS[SE.status(s[k])]
             ax.add_patch(plt.Rectangle((j + 0.03, i + 0.06), 0.94, 0.88, color=col, alpha=0.22, lw=0))
             ax.text(j + 0.5, i + 0.5, f"{s[k]:.2f} {sym}", ha="center", va="center",
                     fontweight="bold" if bold else "normal")
@@ -156,14 +156,14 @@ def heatmap(res):
     labels, texts = [], []
     for i, r in enumerate(rows):
         lab = f"{r['id']}  {r['label']}"
-        if r["id"] in T.ABS_BOUND:
-            lab += f"  [abs: ±{T.ABS_BOUND[r['id']]:g} {r['unit']} = 25 %]"
+        if r["id"] in SE.ABS_BOUND:
+            lab += f"  [abs: ±{SE.ABS_BOUND[r['id']]:g} {r['unit']} = 25 %]"
         labels.append(lab if r["scored"] else f"◦ {lab}  (not scored)")
         row_t = []
         for j, n in enumerate(runs):
             v = res["rows"][i]["runs"][n]["value"]
             X[i, j] = x_scaled(r["id"], v)
-            nd = (2 if r["unit"] in ("yr", "K") else 1) if r["id"] in T.ABS_BOUND else 0
+            nd = (2 if r["unit"] in ("yr", "K") else 1) if r["id"] in SE.ABS_BOUND else 0
             row_t.append("n/a" if not np.isfinite(v) else f"{v:+.{nd}f}")
         texts.append(row_t)
     cmap = ListedColormap(DIVERGING)
@@ -376,13 +376,13 @@ def window_comparison(res):
             fontsize=8, transform=tr, fontweight="bold")
     for e, yy in zip(ms, pos):
         lab = f"{e['id']}  {e['label']}"
-        if e["id"] in T.ABS_BOUND:
+        if e["id"] in SE.ABS_BOUND:
             lab += " [abs]"
         ax.text(fx(0.1), yy, lab if len(lab) < 64 else lab[:61] + "…", ha="left", va="center",
                 fontsize=7.5, transform=tr, clip_on=False)
         for xi, s in ((0.2, "extensive"), (0.6, "reduced")):
             mark = ("✓" if e["scored"][s] else
-                    ("–" if e["id"] in T.SCORINGS[s]["hidden"] else "◦"))
+                    ("–" if e["id"] in SE.SCORINGS[s]["hidden"] else "◦"))
             ax.text(fx(LBL + xi), yy, mark, ha="center", va="center", fontsize=8.5, transform=tr,
                     color=INK if e["scored"][s] else INK2)
         nd = 1 if e["unit"] == "%" else 2
@@ -417,7 +417,7 @@ def window_comparison(res):
                 tot = g["total"] if key == "passed" else g["D_total"]
                 tb.text(x, yy, f"{g[key]} / {tot}", ha="center", va="center", color=INK2)
                 continue
-            col, sym = STATUS[T.status(g[key])]
+            col, sym = STATUS[SE.status(g[key])]
             tb.add_patch(plt.Rectangle((x - 0.6, yy - 0.38), 1.2, 0.76, color=col, alpha=0.22, lw=0))
             tb.text(x, yy, f"{g[key]:.2f} {sym}", ha="center", va="center",
                     fontweight="bold" if key == "combined" else "normal")

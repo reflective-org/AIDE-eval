@@ -1,17 +1,26 @@
 """
-Shared sources, readers and math for the transport scorecard (22, 23, 24).
+Shared constants, sources, readers and math of the stratospheric-dynamics evaluation
+(the transport scorecard): 01_fields.py, 02_scorecard.py, 03_figures.py and
+checks/port_check.py.
 
-The transport scorecard is the jcm-strat relative scorecard (phase 29) ported into
-this repository: age of air (A), residual circulation (B), polar vortex (C) and
-variability (D), each metric scored as its relative deviation from a reference.
-docs/TRANSPORT_SCORECARD.md is the description; this module holds the parts
-that 22, 23 and 24 share, so that they cannot disagree.
+The scorecard is the jcm-strat relative scorecard (phase 29, phase 31's scored set)
+ported into this repository: age of air (A), residual circulation (B), polar vortex (C)
+and variability (D), each metric scored as its relative deviation from a reference.
+docs/EVALUATION_PROTOCOL.md is the description; this module holds the parts the scripts
+share, so that they cannot disagree.
 
-SOURCES AND READERS follow 20_series_from_zonal_mean.py: a source is a dict
-naming its reader and where its data are, a reader is `reader(spec, years)`,
-and READERS maps the name to the function. The transport readers return the
-field contract of docs/TRANSPORT_SCORECARD.md section 1 rather than 20's
-(U, T, V, OMEGA, VPTP) set, so they are registered here and not in 20.
+It merges transport_common.py with the parts of aide_val_common.py the scorecard uses
+(CESM constants, the h6 loader, interp_level); the rest of aide_val_common.py belonged to
+the two-tier protocol, archived as git tag tier-protocol-final.
+
+CESM h6 conventions, established against the files (evidence: scripts 01-01d at tag
+tier-protocol-final):
+
+  1. VTHzm is already the eddy flux v'theta'; do not subtract Vzm*THzm.
+  2. Wzm is the log-pressure vertical velocity w = -H omega / p, H = 7 km.
+  3. Below-surface points are the sentinel 1e35 with no _FillValue; masked with abs < 1e20.
+  4. MSKtem is not a 0/1 mask (a fractional count of above-surface interfaces) and is
+     not applied to the zonal-mean fields.
 """
 
 from __future__ import annotations
@@ -25,7 +34,19 @@ import netCDF4
 import numpy as np
 import xarray as xr
 
-import aide_val_common as C
+# --------------------------------------------------------------------- constants
+# CESM values (CAM shr_const), used for model and references alike
+A_EARTH = 6.37122e6      # m, CAM shr_const_rearth
+G0 = 9.80616             # m/s2, CAM gravit
+RGAS = 287.058           # J/kg/K, CAM rair
+CP = 1004.64             # J/kg/K, CAM cpair
+KAPPA = RGAS / CP        # 0.2858
+H_SCALE = 7000.0         # m, standard log-pressure scale height (AHL 1987)
+P_REF_HPA = 1000.0       # reference pressure for theta and log-pressure height
+FILL_SENTINEL = 1e20     # anything larger is the 1e35 below-surface sentinel
+
+_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+OUTDIR = os.path.join(_ROOT, "output")
 
 DAYS_PER_YEAR = 365.25          # the jcm-strat clocks count days; the contract asks years
 
@@ -41,7 +62,7 @@ REFS = dict(
     clams_member="clams_v3.1_era5_zm_lat_press_{year}.nc",
     # WACCM6 REF-D1 entry age [yr], base point 0.47N 103 hPa - A1
     waccm_aoa="/data/CESM2_REFD1_AOA/AoA_waccm6_refd1.04_AOA1mf_1970-2019_ba_0_100.0_ck_0_50.0.nc",
-    # CESM2.1.5-WACCM6 histSST h6 tape (Vzm, VTHzm, THzm) through aide_val_common - B1, B2
+    # CESM2.1.5-WACCM6 histSST h6 tape (Vzm, VTHzm, THzm) through load_h6 - B1, B2
     waccm_tem_segment="1996-2014",
     # ERA5 monthly zonal means of u and T, 25 levels - C1, C2
     era5_zm_monthly=os.path.join(DATA, "era5", "era5_zm_monthly_{year}.nc"),
@@ -70,7 +91,49 @@ JCM_STRAT_P31_RUNS = {   # port source: (success_<tag> directory, group D file)
     "AL7h_1119": ("success_1119", os.path.join(JCM_STRAT_P31, "variability.json")),
 }
 
-# The contract (docs/TRANSPORT_SCORECARD.md section 1): required, then optional.
+
+# --------------------------------------------------------------------- CESM h6 tape
+# CESM2.1.5-WACCM6 fixed-SST histSST, daily zonal-mean TEM tape (cam.h6): Uzm Vzm Wzm
+# THzm VTHzm UVzm UWzm on the 71 hybrid interfaces (ilev), noleap. The scorecard reads
+# the 1996-2014 run (group B reference). Above ilev index 53 (~182 hPa) hybi = 0, so the
+# interface pressure is hyai*P0 and needs no surface pressure.
+H6_ROOT = "/data/cesm2.1.5_output/histSST"
+H6_SEGMENTS = {
+    "1996-2014": dict(
+        case="f.e21.FWHIST.f09_f09_mg17.atmos-scale_fixedSST_1996-2014.001",
+        subdir="archive/atm/proc/tseries/day_1",
+        span="19960101-20141231"),
+}
+
+
+def h6_path(segment, var):
+    s = H6_SEGMENTS[segment]
+    return os.path.join(H6_ROOT, s["case"], s["subdir"], f"{s['case']}.cam.h6.{var}.{s['span']}.nc")
+
+
+def load_h6(segment, var, ilev_slice):
+    """One zonal-mean h6 variable as (time, ilev, lat), the 1e35 sentinel masked."""
+    ds = xr.open_dataset(h6_path(segment, var), decode_times=True)
+    da = ds[var].isel(zlon=0, ilev=ilev_slice)
+    da = da.where(np.abs(da) < FILL_SENTINEL)
+    da = da.load()
+    ds.close()
+    return da
+
+
+def interp_level(field, p_hpa, p_target, axis=1):
+    """Linear-in-log(p) interpolation of `field` onto p_target; p_hpa ascending."""
+    lp = np.log(p_hpa)
+    lt = np.log(p_target)
+    k = int(np.searchsorted(lp, lt)) - 1
+    k = max(0, min(k, len(lp) - 2))
+    w = (lt - lp[k]) / (lp[k + 1] - lp[k])
+    lo = np.take(field, k, axis=axis)
+    hi = np.take(field, k + 1, axis=axis)
+    return (1.0 - w) * lo + w * hi
+
+
+# The field contract (docs/EVALUATION_PROTOCOL.md): required, then optional.
 CONTRACT = ("Uzm", "Vzm", "THzm", "VTHzm", "AOA150")
 OPTIONAL = ("T", "Wzm")
 UNITS = {"Uzm": "m/s", "Vzm": "m/s", "THzm": "K", "VTHzm": "K m/s",
@@ -165,7 +228,7 @@ def read_netcdf(spec, years):
 
     Any calendar: each day is labelled by its own year, month and day, so a
     noleap record simply has no 29 February. Values beyond 1e20 are masked as
-    fill (protocol section 5, rule 4). T, if absent, is THzm (p/1000)^kappa.
+    fill (the 1e35 sentinel convention). T, if absent, is THzm (p/1000)^kappa.
     """
     files = sorted(glob.glob(spec["path"]))
     if not files:
@@ -182,10 +245,10 @@ def read_netcdf(spec, years):
     for k in CONTRACT + OPTIONAL:
         if k in ds:
             x = ds[k].transpose("time", "plev", "lat").values[keep]
-            F[k] = np.where(np.abs(x) < C.FILL_SENTINEL, x, np.nan)
+            F[k] = np.where(np.abs(x) < FILL_SENTINEL, x, np.nan)
     F.update(plev=ds.plev.values.astype("f8"), lat=ds.lat.values.astype("f8"), days=days)
     if "T" not in F:
-        F["T"] = F["THzm"] * (F["plev"][None, :, None] / C.P_REF_HPA) ** C.KAPPA
+        F["T"] = F["THzm"] * (F["plev"][None, :, None] / P_REF_HPA) ** KAPPA
     ds.close()
     return orient(F)
 
@@ -298,7 +361,7 @@ def weighted_bias(diff, lat, mask):
 # --------------------------------------------------------------------- age references
 def clams_member(year):
     """One CLaMS v3.1 year, read from the zip into memory (the extracted copies are
-    not readable by every uid; see 20_series_from_zonal_mean.read_clams_zip)."""
+    not readable by every uid)."""
     with zipfile.ZipFile(REFS["clams_zip"]) as z:
         raw = z.read(REFS["clams_member"].format(year=year))
     return netCDF4.Dataset(f"clams_{year}", memory=raw)
@@ -336,9 +399,8 @@ def waccm_age(years):
 # --------------------------------------------------------------------- residual circulation
 # jcm-strat strat_circulation.py: the TEM residual streamfunction from time-mean
 # [v], [v'theta'], [theta] in pressure coordinates, and w* from its latitude
-# derivative - no w-bar needed. Constants are CESM's (aide_val_common, protocol
-# section 4.6) where jcm-strat has a = 6.371e6 m, g = 9.80665 m/s2: w* scales with
-# 1/a (-0.004 %), Psi* with a/g (+0.009 %).
+# derivative - no w-bar needed. Constants are CESM's (above) where jcm-strat has
+# a = 6.371e6 m, g = 9.80665 m/s2: w* scales with 1/a (-0.004 %), Psi* with a/g (+0.009 %).
 def tem_streamfunction(vbar, vth, thbar, p_pa, lat_deg):
     """(p, lat) time means on pressure p_pa [Pa, any order] -> p ascending [Pa],
     v* [m/s] and Psi* [kg/s]:
@@ -355,7 +417,7 @@ def tem_streamfunction(vbar, vth, thbar, p_pa, lat_deg):
     integrand = vstar * np.cos(np.deg2rad(lat_deg))[None, :]
     psi = np.zeros_like(vstar)
     psi[1:] = np.cumsum(0.5 * (integrand[1:] + integrand[:-1]) * np.diff(p)[:, None], axis=0)
-    psi *= 2 * np.pi * C.A_EARTH / C.G0
+    psi *= 2 * np.pi * A_EARTH / G0
     return p, vstar, psi
 
 
@@ -364,18 +426,18 @@ def residual_w(p, psi, lat_deg):
     w* = -H omega* / p, H = 7 km. Rows poleward of 88 deg are masked (1/cos)."""
     phi = np.deg2rad(lat_deg)
     dpsi = np.gradient(psi, phi, axis=1)
-    omega = -(C.G0 / (2 * np.pi * C.A_EARTH ** 2 * np.cos(phi)[None, :])) * dpsi
-    w = -C.H_SCALE * omega / p[:, None] * 1e3
+    omega = -(G0 / (2 * np.pi * A_EARTH ** 2 * np.cos(phi)[None, :])) * dpsi
+    w = -H_SCALE * omega / p[:, None] * 1e3
     w[:, np.abs(lat_deg) > 88.0] = np.nan
     return w
 
 
 def tropical_wstar(p_hpa, w, lat, target, nearest=False):
     """cos(lat)-weighted w* [mm/s] over |lat| <= 15 at `target` hPa: linear in
-    log p between the bracketing levels (aide_val_common.interp_level), or at the
+    log p between the bracketing levels (interp_level), or at the
     nearest level as jcm-strat does (nearest=True)."""
     row = (w[nearest_level(p_hpa, target)] if nearest
-           else C.interp_level(w, p_hpa, target, axis=0))
+           else interp_level(w, p_hpa, target, axis=0))
     return band_abs(lat, row, 0, 15)
 
 
@@ -383,7 +445,7 @@ def upward_mass_flux(p_hpa, psi, lat, target, nearest=False):
     """Tropical upward mass flux [kg/s]: max - min of Psi* over |lat| <= 60 at
     `target` hPa, Psi* interpolated linearly in log p (or the nearest level)."""
     row = (psi[nearest_level(p_hpa, target)] if nearest
-           else C.interp_level(psi, p_hpa, target, axis=0))
+           else interp_level(psi, p_hpa, target, axis=0))
     row = row[np.abs(lat) <= 60.0]
     return float(row.max() - row.min())
 

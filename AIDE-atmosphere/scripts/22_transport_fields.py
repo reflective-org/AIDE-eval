@@ -2,7 +2,7 @@
 22 - Read a source's transport fields and compute the transport diagnostics.
 
 The first stage of the transport scorecard (docs/TRANSPORT_SCORECARD.md). A
-source is read through transport_common.READERS into the field contract of
+source is read through strat_eval_common.READERS into the field contract of
 section 1 of that document, then reduced to the metrics of groups A-D, each
 beside its reference. Scoring is 23's; this script only measures.
 
@@ -11,7 +11,7 @@ beside its reference. Scoring is 23's; this script only measures.
   22_transport_fields.py --inspect NAME      shapes, units and ranges of the
                                              contract fields, nothing written
 
-Each source is diagnosed over its own window (transport_common.SOURCES). The
+Each source is diagnosed over its own window (strat_eval_common.SOURCES). The
 model-independent references are computed once per window and call, over the
 window's years (CLaMS, WACCM6 entry age, ERA5), except the WACCM6 TEM reference
 of group B, which is 1996-2014 for every window, and written beside the
@@ -31,8 +31,7 @@ import numpy as np
 import xarray as xr
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import aide_val_common as C
-import transport_common as T
+import strat_eval_common as SE
 
 
 def row(group, mid, label, model, ref, **extra):
@@ -50,12 +49,12 @@ def row(group, mid, label, model, ref, **extra):
 # REF-D1 2-D entry age instead of shifted CLaMS, on the WACCM6 grid: the WACCM6
 # clock starts at its tropical ~100 hPa base point, so no offset is applied.
 def references_A(years):
-    pc, latc, ac = T.clams_age(years)
-    pw, latw, aw = T.waccm_age(years)
+    pc, latc, ac = SE.clams_age(years)
+    pw, latw, aw = SE.waccm_age(years)
     # CLaMS counts from the surface; its own tropical age at 150 hPa is the offset
     # that turns it into an entry age comparable with AOA150
-    offset = T.band_abs(latc, ac[T.nearest_level(pc, 150.0)], 0, 10)
-    kc, kw = T.nearest_level(pc, 55.0), T.nearest_level(pw, 55.0)
+    offset = SE.band_abs(latc, ac[SE.nearest_level(pc, 150.0)], 0, 10)
+    kc, kw = SE.nearest_level(pc, 55.0), SE.nearest_level(pw, 55.0)
     tc, tw = np.abs(latc) <= 10, np.abs(latw) <= 10
     with warnings.catch_warnings():              # all-fill columns below the surface
         warnings.simplefilter("ignore", RuntimeWarning)
@@ -63,9 +62,9 @@ def references_A(years):
         prof_w = np.nanmean(aw[:, tw], axis=1)
     return dict(
         years=list(years), clams_offset_150=offset,
-        waccm_55_tropics=T.band_abs(latw, aw[kw], 0, 10),
-        clams_55_tropics=T.band_abs(latc, ac[kc], 0, 10),
-        clams_55_5070=T.band_abs(latc, ac[kc], 50, 70),
+        waccm_55_tropics=SE.band_abs(latw, aw[kw], 0, 10),
+        clams_55_tropics=SE.band_abs(latc, ac[kc], 0, 10),
+        clams_55_5070=SE.band_abs(latc, ac[kc], 50, 70),
         profile_clams_p=pc.tolist(), profile_clams_entry_tropics=prof_c.tolist(),
         profile_waccm_p=pw.tolist(), profile_waccm_entry_tropics=prof_w.tolist(),
         _clams=(pc, latc, ac), _waccm=(pw, latw, aw))
@@ -77,19 +76,19 @@ def group_A(F, R):
     pc, latc, ac = R["_clams"]
     off = R["clams_offset_150"]
 
-    k55 = T.nearest_level(p, 55.0)
-    trop, ext = T.band_abs(lat, age[k55], 0, 10), T.band_abs(lat, age[k55], 50, 70)
+    k55 = SE.nearest_level(p, 55.0)
+    trop, ext = SE.band_abs(lat, age[k55], 0, 10), SE.band_abs(lat, age[k55], 50, 70)
 
     # A2: model on the CLaMS grid against CLaMS minus its 150 hPa tropical age,
     # 100-5 hPa, |lat| <= 80
-    am = T.on_grid(age, p, lat, pc, latc)
+    am = SE.on_grid(age, p, lat, pc, latc)
     dom = ((pc >= 5.0) & (pc <= 100.0))[:, None] & (np.abs(latc) <= 80.0)[None, :]
-    rmse = T.weighted_rmse(am - (ac - off), latc, dom)
+    rmse = SE.weighted_rmse(am - (ac - off), latc, dom)
 
     # A2-WACCM: model on the WACCM6 grid against the WACCM6 entry age, 100-5 hPa,
     # |lat| <= 80
     pw, latw, aw = R["_waccm"]
-    dw = T.on_grid(age, p, lat, pw, latw) - aw
+    dw = SE.on_grid(age, p, lat, pw, latw) - aw
     domw = ((pw >= 5.0) & (pw <= 100.0))[:, None] & (np.abs(latw) <= 80.0)[None, :]
 
     prof = np.nanmean(age[:, np.abs(lat) <= 10], axis=1)
@@ -97,11 +96,11 @@ def group_A(F, R):
     rows = [
         row("A", "A1", "entry age 55 hPa tropics [yr]", trop, R["waccm_55_tropics"]),
         row("A", "A2", "2-D age RMSE vs CLaMS [yr]", rmse, 0.0),
-        row("A", "A2-WACCM", "2-D entry-age RMSE vs WACCM6 [yr]", T.weighted_rmse(dw, latw, domw),
-            0.0, bias=T.weighted_bias(dw, latw, domw)),
+        row("A", "A2-WACCM", "2-D entry-age RMSE vs WACCM6 [yr]", SE.weighted_rmse(dw, latw, domw),
+            0.0, bias=SE.weighted_bias(dw, latw, domw)),
         row("A", "A3", "age step tropics -> 50-70 deg, 55 hPa [yr]", ext - trop,
             R["clams_55_5070"] - R["clams_55_tropics"]),
-        row("A", "A4", "transit 70 -> 10 hPa [yr]", at(10.0) - at(70.0), T.A4_RANGE),
+        row("A", "A4", "transit 70 -> 10 hPa [yr]", at(10.0) - at(70.0), SE.A4_RANGE),
     ]
     return rows, dict(age_p=p.tolist(), age_tropics=prof.tolist(), age_level_55=float(p[k55]))
 
@@ -120,36 +119,36 @@ FLUX_LEVELS = (100.0, 70.0)
 def circulation(V, VTH, TH, p_hpa, lat):
     """Time-mean fields (time, p, lat) -> p [hPa, ascending], Psi* [kg/s], w* [mm/s]."""
     mean = lambda x: np.nanmean(x, axis=0, dtype="f8")
-    p, _, psi = T.tem_streamfunction(mean(V), mean(VTH), mean(TH), p_hpa * 100.0, lat)
-    return p / 100.0, psi, T.residual_w(p, psi, lat)
+    p, _, psi = SE.tem_streamfunction(mean(V), mean(VTH), mean(TH), p_hpa * 100.0, lat)
+    return p / 100.0, psi, SE.residual_w(p, psi, lat)
 
 
 def circulation_metrics(p, psi, w, lat):
     out = {}
     for lv in W_LEVELS:
-        out[f"B1-{lv:g}"] = (T.tropical_wstar(p, w, lat, lv),
-                             T.tropical_wstar(p, w, lat, lv, nearest=True))
+        out[f"B1-{lv:g}"] = (SE.tropical_wstar(p, w, lat, lv),
+                             SE.tropical_wstar(p, w, lat, lv, nearest=True))
     for lv in FLUX_LEVELS:
-        out[f"B2-{lv:g}"] = (T.upward_mass_flux(p, psi, lat, lv) / 1e9,
-                             T.upward_mass_flux(p, psi, lat, lv, nearest=True) / 1e9)
+        out[f"B2-{lv:g}"] = (SE.upward_mass_flux(p, psi, lat, lv) / 1e9,
+                             SE.upward_mass_flux(p, psi, lat, lv, nearest=True) / 1e9)
     return out
 
 
 def references_B():
-    seg = T.REFS["waccm_tem_segment"]
-    V, VTH, TH = (C.load_h6(seg, v, T.WACCM_ILEV) for v in ("Vzm", "VTHzm", "THzm"))
+    seg = SE.REFS["waccm_tem_segment"]
+    V, VTH, TH = (SE.load_h6(seg, v, SE.WACCM_ILEV) for v in ("Vzm", "VTHzm", "THzm"))
     yr = np.array([t.year for t in V.time.values])
-    keep = (yr >= T.WACCM_TEM_YEARS[0]) & (yr <= T.WACCM_TEM_YEARS[1])
+    keep = (yr >= SE.WACCM_TEM_YEARS[0]) & (yr <= SE.WACCM_TEM_YEARS[1])
     lat = V.lat.values.astype("f8")
     p, psi, w = circulation(V.values[keep], VTH.values[keep], TH.values[keep],
                             V.ilev.values.astype("f8"), lat)
-    return dict(years=list(T.WACCM_TEM_YEARS), segment=seg, n_days=int(keep.sum()),
+    return dict(years=list(SE.WACCM_TEM_YEARS), segment=seg, n_days=int(keep.sum()),
                 n_levels=int(p.size), top_hPa=float(p[0]),
                 metrics={k: dict(interp=v[0], nearest=v[1])
                          for k, v in circulation_metrics(p, psi, w, lat).items()},
-                nearest_hPa={f"{lv:g}": float(p[T.nearest_level(p, lv)]) for lv in W_LEVELS},
+                nearest_hPa={f"{lv:g}": float(p[SE.nearest_level(p, lv)]) for lv in W_LEVELS},
                 profile_waccm_p=p.tolist(),
-                profile_waccm_wstar_tropics=T.tropical_profile(w, lat).tolist())
+                profile_waccm_wstar_tropics=SE.tropical_profile(w, lat).tolist())
 
 
 def group_B(F, R):
@@ -163,8 +162,8 @@ def group_B(F, R):
                  else f"mass flux {lv} hPa [1e9 kg/s]")
         r = R["metrics"][mid]
         rows.append(row("B", mid, label, vi, r["interp"], model_nearest=vn, ref_nearest=r["nearest"],
-                        nearest_hPa=float(p[T.nearest_level(p, float(lv))])))
-    return rows, dict(wstar_p=p.tolist(), wstar_tropics=T.tropical_profile(w, lat).tolist())
+                        nearest_hPa=float(p[SE.nearest_level(p, float(lv))])))
+    return rows, dict(wstar_p=p.tolist(), wstar_tropics=SE.tropical_profile(w, lat).tolist())
 
 
 # --------------------------------------------------------------------- group C
@@ -190,7 +189,7 @@ def era5_monthly(var, keys, p, lat):
     """ERA5 monthly zonal mean of `var` on (p, lat) for each (year, month) in keys."""
     out = {}
     for y in sorted({k[0] for k in keys}):
-        with xr.open_dataset(T.REFS["era5_zm_monthly"].format(year=y)) as ds:
+        with xr.open_dataset(SE.REFS["era5_zm_monthly"].format(year=y)) as ds:
             tname = [c for c in ds.coords if c.startswith("time") or c == "valid_time"][0]
             x = ds[var].rename({tname: "time"}).interp(lat=lat)
             lp = np.log(ds.level.values.astype(float))
@@ -217,7 +216,7 @@ def group_C(F, R):
     _, TT = monthly(F["T"], F["days"])
     EU, ET = era5_monthly("uzm", keys, p, lat), era5_monthly("tzm", keys, p, lat)
     mon = np.array([k[1] for k in keys])
-    k50, k10 = T.nearest_level(p, 50.0), T.nearest_level(p, 10.0)
+    k50, k10 = SE.nearest_level(p, 50.0), SE.nearest_level(p, 10.0)
     jets, caps = [], []
     for h, (months, sign) in WINTER.items():
         k = np.isin(mon, months)
@@ -267,7 +266,7 @@ class Daily:
 
     @classmethod
     def era5(cls, years):
-        zs = [dict(np.load(T.REFS["era5_daily"].format(year=y))) for y in years]
+        zs = [dict(np.load(SE.REFS["era5_daily"].format(year=y))) for y in years]
         cat = lambda k: np.concatenate([z[k] for z in zs])
         return cls(cat("days").astype("datetime64[D]"), zs[0]["p_hpa"], zs[0]["lat"],
                    {k: cat(k) for k in ("u", "v", "T", "th", "vth")})
@@ -287,7 +286,7 @@ class Daily:
 
     def vT(self, p, lo, hi):
         """v'T' from v'theta' on the pressure level."""
-        return self.band("vth", p, lo, hi) / (C.P_REF_HPA / self.p[self.ilev(p)]) ** C.KAPPA
+        return self.band("vth", p, lo, hi) / (SE.P_REF_HPA / self.p[self.ilev(p)]) ** SE.KAPPA
 
     def months(self):
         return (self.days.astype("datetime64[Y]").astype(int) + 1970,
@@ -321,11 +320,11 @@ def monthly_tem_wstar(z, plev=70.0):
         if k.sum() < 25:
             continue
         mean = lambda v: z.f[v][k].mean(0, dtype="f8")
-        p, _, psi = T.tem_streamfunction(mean("v"), mean("vth"), mean("th"), z.p * 100.0, z.lat)
-        w = T.residual_w(p, psi, z.lat)
+        p, _, psi = SE.tem_streamfunction(mean("v"), mean("vth"), mean("th"), z.p * 100.0, z.lat)
+        w = SE.residual_w(p, psi, z.lat)
         t.append(m)
-        wi.append(T.tropical_wstar(p / 100.0, w, z.lat, plev))
-        wn.append(T.tropical_wstar(p / 100.0, w, z.lat, plev, nearest=True))
+        wi.append(SE.tropical_wstar(p / 100.0, w, z.lat, plev))
+        wn.append(SE.tropical_wstar(p / 100.0, w, z.lat, plev, nearest=True))
     return np.array(t), np.array(wi), np.array(wn)
 
 
@@ -341,7 +340,7 @@ def clams_monthly_age(years, plev=55.0):
     """CLaMS monthly AGE [yr], 10S-10N, linear in log p to plev."""
     t, a = [], []
     for y in years:
-        with T.clams_member(y) as d:
+        with SE.clams_member(y) as d:
             A = np.ma.filled(np.ma.asarray(d.variables["AGE"][:], dtype="f8"), np.nan)
             press = np.asarray(d.variables["press"][:], dtype="f8")
             lat = np.asarray(d.variables["lat"][:], dtype="f8")
@@ -502,7 +501,7 @@ _B = {}
 
 def references(window):
     """References for one window; B (WACCM6 1996-2014) is computed once per call."""
-    years = T.years_of(window)
+    years = SE.years_of(window)
     if not _B:
         _B.update(references_B())
     return dict(A=references_A(years), B=_B, C={}, D=references_D(years))
@@ -515,8 +514,8 @@ def public(d):
 
 
 def diagnose(name, R):
-    spec = T.SOURCES[name]
-    F = T.load_source(name, T.years_of(spec["window"]))
+    spec = SE.SOURCES[name]
+    F = SE.load_source(name, SE.years_of(spec["window"]))
     rows, prof = [], {}
     for fn, key in ((group_A, "A"), (group_B, "B"), (group_C, "C"), (group_D, "D")):
         r, p = fn(F, R[key])
@@ -533,8 +532,8 @@ def diagnose(name, R):
 def inspect(name):
     """Print what the reader hands the diagnostics, so a new source can be checked
     against the contract before anything is scored."""
-    spec = T.SOURCES[name]
-    F = T.load_source(name, T.years_of(spec["window"]))
+    spec = SE.SOURCES[name]
+    F = SE.load_source(name, SE.years_of(spec["window"]))
     p, lat, days = F["plev"], F["lat"], F["days"]
     print(f"{name}: {spec['long_name']}  reader {spec['reader']}  {spec['path']}")
     print(f"  days  {days.size}  {days[0]} .. {days[-1]}")
@@ -542,12 +541,12 @@ def inspect(name):
           f"{bool(np.all(np.diff(p) > 0))}; inside 5-150 hPa: {int(((p >= 5) & (p <= 150)).sum())}")
     print(f"  lat   {lat.size}  {lat.min():.3f} .. {lat.max():.3f}, ascending "
           f"{bool(np.all(np.diff(lat) > 0))}")
-    for k in T.CONTRACT + T.OPTIONAL:
+    for k in SE.CONTRACT + SE.OPTIONAL:
         if k not in F:
             print(f"  {k:7s} absent")
             continue
         x = F[k]
-        print(f"  {k:7s} {str(x.shape):18s} {str(x.dtype):8s} [{T.UNITS[k]:5s}] "
+        print(f"  {k:7s} {str(x.shape):18s} {str(x.dtype):8s} [{SE.UNITS[k]:5s}] "
               f"min {np.nanmin(x):11.4g}  mean {np.nanmean(x, dtype='f8'):11.4g}  "
               f"max {np.nanmax(x):11.4g}  NaN {int(np.isnan(x).sum())}")
 
@@ -560,20 +559,20 @@ def main():
     if a.inspect:
         inspect(a.inspect)
         return
-    names = a.names or list(T.SOURCES)
-    unknown = [n for n in names if n not in T.SOURCES]
+    names = a.names or list(SE.SOURCES)
+    unknown = [n for n in names if n not in SE.SOURCES]
     if unknown:
-        raise SystemExit(f"unknown source(s) {unknown}; registered: {list(T.SOURCES)}")
-    os.makedirs(C.OUTDIR, exist_ok=True)
-    for window in sorted({tuple(T.SOURCES[n]["window"]) for n in names}):
+        raise SystemExit(f"unknown source(s) {unknown}; registered: {list(SE.SOURCES)}")
+    os.makedirs(SE.OUTDIR, exist_ok=True)
+    for window in sorted({tuple(SE.SOURCES[n]["window"]) for n in names}):
         R = references(window)
-        out = os.path.join(C.OUTDIR, f"22_transport__references__{window[0]}-{window[1]}.json")
-        json.dump(dict(window=list(window), refs={k: T.REFS[k] for k in T.REFS},
+        out = os.path.join(SE.OUTDIR, f"22_transport__references__{window[0]}-{window[1]}.json")
+        json.dump(dict(window=list(window), refs={k: SE.REFS[k] for k in SE.REFS},
                        **public(R)), open(out, "w"), indent=1)
         print(f"wrote {out}")
-        for n in [n for n in names if tuple(T.SOURCES[n]["window"]) == window]:
+        for n in [n for n in names if tuple(SE.SOURCES[n]["window"]) == window]:
             res = diagnose(n, R)
-            out = os.path.join(C.OUTDIR, f"22_transport__{n}.json")
+            out = os.path.join(SE.OUTDIR, f"22_transport__{n}.json")
             json.dump(res, open(out, "w"), indent=1)
             print(f"{n}: " + "  ".join(f"{m['id']} {m['model']:.3g}" for m in res["metrics"]))
             print(f"wrote {out}")
