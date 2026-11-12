@@ -1,7 +1,7 @@
 """
 02 - Score the diagnostics and write the scorecard reports.
 
-The second stage of the transport scorecard (docs/TRANSPORT_SCORECARD.md). Reads
+The second stage of the scorecard (docs/EVALUATION_PROTOCOL.md). Reads
 the per-source output of 01 and scores every metric as jcm-strat
 relative_scores.py does:
 

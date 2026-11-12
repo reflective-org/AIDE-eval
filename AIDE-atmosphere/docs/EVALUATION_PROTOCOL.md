@@ -1,753 +1,392 @@
-# Evaluation protocol
+# Evaluation protocol — stratospheric dynamics
 
-Two tiers:
+The standard evaluation of stratospheric dynamics and transport in this repository: one
+scorecard of age of air (A), residual circulation (B), polar vortex (C) and variability (D),
+each metric scored as its relative deviation from an observation-based or model reference.
 
-- **Tier 1** — a 5-year regression check, run on every new model version
-- **Tier 2** — a 35-year validation
-
-Every number below is transcribed from `output/16_anchors_45yr.json`, produced by
-`scripts/16_anchors_45yr.py`. **Both tiers are anchored on CESM 1970–2014, the whole
-record** — 44 annual years, 42 DJF and 45 JJA seasons. Nothing here has been run against an
-AIDE-WACCM rollout: these are the criteria, plus the machinery exercised on a window of
-CESM's own output (§3.4), on four reanalyses and on one GCM rollout (§6).
-
-The anchor uses every year the run affords, which makes σ the best estimated and the
-variance windows the tightest available. It also leaves no CESM output held back to test the
-thresholds with; §2 is that limitation and where the supporting evidence now lives.
-
-Results and interpretation are kept apart. Tables and the bullets under them state what was
-measured; every inference drawn from them is in a labelled `Interpretation` block.
-
----
-
-## The two tiers at a glance
-
-| | **Tier 1 — screening** | **Tier 2 — validation** |
-|---|---|---|
-| Length | 5 years | 35 years |
-| Anchor | 1970–2014 (45 yr) | 1970–2014 (45 yr) |
-| Runs on | every new model version | a configuration that passed tier 1 |
-| Scores | **individual years** | the **rollout mean**, the **variance** and the **shape** |
-| Question | is the configuration broken? | is the configuration correct? |
-| Thresholds | loose, empirical, **provisional** | derived, not adjustable by inspection |
-| Expected to change | yes — tighten as failure modes emerge | no |
-| A pass means | continue | the configuration meets the validation targets |
-
-The two tiers answer different questions. Tier 1 is a regression test: low cost, a low
-false-alarm rate on a healthy model, and sensitive to a broken configuration. Tier 2 is the
-scientific claim.
-
----
-
-## 1. Tier 1 — 5-year screening
-
-### What is checked
-
-**Every individual year, against a ±3σ band around the CESM 1970–2014 mean.** A 5-year
-rollout gives 5 values per diagnostic and all 5 are checked. This is not a check on the
-5-year mean: a regression test has to see a single catastrophic year, which averaging hides.
-
-σ is detrended within the anchor wherever the trend is significant at p < 0.05, marked `*`.
-Three diagnostics trigger it.
-
-| Diagnostic | Units | Anchor mean | σ | **Accept (any single year)** | Anchor n | Widest anchor year |
-|---|---|---|---|---|---|---|
-| Mass flux, 70 hPa | 10⁹ kg s⁻¹ | 9.4487 | 0.2128* | **8.810 – 10.087** | 44 | +3.45σ (1978) |
-| w̄*, 10°S–10°N | mm s⁻¹ | 0.1917 | 0.0144* | **0.1485 – 0.2350** | 44 | +2.57σ (1992) |
-| Vortex NH, DJF | m s⁻¹ | 24.8 | 5.6 | **8.0 – 41.6** | 42 | +2.17σ (2014) |
-| Vortex SH, JJA | m s⁻¹ | −81.6 | 2.5 | **−89.0 – −74.2** | 45 | +3.05σ (2011) |
-| Polar cap T, NH | K | 209.55 | 1.90* | **203.8 – 215.3** | 42 | +2.35σ (2011) |
-| Polar cap T, SH | K | 192.13 | 2.02 | **186.1 – 198.2** | 45 | +2.75σ (1992) |
-
-Plus one count, which needs no band: **0–7 major NH SSWs over the 5 winters**, against 3.4
-expected at the anchor rate of 0.689/winter (31 events in 45 winters, 95% Poisson interval).
-
-### The anchor against its own band
-
-Scoring all 45 anchor years back against the band they define gives **3 exceedances in 262
-year-checks**: mass flux in 1971 and 1978, SH vortex in 2011.
-
-> **Interpretation** — A band built from a detrended σ but centred on a mid-trend mean will
-> flag the ends of a trending record. Both mass-flux exceedances are in the 1970s, before
-> most of the BDC acceleration (D9). The 3 are not evidence that ±3σ is too tight; they are
-> the forced trend appearing in a statistic that has had the trend removed from its width but
-> not from its centre. A model flagged in the same way needs its period checked before
-> its physics.
-
-### Why ±3σ
-
-The band clears the whole anchor record apart from those 3 checks, and multiplicity is the
-reason not to start tighter. Six diagnostics × 5 years is **30 simultaneous checks per
-screening run**. For a model that is perfect and merely Gaussian:
-
-| Band | False alarm per check | Chance of ≥1 flag per screening run |
-|---|---|---|
-| ±2.0σ | 4.55% | **75.3%** |
-| ±2.5σ | 1.24% | 31.3% |
-| ±3.0σ | 0.27% | **7.8%** |
-| ±3.5σ | 0.05% | 1.4% |
-
-> **Interpretation** — ±2σ is unusable as a hard gate: it would flag three runs in four on a
-> flawless model. ±3σ is the loosest band that is still informative and the tightest that
-> stays quiet. If tier 1 tightens, this is the number to move, and the sensible path is to
-> keep ±3σ as the hard gate and add tighter bands as advisory flags that are logged rather
-> than failed on.
-
-> **Settled for now: ±3σ.** Agreed 2026-08-18, to be revisited once real failure modes have
-> been seen.
-
-### Advisory, not gating, at tier 1
-
-This is **enforced by the report, not left to the reader**: any check whose tolerance sits
-below the n = 15.4 crossover and which would otherwise pass is marked `advisory`, printed as
-`advisory` rather than `PASS`, and excluded from every total, with the number excluded stated.
-A failure still counts at any length — see the asymmetry in appendix A.
-
-- **The 5-year mean**, held to `max(0.5σ, 1.96σ/√5) = 0.877σ`. Logged because it catches a
-  uniform drift that no individual year is extreme enough to trip. Not a gate: at n = 5 the
-  detection branch dominates so heavily that the threshold is nearly 1σ, which would pass
-  almost anything (appendix A).
-- **The three shape checks of §3.4** — seasonal cycle, daily distribution, tropical w*
-  profile. Computed and reported at 5 years, gated only at 35. Two reasons their passes
-  cannot gate here. Their tolerances at n = 5 sit near 0.88σ for the same reason the mean's
-  does, so they would pass almost anything; and adding 23 gated checks to the 30 already in
-  the per-year band would multiply the false-alarm budget below, which is the one thing a
-  screening gate must not do.
-
-### What tier 1 does not do
-
-It does not **gate** on variance, the mechanism relations, the forced trend, or the shape
-checks of §3.4 — it reports the last of these and gates on none of them. Nothing at tier 1
-tests the forced trend at all.
-
-> **Interpretation** — A tier-1 pass is not evidence that a configuration is good, only that
-> it is not obviously broken. Do not report it as a validation.
-
----
-
-## 2. What this anchor cannot verify
-
-The standing rule is that a threshold CESM cannot meet on a different sample of its own
-output is not a threshold (D12). The operational anchor cannot satisfy that rule: it spans
-1970–2014, so **no CESM year lies outside it** and no held-out sample exists.
-
-The evidence therefore comes from the anchors this one replaced, archived in
-[`../stale/`](../stale/README.md):
-
-| Test | Anchor | Scored on | Result |
-|---|---|---|---|
-| Tier 1, ±3σ, per year | 1996–2014 | 1970–1995, as five 5-year screening runs | 28 of 30 block verdicts pass; both failures mass flux, both pre-1980 |
-| Tier 2, mean and variance | 1980–2014 | 1970–1994 | 4 of 6 mean, 6 of 6 variance |
-
-> **Interpretation** — What transfers from those runs is the *method*, not the numbers: a
-> ±3σ per-year gate and a 0.5σ mean tolerance are the right size on CESM output that did not
-> set them, and the diagnostics that failed did so for an identifiable physical reason rather
-> than from noise. The thresholds in this document are the same construction on a longer
-> sample. They inherit that support and cannot add to it — which is the price of using the
-> whole record, and the reason the archived material is kept rather than deleted.
-
----
-
-## 3. Tier 2 — 35-year validation
-
-**Anchored on 1970–2014**, the same anchor as tier 1. 35 years is past the 15.4-year
-crossover, so every mean tolerance is the full-strength **0.5σ**; running longer buys no
-further tightening on the mean.
-
-The anchor joins two separate CESM runs across the 1995/96 restart. σ is detrended where the
-trend is significant at p < 0.05, marked `*`.
-
-### 3.1 Mean
-
-| Diagnostic | Units | Anchor mean | σ | Tolerance | **Accept (rollout mean)** | as % of mean |
-|---|---|---|---|---|---|---|
-| Mass flux, 70 hPa | 10⁹ kg s⁻¹ | 9.4487 | 0.2128* | ±0.1064 | **9.3423 – 9.5552** | 1.1% |
-| w̄*, 10°S–10°N | mm s⁻¹ | 0.1917 | 0.0144* | ±0.0072 | **0.1845 – 0.1990** | 3.8% |
-| Vortex NH, DJF | m s⁻¹ | 24.8 | 5.6 | ±2.8 | **22.0 – 27.6** | 11.3% |
-| Vortex SH, JJA | m s⁻¹ | −81.6 | 2.5 | ±1.2 | **−82.8 – −80.3** | 1.5% |
-| Polar cap T, NH | K | 209.55 | 1.90* | ±0.95 | **208.60 – 210.50** | 0.5% |
-| Polar cap T, SH | K | 192.13 | 2.02 | ±1.01 | **191.12 – 193.14** | 0.5% |
-
-The DJF rows rest on 42 seasons and the JJA rows on 45; the annual rows on 44 years. One
-DJF season is lost at each record edge and one annual year at the restart.
-
-### 3.2 Variance
-
-| Metric | 95% acceptance window | Width |
-|---|---|---|
-| **Interannual σ ratio** (rollout σ ÷ anchor σ) | **0.68 – 1.32** | 0.64 |
-| **Daily DJF σ ratio**, u at 60°N | **0.88 – 1.12** | 0.24 |
-
-The daily series gives 6.8 effective samples per winter — 4013 DJF days, 14-day
-decorrelation time — against one for the annual series.
-
-> **Interpretation** — Both windows are tighter than the same construction on the 35-year
-> anchor gave (0.66–1.34 and 0.87–1.13), because the reference σ now rests on the whole
-> record. That is the main practical gain from the longer anchor. The daily ratio remains the
-> sharper test and is what will catch an emulator that has smoothed away its own weather.
-> Detrend both sides before forming the interannual ratio: over the pooled record the
-> mass-flux σ is 54% larger raw than detrended, so an undetrended ratio measures trend, not
-> variability.
-
-### 3.3 Counts and relations
-
-| Check | Anchor | **Accept at 35 years** |
-|---|---|---|
-| Major NH SSW, count | 0.689/winter (31 in 45) | **15 – 34**, expect 24.1 |
-| R1 wave → vortex, slope | −0.936 | resolvable to ±0.36 |
-| R2 thermal wind, slope | −2.062 | resolvable to ±0.57 |
-
-### 3.4 Shape — the annual march, the distribution, the vertical profile
-
-Everything above scores the **level** of the circulation and its **spread**. A model can pass
-both and still have the wrong shape: the right annual-mean upwelling with the annual march
-inverted, the right DJF mean vortex with no tails, the right 70 hPa w̄* with a vertical
-profile that peaks in the wrong place. Three checks close that gap. Each is reported at
-5 years (§1) and gated here, at the same ±0.5σ tolerance as the mean.
-
-**Seasonal cycle.** The amplitude and phase of the annual harmonic, fitted to each year's
-12-month climatology so that both carry an interannual σ. The twelve monthly means are not
-scored individually: that would be a twelve-way multiplicity problem.
-
-| Diagnostic | Amp anchor | Amp tolerance | Phase anchor | Phase tolerance |
-|---|---|---|---|---|
-| Mass flux, 70 hPa | 1.7227 ×10⁹ kg s⁻¹ | ±0.1310 | 11.51 | ±0.160 |
-| w̄*, 10°S–10°N | 0.0801 mm s⁻¹ | ±0.0074 | 11.83 | ±0.267 |
-| Vortex NH, DJF | 18.71 m s⁻¹ | ±1.3099 | 11.38 | ±0.123 |
-| Vortex SH, JJA | 47.05 m s⁻¹ | ±1.0078 | 0.25 | ±0.111 |
-| Polar cap T, NH | 10.94 K | ±0.5801 | 5.49 | ±0.071 |
-| Polar cap T, SH | 23.78 K | ±0.5469 | 11.72 | ±0.081 |
-
-Amplitude is the harmonic's half range, so its peak-to-trough is twice the value shown.
-Phase is a continuous month with 0 = mid-January, compared circularly. The annual harmonic is
-not the whole annual march: where the cycle carries a strong semi-annual component the phase
-sits away from the observed maximum, and both upwelling diagnostics do — w̄*'s harmonic peaks
-in December while its 12-point curve peaks in March. The observed argmax is carried alongside
-every phase, unscored, so the two cannot be confused.
-
-**Daily distribution.** The 5th, 25th, 50th, 75th and 95th percentile of daily u at 60°N,
-each taken **within** a winter and then averaged across winters.
-
-| Percentile | Anchor | σ | **Tolerance at 35 yr** |
-|---|---|---|---|
-| p5 | 6.74 m s⁻¹ | 8.96 | **±4.48** |
-| p25 | 18.33 | 7.50 | **±3.75** |
-| p50 | 25.58 | 6.30 | **±3.15** |
-| p75 | 32.29 | 5.02 | **±2.51** |
-| p95 | 39.62 | 5.06 | **±2.53** |
-
-> **Interpretation** — the per-winter reduction is the whole point. Winters are independent,
-> so the sample is winters and the D5 rule applies directly with n = winters; the 14-day
-> decorrelation time that forces an effective-n correction on the pooled daily σ of §3.2
-> never enters here. This also supersedes the flat "p5/p95 within 5 m s⁻¹" row the older
-> target table carried, which was not derived from σ and carried no rollout length. A model
-> that has smoothed away its own weather shows p5 too high and p95 too low at once, which no
-> test of the mean or of a single σ can see.
-
-**Tropical w\* profile.** 10°S–10°N w̄* at six pressure levels, each divided by the profile's
-own vertical mean.
-
-| Level | Normalised anchor | **Tolerance at 35 yr** | Absolute anchor (advisory) |
-|---|---|---|---|
-| 100 hPa | 1.4679 | **±0.0624** | 0.4743 mm s⁻¹ |
-| 70 hPa | 0.5933 | **±0.0267** | 0.1917 |
-| 50 hPa | 0.5309 | **±0.0288** | 0.1711 |
-| 30 hPa | 0.7984 | **±0.0489** | 0.2579 |
-| 20 hPa | 1.1132 | **±0.0616** | 0.3621 |
-| 10 hPa | 1.4962 | **±0.1378** | 0.4903 |
-
-The profile is non-monotonic, with its minimum at 50 hPa between larger values at 100 and
-10 hPa, so a single 70 hPa number constrains none of this structure. Only five of the six
-normalised values are independent, since they are divided by their own mean.
-
-> **Interpretation** — the absolute values cannot carry a gate. Appendix C records a grid
-> error on w̄* at 70 hPa of +2.0% on a 20-layer grid and +11.8% on a 45-layer grid, against a
-> tier-2 tolerance of 3.8%, so an absolute per-level target would fail a correct model on
-> vertical grid alone. Dividing by the profile mean cancels a multiplicative estimator bias
-> that is **uniform in height**, and that uniformity is assumed, not measured: the two figures
-> above are two grids at one level, not one grid at two levels. Until it is measured, treat a
-> profile-shape failure as a reason to check the grid before concluding anything about the
-> circulation. All six levels are standard pressure levels, carried by reanalyses and model
-> archives alike, so the check needs no regridding in the vertical to score either.
-
-### 3.5 Running a validation
-
-```bash
-$PY scripts/17_validate.py FIRST_YEAR LAST_YEAR     # default 1996 2014
-$PY scripts/18_validation_figures.py
-```
-
-Writes [`../validation_results/validation_result.md`](../validation_results/)
-and seven figures beside it. Climate-model data enters through
-`17_validate.climate_model_series`, which is the one function to replace when the model is a
-model rollout rather than a window of CESM's own record — the three shape checks of §3.4 come
-through that same function, so a rollout scores everything in one pass.
-
-The committed result scores **CESM 1996–2014**: tier 1 5/6, tier 2 mean 5/6, variance 7/7,
-SSW pass, mechanism 1/2, shape 23/23.
-
-> **Interpretation** — That model lies inside the anchor, so it is a self-consistency
-> check on the machinery and not a validation. Its two mean-side failures are both predicted:
-> mass flux at +1.04σ is D9 with the sign reversed, 1996–2014 being the post-acceleration
-> half of the record, and R1 is the relation D10 demoted. Any pass there is weaker evidence
-> than the corresponding failure, and the report labels itself accordingly.
-
----
-
-## 4. Input requirements
-
-What a model has to supply to be scored against the thresholds above. Everything in this
-section is what `scripts/aide_val_common.py` reads and what the diagnostics consume. The
-CESM values quoted throughout are the reference implementation, not a constraint on the
-climate model's own grid (§5, rule 2).
-
-### 4.1 Minimum request
-
-**Tier 1 needs 5 years, tier 2 needs 35 years.** Both need the same fields, at the same
-resolution, on the same grid. Two forms of the request, depending on what the archive holds:
-
-| | **A zonal-mean TEM tape** | **A standard pressure-level archive** |
-|---|---|---|
-| Fields | ū, v̄, w̄ (log-pressure), θ̄, v'θ' | `ua`, `va`, `wap`, `ta` (CF/CMIP names) |
-| Shape | (time, level, lat), already zonally averaged | (time, level, lat, lon) daily 3-D — or zonal means **plus** 3-D `va` and `ta` |
-| Temporal | daily means | daily means |
-| Levels | pressure levels bracketing 10, 50, 70 and 100 hPa, with one level beyond each end | same |
-| Latitude | global, −90° to +90° | same |
-| Derivation | none | w̄ from `wap`, θ̄ from `ta`, v'θ' from 3-D `va` and `ta` (§4.6) |
-
-- **v'θ' is the one field that cannot be recovered from zonal means.** An archive holding
-  only zonal means must also hold the eddy heat flux itself, or the 3-D daily `va` and `ta`
-  from which to form it.
-- **θ̄ needs no 3-D data.** On a pressure surface the transform is linear in T, so
-  `θ̄ = T̄ (1000/p)^κ` exactly.
-- **`wap` is ω, not w.** It has to be converted (§4.6); using it, or a geometric vertical
-  velocity, in place of log-pressure w̄ is an 11% error on all upwelling.
-- CESM's `cam.h6` tape is the first column. §4.2–§4.6 give the exact definitions the two
-  columns have to meet.
-
-### 4.2 The five fields
-
-| Symbol | CESM `cam.h6` name | Units | Definition | Diagnostics that need it |
-|---|---|---|---|---|
-| ū | `Uzm` | m s⁻¹ | zonal-mean zonal wind | vortex NH, vortex SH, SSW count, daily DJF σ |
-| v̄ | `Vzm` | m s⁻¹ | zonal-mean meridional wind | v̄* (TEM); not scored on its own |
-| w̄ | `Wzm` | m s⁻¹ | zonal-mean **log-pressure** vertical velocity, `w = −Hω/p` | w̄*, mass flux |
-| θ̄ | `THzm` | K | zonal-mean potential temperature, reference 1000 hPa | polar cap T; `dθ/dz` in the TEM term |
-| v'θ' | `VTHzm` | K m s⁻¹ | zonal-mean **eddy** meridional heat flux | TEM streamfunction ψ; R1 heat flux at 100 hPa |
-
-- Nothing else is read. `UVzm` and `UWzm` are on the CESM tape and are not used by any tier-1
-  or tier-2 diagnostic.
-- **All five must sit on one common set of levels and one common latitude grid.**
-  `tem_residual` differences them against each other level by level.
-- `VTHzm` is the eddy flux `v'θ'`, not the product of the zonal means. Passing the full
-  product where the eddy flux is expected reverses the sign of tropical w̄* (§4.6).
-- The separate transport scorecard also reads an entry-age tracer; its field contract is
-  §1 of [TRANSPORT_SCORECARD.md](TRANSPORT_SCORECARD.md#1-field-contract).
-
-### 4.3 Temporal resolution
-
-**Daily means are required. A monthly archive is not sufficient.**
-
-- Two scored quantities cannot be formed from monthly output: the **SSW count** (needs the
-  day the wind reverses) and the **daily DJF σ ratio**, which §3.2 identifies as the sharper
-  of the two variance tests.
-- Every other diagnostic is reduced from the same daily series. A monthly archive would
-  support the mean tests of §3.1 and nothing else.
-- CESM's calendar is `noleap` (365 days). A different calendar changes only the day counts
-  in the completeness rules below.
-- Each daily value is labelled by the calendar day of its own mean.
-
-| Reduction | Rule | Completeness requirement |
-|---|---|---|
-| Annual mean | calendar-year mean of the daily series | ≥ 350 days, else the year is dropped |
-| DJF season | Dec–Jan–Feb, labelled by the January year (Dec 1996 → season 1997) | ≥ 81 days (`0.9 × 30 × 3`) |
-| JJA season | Jun–Jul–Aug, labelled by its own year | ≥ 81 days |
-| SSW season | NH, Nov 1 – Mar 31, labelled by the January year | ≥ 100 days |
-| Daily DJF σ | all DJF days pooled, no seasonal reduction first | decorrelation time τ = 14 days assumed |
-
-- Record length: **5 years for tier 1, 35 years for tier 2** (§1, §3).
-- Incomplete DJF seasons at both record edges are dropped, leaving one fewer DJF season
-  than annual years. JJA lies inside a calendar year and loses none.
-
-### 4.4 Vertical grid
-
-| Diagnostic | Level or layer |
+| | |
 |---|---|
-| Mass flux | 70 hPa |
-| w̄*, 10°S–10°N | 70 hPa |
-| Vortex NH, vortex SH, SSW | 10 hPa |
-| Polar cap T, both hemispheres | layer 10–50 hPa |
-| R1 heat flux (tier-2 mechanism) | 100 hPa |
-| w̄* profile (§3.4 shape) | 100, 70, 50, 30, 20, 10 hPa |
+| Standard window | 2006–2019, daily (§2) |
+| Headline score | **standard** scoring: jcm-strat phase 31's scored set (the former "reduced" scoring), 20 metrics (§6) |
+| Full listing | **extensive** scoring: the 34 metrics of the jcm-strat phase-29 scorecard (§6) |
+| Tolerance | ±25 % of the reference; absolute bounds for A2, A2-WACCM, C1 latitudes, C2, D4 dates |
+| Evaluate a model | one `sources/<set>.json`, then `scripts/evaluate.py <set>` (§9) |
+| Results | [validation_results/](../validation_results/): [SCORING_STANDARD.md](../validation_results/SCORING_STANDARD.md) (ranking), [SCORING_EXTENSIVE.md](../validation_results/SCORING_EXTENSIVE.md), one folder per set (§10) |
+| Open issues | w* estimator interim, AIDE-eval #5 (§7); group C daily-mean input, AIDE-eval #7 (§8) |
+| Code, data flow | [ARCHITECTURE.md](ARCHITECTURE.md); decisions [DECISIONS.md](DECISIONS.md); deferred [DEFERRED.md](DEFERRED.md); status [PROGRESS.md](PROGRESS.md) |
 
-- **Pressure levels, monotonically increasing**, with the pressure of each level known
-  independently of surface pressure. On CESM's hybrid grid every level above 182 hPa has
-  `hybi = 0`, so interface pressure is `hyai·P0` and no `PS` is needed.
-- Interpolation onto 10, 70 and 100 hPa is **linear in ln p**. The level set must bracket
-  each target, with at least one further level beyond each end of the 10–100 hPa range so
-  the centred vertical derivative is defined at the brackets. The §3.4 profile adds 20, 30
-  and 50 hPa to that list; all six of its levels sit above the 182 hPa `hybi = 0` transition,
-  so none needs a surface-pressure field.
-- **A grid too coarse to resolve the profile cannot be scored on it.** The 20-layer store
-  measured in appendix C carries about six layers between 1 and 100 hPa, which does not
-  resolve a six-level profile; the 45-layer store carries about twenty-one and does. Report
-  the layer count in the stratosphere alongside any profile result.
-- The TEM term needs `dθ/dz` on log-pressure height `z = −H ln(p/1000)`, by centred
-  differences over the supplied levels.
-- Polar cap T is a mean over the levels falling inside 10–50 hPa, weighted by Δ ln p.
-- CESM reference: 71 hybrid interface levels, of which the 41 spanning 0.099–652 hPa are
-  loaded; 26 lie between 1 and 200 hPa, and 8 inside the 10–50 hPa polar cap layer. The
-  brackets are 9.55 / 11.86 hPa for 10, 66.80 / 80.70 for 70, and 94.94 / 111.69 for 100.
-- Fill values must be masked before any reduction (§5, rule 4). On CESM this is the `1e35`
-  below-surface sentinel; on another model it is whatever that model writes.
+Tables and bullets state what was measured. Inferences are in labelled `Interpretation`
+blocks.
 
-### 4.5 Horizontal grid
+---
 
-- **Latitude must be global, −90° to +90°.** The mass-flux integral runs over every latitude
-  where w̄* > 0 at 70 hPa, not over a prescribed tropical band.
-- Latitude bands used: **10°S–10°N** (w̄*), **60–90°N** and **60–90°S** (polar cap T),
-  **45–75°N** (R1 heat flux). Band means are **cos(lat)-weighted with inclusive endpoints**,
-  not Gaussian-weighted.
-- Point latitudes: **exactly ±60°**, reached by linear interpolation in latitude. CESM's
-  0.9424° grid has no point at 60°.
-- Zonal means only. No longitudinal information enters any diagnostic.
-- CESM reference: 192 latitudes, 0.9424° spacing (f09).
+## 1. Purpose and scope
 
-> **Interpretation** — The grid above is what CESM supplies, not what a climate model must
-> match. Rule 2 in §5 scores on the emulator's own grid with CESM reduced onto it, so a
-> coarser model grid is admissible; an incomplete latitude range is not, because it changes
-> the mass-flux integral itself.
+- **Purpose.** Score a model's stratospheric circulation and tracer transport against
+  references of the same years, with one fixed metric set, tolerance and code path, so that
+  models and model versions are comparable.
+- **Origin.** The jcm-strat relative scorecard (phase 29) and phase 31's scored metric set,
+  ported into this repository. The diagnostics are recomputed here from daily zonal means;
+  the port reproduces jcm-strat's own values (§10.3).
+- **Scope.** Zonal-mean diagnostics, 150–5 hPa, both hemispheres. No chemistry, no
+  tropospheric metric, no longitudinal structure.
+- **Not in scope.** The two-tier CESM-anchored protocol that this document replaced on
+  2026-11-12 (§12).
 
-### 4.6 Deriving the five fields from a standard archive
+---
 
-Most archives carry ω, T and 3-D winds rather than a zonal-mean TEM tape.
+## 2. Standard window
 
-| Available (CF/CMIP name) | Derive | Constraint |
+- **2006-01-01 to 2019-12-31**, 14 years, daily.
+- References A, C and D are taken over the scored window's own years (§5); B is WACCM6 h6
+  1996–2014 for every window.
+- A result set on any other window is scored with references of its own years and flagged
+  **"non-standard window (N of 14 standard years)"** — N = years inside 2006–2019 — in its
+  reports, both summaries, the ranking and its figures.
+- Reasons for 2006–2019: the ERA5 copies held here cover 2006–2019; CLaMS v3.1 covers
+  2004–2023 and the WACCM6 entry age 1970–2019; jcm-strat phase 31 extended AL7h to 2019.
+
+| Set | Window | Flag |
 |---|---|---|
-| `ua`, `va` | ū, v̄ — zonal mean, no transform | Must be on the same pressure levels as the rest |
-| `wap` = ω (Pa s⁻¹) | `w = −Hω/p`, H = 7000 m | Geometric vertical velocity is not a substitute: using it is an 11% error on all upwelling |
-| `ta` = T (K) | `θ = T (1000/p)^κ`, κ = 0.2857 | p in hPa. Linear in T on a pressure surface, so `θ̄ = T̄ (1000/p)^κ` |
-| 3-D `va` and `ta` | `v'θ' = [vθ] − [v][θ]`, formed on the native 3-D grid **before** zonal averaging | Cannot be recovered from zonal means alone |
+| `jcm-strat-AL7h-2006-2019` | 2006–2019 | standard |
+| `jcm-strat-phase29-2006-2010` | 2006–2010 | non-standard window (5 of 14 standard years) — no later years exist for these runs |
 
-- Polar cap T is reconstructed from θ̄ by the reference path. An archive that carries `ta`
-  can use it directly; the two are the same quantity.
-- A coarse pressure archive can bracket 10, 50, 70 and 100 hPa and still degrade two
-  diagnostics: `dθ/dz` in the TEM term is differenced over the levels supplied, and the
-  polar cap average is taken over the levels inside 10–50 hPa, of which CESM has 8 (§4.4).
+---
 
-Constants, at CESM's own values:
+## 3. Input field contract
 
-| Constant | Value | Used in |
+A model supplies daily zonal means on pressure levels for **every day of 2006–2019**.
+
+| Name | Units | Definition | Metrics that read it |
+|---|---|---|---|
+| `Uzm` | m s⁻¹ | zonal-mean zonal wind | C1, D1–D4 |
+| `Vzm` | m s⁻¹ | zonal-mean meridional wind | B1, B2, D4-w, D7 |
+| `THzm` | K | zonal-mean potential temperature, reference 1000 hPa | B1, B2, D4-w, D7; C2 and D6 through T |
+| `VTHzm` | K m s⁻¹ | zonal-mean **eddy** heat flux v'θ' | B1, B2, D4-w, D5, D6, D7 |
+| `AOA150` | yr | entry age: an age clock reset to zero wherever p > 150 hPa | A1–A4, A2-WACCM, D7 |
+| `T` | K | zonal-mean temperature — optional; if absent `T = THzm (p/1000)^κ` | C2, D6 |
+| `Wzm` | m s⁻¹ | log-pressure w̄ = −Hω/p, H = 7 km — optional, read by no metric | — |
+
+- **Shape** `(time, plev, lat)`, every field on one common set of levels and latitudes.
+- **`plev`** in hPa, any order (sorted ascending on reading). Pressure per level must not
+  depend on surface pressure.
+- **`lat`** in degrees, global, any order.
+- **`time`** daily, each value labelled by the calendar day of its own mean; any CF
+  calendar (`noleap` read through `cftime`). The record must cover 1 January of the first
+  year to 31 December of the last; the reader refuses anything shorter.
+- **`VTHzm` is the eddy flux**, formed from instantaneous 3-D fields before any time
+  averaging, not the product of the zonal means.
+- **`AOA150` in years** (365.25 days).
+- **Levels** must reach well above 10 hPa: Ψ* is integrated from the top supplied level
+  (jcm-strat 0.01 hPa, CESM h6 4.5 × 10⁻⁶ hPa). The metrics read 5–150 hPa.
+- **Fill values** above 1e20 in absolute value are masked on reading.
+
+### Supplying netCDF
+
+- One or more files (globs allowed) with variables named as above, dims `time`, `plev`,
+  `lat`, CF time units. Read by the `netcdf` reader.
+- Register the files in one JSON (§9); check them with
+  `01_fields.py --inspect <set>` (shapes, units, ranges, levels in 5–150 hPa, NaN counts).
+- The jcm-strat runs are read by the `jcm_npz` reader from jcm-strat's `daily_zm.py` files
+  (`u`→`Uzm`, `v`→`Vzm`, `th`→`THzm`, `vth`→`VTHzm`, `aoa150`/365.25→`AOA150`, `T` kept).
+  A list of files is one record: identical grid, consecutive days, no gap or overlap.
+
+---
+
+## 4. Metrics
+
+Window means unless stated. "Nearest level" is the model level nearest the target pressure,
+as jcm-strat takes it; w* and Ψ* are interpolated in log p (§7). Reference values for the
+two scored windows, from `output/<set>/references.json` and the per-run JSON (C references
+are on the jcm-strat grid).
+
+| ID | Quantity | Reference | 2006–2019 | 2006–2010 | Scored |
+|---|---|---|---|---|---|
+| **A1** | entry age 10°S–10°N (cos-weighted), nearest level to 55 hPa | WACCM6 REF-D1 entry age | 1.103 yr | 1.099 yr | relative |
+| **A2** | cos-weighted RMSE of AOA150 against CLaMS minus CLaMS' 10°S–10°N age at 150 hPa, model on the CLaMS grid, 100–5 hPa, \|lat\| ≤ 80° | 0 (offset 0.090 / 0.091 yr) | — | — | absolute < 0.4 yr; extensive only |
+| **A2-WACCM** | cos-weighted RMSE of AOA150 against the WACCM6 REF-D1 2-D entry age, model on the WACCM6 grid, 100–5 hPa, \|lat\| ≤ 80°, no offset | 0 | — | — | absolute < 0.4 yr; standard only |
+| **A3** | age step 10°S–10°N → 50–70° (both hemispheres), nearest level to 55 hPa | CLaMS | 2.83 yr | 2.84 yr | relative |
+| **A4** | transit 70 → 10 hPa of the 10°S–10°N age profile, linear in log p | range 2.3–3.2 yr (CLaMS 3.0, WACCM6 2.5) | 2.75 | 2.75 | relative to the midpoint |
+| **B1-p** | w* 15°S–15°N (cos-weighted) at p = 100, 70, 50, 30, 10 hPa | WACCM6 h6 1996–2014, same estimator | 0.456, 0.228, 0.198, 0.271, 0.463 mm s⁻¹ | same | relative |
+| **B2-p** | tropical upward mass flux: max − min of Ψ* over \|lat\| ≤ 60° at p = 100, 70 hPa | WACCM6, same | 12.39, 6.53 × 10⁹ kg s⁻¹ | same | relative |
+| **C1-jetP_H** | winter (DJF N, JJA S) maximum of monthly-mean u poleward of 30°, nearest level to P = 50, 10 hPa | ERA5 monthly zonal means, same months, model grid | 50 hPa N 17.5, S 47.7; 10 hPa N 27.6, S 73.9 m s⁻¹ | 16.4, 46.7; 25.2, 71.9 | relative |
+| **C1-…-lat** | grid latitude of that maximum | ERA5, same | — | — | absolute ± 4° on \|lat\| |
+| **C2-H** | winter polar-cap (60–90°) T at the nearest level to 50 hPa, minus ERA5 | 0 | — | — | absolute ± 2 K |
+| **D1-H** | std over winters of winter-mean u, 10 hPa, 55–65° | ERA5 CDS daily, same days | N 9.16, S 2.88 m s⁻¹ | 6.51, 2.16 | relative |
+| **D2-H** | std of daily u anomalies at 60°, 10 hPa, within winter | ERA5 | N 16.67, S 5.83 m s⁻¹ | 14.99, 5.25 | relative |
+| **D3** | NH major SSWs (u 60°N 10 hPa reversal Nov–Mar, ≥ 20 days apart, not a final warming) | ERA5 | 12 | 8 | relative |
+| **D4-fwH** | mean final-warming date: first easterly crossing of the 5-day-smoothed u at 60°, 10 hPa after which u stays below 5 m s⁻¹ (Mar–Jul N, Sep–Jan S), springs common to model and ERA5 | ERA5 | N 40.7, S 80.4 days after 1 Mar / 1 Sep | 44.4, 89.8 | absolute ± 10 days |
+| **D4-w** | annual-cycle amplitude of monthly w* 15°S–15°N at 70 hPa | ERA5 | 0.173 mm s⁻¹ | 0.185 | relative |
+| **D5-H** | std of daily v'T' anomalies, 100 hPa, 45–75°, within winter | ERA5 | N 11.88, S 7.42 K m s⁻¹ | 11.47, 7.90 | relative |
+| **D6-H** | slope of 50 hPa polar-cap T anomaly on the trailing 40-day 100 hPa heat-flux anomaly (Jan–Mar N, Jul–Oct S) | ERA5 | N 1.026, S 1.135 K per K m s⁻¹ | 0.972, 0.766 | relative |
+| **D7** | slope of deseasonalised, detrended monthly 10°S–10°N age at 55 hPa on the trailing 3-month w* anomaly at 70 hPa | CLaMS age with ERA5 w* | −4.41 yr per mm s⁻¹ | −4.52 | relative |
+
+- H = N or S. D anomalies are taken against each dataset's own 31-day-smoothed
+  day-of-year climatology.
+- D3 uses jcm-strat's detector (`strat_compare.ssw_dates`), ported.
+- A2-WACCM: the WACCM6 REF-D1 clock starts at its tropical base point (0.47°N, 103 hPa),
+  close to the 150 hPa reset of AOA150, so no offset is subtracted. A2 subtracts CLaMS'
+  150 hPa tropical age, which does not put CLaMS on a 150 hPa clock.
+
+---
+
+## 5. References
+
+| Reference | Location | Years | Metrics |
+|---|---|---|---|
+| CLaMS v3.1 driven by ERA5, zonal-mean AGE | `/data/CLaMS/CLaMS_v3/clams_v3.1_era5_zm_lat.zip` (2004–2023), read in memory | scored window | A2–A4, D7 |
+| WACCM6 REF-D1 entry age (base 0.47°N, 103 hPa) | `/data/CESM2_REFD1_AOA/AoA_waccm6_refd1.04_AOA1mf_1970-2019_ba_0_100.0_ck_0_50.0.nc` | scored window | A1, A2-WACCM |
+| CESM2.1.5-WACCM6 histSST h6 (`Vzm`, `VTHzm`, `THzm`) | `/data/cesm2.1.5_output/histSST`, through `strat_eval_common.load_h6` | **1996–2014 for every window** (6935 days, 61 interfaces from 4.5 × 10⁻⁶ hPa) | B1, B2 |
+| ERA5 monthly zonal means (`uzm`, `tzm`, 25 levels) | `AIDE-atmosphere/data/era5/era5_zm_monthly_<y>.nc` | scored window | C1, C2 |
+| ERA5 CDS daily zonal means (u, v, T, θ, v'θ', 17 levels 1–250 hPa) | `AIDE-atmosphere/data/era5/era5_<y>.npz` | scored window | D1–D7 |
+
+- Every path is in `strat_eval_common.REFS`.
+- The ERA5 files are copies of jcm-strat's, made by `scripts/copy_era5_refs.sh` (2006–2019,
+  28 files) and checked against `scripts/era5_refs.sha256`; `AIDE-atmosphere/data/` is
+  gitignored.
+- **B is not period-matched.** WACCM6 histSST h6 exists for 1970–1995 and 1996–2014; the
+  reference is the whole 1996–2014 run. For 2006–2019 the overlap is 2006–2014 (9 years).
+- CESM h6 conventions, established against the files (evidence: the archived scripts
+  `01*`, §12): `VTHzm` is the eddy flux, not `Vzm·THzm`; `Wzm` is log-pressure
+  w = −Hω/p; below-surface points are the sentinel `1e35` without `_FillValue`, masked with
+  `abs(x) < 1e20`; `MSKtem` is a fractional count, not a 0/1 mask.
+- Constants are CESM's: a = 6.37122 × 10⁶ m, g = 9.80616 m s⁻², κ = R/c_p = 287.058 /
+  1004.64, H = 7 km.
+
+---
+
+## 6. Scoring
+
+jcm-strat `relative_scores.py`:
+
+- **Relative metrics**: rel = model / ref − 1, err = \|rel\| / 0.25. A4 against the midpoint
+  2.75 yr of its range. A negative slope keeps its sign in the ratio (−40 % is 40 % too
+  small).
+- **Absolute metrics** keep their bound: A2 and A2-WACCM < 0.4 yr, C1 latitudes ± 4° on
+  \|lat\|, C2 ± 2 K, D4 final-warming dates ± 10 days; err = \|difference\| / bound.
+- **Status**: pass err ≤ 1, near err ≤ 1.5, fail above. A metric that cannot be formed fails
+  (err 3).
+- **Group score** = mean err of the group's scored metrics. **Combined** = mean of the A, B
+  and C group scores. D is reported on its own.
+- The tolerances are the scorecard's; they are not derived from interannual σ.
+
+### Two scorings
+
+| | **standard** (headline, ranking) | **extensive** (full listing) |
 |---|---|---|
-| a (Earth radius) | 6.37122 × 10⁶ m | mass flux, w̄* |
-| g₀ | 9.80616 m s⁻² | mass-flux density |
-| R | 287.058 J kg⁻¹ K⁻¹ | κ |
-| c_p | 1004.64 J kg⁻¹ K⁻¹ | κ |
-| κ = R/c_p | 0.2857 | θ ↔ T; computed from R and c_p, not hard-coded |
-| H (scale height) | 7000 m | log-pressure w and z |
-| p_ref | 1000 hPa | θ, log-pressure height |
-| ρ at the flux surface | `p / (g₀H)` | mass flux (Butchart et al. 2010 / CCMVal convention) |
+| Definition | jcm-strat phase 31's scored set = the former "reduced" scoring | the 34 metrics of the phase-29 scorecard |
+| Scored | 20: A 4, B 7, C 6, D 3 | 34: A 4, B 7, C 10, D 13 |
+| Age RMSE | A2-WACCM | A2 (shifted CLaMS) |
+| Listed, not scored | A2 and phase 31's `make_phase31_report.py` UNSCORED: C1-jet10_N, C1-jet10_N-lat, C1-jet10_S, C1-jet10_S-lat, D1-N, D1-S, D2-N, D2-S, D3, D4-fwN, D4-fwS, D6-N, D6-S, D7 | — (A2-WACCM computed, not shown) |
+| Passes counted | A–C of 17, D of 3 | A–C of 21, D of 13 |
 
-> **Interpretation** — These are CESM's constants, and the thresholds were derived with them.
-> A rollout scored with different constants is being compared against a different quantity.
-> This is D8 applied to the inputs rather than to the estimator: the two standard routes to
-> w̄* differ by 10.8%, which is larger than the tier-2 mass-flux tolerance.
-
----
-
-## 5. Rules that apply at both tiers
-
-These are not negotiable per tier. They are what makes a comparison meaningful.
-
-1. **Pin the estimator.** Model and truth go through `aide_val_common.tem_residual`. The
-   two standard routes to w̄* differ by 10.8% on identical data — larger than the tier-2
-   mass-flux tolerance itself (D8).
-2. **Score on the emulator's grid**, with CESM reduced onto it, not the reverse.
-3. **Detrend both sides, and period-match anything that overlaps CESM in time.** The
-   anchor spans a real forced trend, so its mean sits mid-trend while its σ has the trend
-   removed (D9). A free rollout with no GHG forcing cannot reproduce that trend, so an
-   absolute upwelling comparison is the wrong test for one; score it against the CESM years
-   it covers, or detrend both sides. This binds hardest on mass flux and w̄*, the two
-   diagnostics whose σ is detrended in §1 and §3.1.
-4. **Mask the `1e35` sentinel** with `abs(x) < 1e20` before any reduction. There is no
-   `_FillValue`; an unguarded mean returns ~1e33.
-5. **Report the rollout length with every number.** A threshold without its n is not a
-   threshold.
+- Standard scores the 50 hPa vortex, the residual circulation, the age on the 150 hPa clock,
+  D4-w and D5; it leaves out the 10 hPa winds, vortex variability, final warmings, SSW count
+  and the two relations D6, D7.
+- jcm-strat phase 31 scored its set with absolute bounds (`success_metrics.py`); standard
+  applies the relative scoring above to that set. Group scores differ from phase 31's; the
+  values behind them agree (§10.3).
+- The ranking (`SCORING_STANDARD.md`) orders every run of every set by its standard combined
+  score. Runs on different windows are each scored against references of their own years,
+  so a cross-window rank compares two differences, not two models on one reference.
 
 ---
 
-## 6. Provenance
+## 7. w* estimator — interim (AIDE-eval issue #5)
 
-```bash
-$PY scripts/02_reference_stats.py         # reads the h6 tape
-                                          # writes output/02_reference_stats.json
-$PY scripts/02b_trends.py                 # reads 02
-                                          # writes output/02b_trends.json
-$PY scripts/07_period_split.py            # reads the h6 tape
-                                          # writes output/07_period_split.json
-$PY scripts/16_anchors_45yr.py            # reads 07
-                                          # writes output/16_anchors_45yr.json
-                                          #   -> sections 1 and 3 of this document
-$PY scripts/17_validate.py \
-      --climate-model NAME 1996 2014      # reads 16 and 07; NAME defaults from the window
-                                          # writes output/17_validation__<stamp>.json
-                                          #   and validation_results/
-                                          #     validation_result__<stamp>.md
-$PY scripts/18_validation_figures.py      # reads 16, 07 and the newest 17 output
-      [--climate-model NAME]              # writes validation_results/*__<stamp>.png
-```
+- **Formula** (jcm-strat `strat_circulation.tem_streamfunction`, `residual_w`), from
+  time-mean [v], [v'θ'], [θ]:
+  v* = [v] − ∂/∂p([v'θ'] / ∂[θ]/∂p); Ψ* = (2πa cos φ / g) ∫ v* dp from the top;
+  w* = −H ω*/p with ω* = −(g / (2πa² cos φ)) ∂Ψ*/∂φ. No w̄ needed. \|lat\| > 88° masked.
+- **Interpolation**: w* and Ψ* linear in log p to the exact target pressure
+  (`interp_level`), not the nearest level. The same for the monthly 70 hPa w* of D4-w and D7.
+- **Model and reference** (WACCM6 h6) go through the same functions.
+- **Interim**: the estimator is open as AIDE-eval issue #5. A change there changes B, D4-w
+  and D7.
 
-### Scoring something that is not this CESM run
+What interpolation changes against the nearest level (phase-29 runs, 2006–2010, from
+`port_check.md`):
 
-The same `17` and `18` score any source. What changes is where the series come from:
-`07` derives them from the CESM h6 tape, and `20` derives the identical series from any
-zonal-mean source — a reanalysis, another GCM, an emulator rollout.
-
-```bash
-$PY scripts/20_series_from_zonal_mean.py --list      # the sources it knows
-$PY scripts/20_series_from_zonal_mean.py ERA5 2004 2023
-                                          # writes output/20_series__ERA5.json
-$PY scripts/17_validate.py --source ERA5  # writes validation_results/ERA5/
-$PY scripts/18_validation_figures.py --climate-model "ERA5 (CLaMS v3.1 zonal mean)"
-```
-
-The contract a source has to meet is small: **zonal-mean u and T on pressure levels,
-with a time axis.** That yields the two vortex and two polar-cap diagnostics and their
-seasonal cycle. A source that also carries daily v, ω, T and the eddy heat flux v'T'
-(formed from the 3-D fields before any time averaging, §4.6) scores the full set: `20`
-derives w = −Hω/p, θ and v'θ' and hands the five fields to the same
-`aide_val_common.series_from_tem_fields` that `07` applies to the CESM tape, so the
-mass flux, w̄*, its profile, the 100 hPa heat flux, the SSW count and the daily
-distribution all come out of one code path (§5, rule 1). Whatever a source cannot
-supply, `17` reports as **not evaluable** rather than omitting — a partial scorecard
-can never be mistaken for a complete one.
-
-The first source to take the full path is a GCM rollout: `jcm-strat` phase 10, the
-stratosphere-only JCM configuration on the Dinosaur dycore (T63, 63 levels, troposphere
-and the tropical zonal-mean wind nudged to ERA5, stratospheric temperature relaxed to a
-seasonal Polvani–Kushner equilibrium), thirty chained one-year segments 1990–2019 with
-6-hourly output. `20` reads the zonal-mean cache of that output, takes daily means, and
-labels the source independent of the anchor; its result and figures are in
-`validation_results/JCM-strat-p10/`.
-
-```bash
-$PY scripts/20_series_from_zonal_mean.py JCM-strat-p10 1990 2019   # ~2 min, reads 7 GB
-$PY scripts/17_validate.py --source JCM-strat-p10
-$PY scripts/18_validation_figures.py --climate-model "jcm-strat phase 10 (T63 strat63) 1990-2019"
-```
-
-The rollout is 30 years, below the 35 tier 2 asks for, so its tier-2 tolerances sit at
-the `0.5σ` branch (n = 30 > 15.4) and every verdict counts; the σ-ratio windows are
-correspondingly a little wider than at n = 35.
-
-> **Interpretation** — independence is a property of the *source*, not of its *period*.
-> A reanalysis whose years lie inside the anchor's is still an independent product; a
-> window of the anchor's own model is not, whatever its years. Each source declares
-> this and it is carried into the report and the figure footers, so a self-consistency
-> check cannot be read as a validation.
-
-Those scripts in that order, plus `aide_val_common.py` and `report_layout.py`. `16`,
-`17` and `18` read only existing JSON and take seconds; if `output/` is empty, `02`, `02b`
-and `07` rebuild it from the tape in about five minutes. See the pipeline order in
-[../CLAUDE.md](../../CLAUDE.md).
-
-Sections 1 and 3 change only when `16` changes; §3.5 only when `17` or `18` changes. Do not
-edit the tables by hand.
-
-`07` also derives the three per-year series the shape checks of §3.4 need and that exist
-nowhere else — the 12-month climatology of each diagnostic year by year, the tropical w̄* at
-each profile level year by year, and the per-winter DJF percentiles. They are computed at the
-tape stage on purpose, so that `16`, `17` and `18` stay JSON-only and fast.
-
-Every scored result is stamped `__<climate model>__<production date>`, so the report, its
-seven figures and the JSON behind them carry the name of what was scored and the day it was
-produced. `18` takes the stamp from `17`'s JSON rather than recomputing it, so a run that
-crosses midnight cannot split its own figures from its report.
-
-The split-anchor scripts that used to sit here, `14` and `15`, are in
-[`../stale/`](../stale/README.md). They still run and still reproduce their JSON; §2 says
-what they are still cited for.
+| Metric | WACCM6 nearest → interpolated | Nearest levels model / WACCM6 [hPa] | Model value change |
+|---|---|---|---|
+| B1-100 | 0.398 → 0.456 mm s⁻¹ (+14.3 %) | 95.9 / 94.9 | +0.7 to +12.8 % |
+| B1-70 | 0.211 → 0.228 (+8.0 %) | 72.2 / 66.8 | +2.2 to +5.1 % |
+| B1-50 | 0.201 → 0.198 (−1.2 %) | 49.3 / 47.1 | −1.0 to −0.4 % |
+| B1-30 | 0.255 → 0.271 (+6.3 %) | 30.4 / 32.6 | −0.6 to +0.2 % |
+| B1-10 | 0.469 → 0.463 (−1.1 %) | 9.86 / 9.55 | −1.7 to −0.3 % |
+| B2-100 | 10.85 → 12.39 × 10⁹ kg s⁻¹ (+14.1 %) | 95.9 / 94.9 | +5.1 to +6.2 % |
+| B2-70 | 6.05 → 6.53 (+7.9 %) | 72.2 / 66.8 | −3.1 to −2.4 % |
+| D4-w | ERA5 unchanged (70 hPa is an ERA5 level) | 72.2 / 70 | 0.0 to +8.2 % |
+| D7 | ERA5/CLaMS unchanged | 72.2 / 70 | −9.2 to −5.2 % |
 
 ---
 
-## 7. Open for sign-off
+## 8. Group C daily-mean input (AIDE-eval issue #7)
 
-Two choices here were made to produce a usable document and are not derived from the data.
-Each is cheap to change.
-
-**Settled, 2026-08-18:**
-
-- **±3σ as the tier-1 gate**, to be revisited once real failure modes have been seen.
-
-**Settled, 2026-08-19:**
-
-- **Both tiers anchored on the whole 1970–2014 record**, so the thresholds are fixed and
-  model-agnostic rather than matched to a CESM sub-period. §2 states the consequence: the
-  anchor cannot be verified out of sample, and the evidence that the construction holds up
-  is the archived split-anchor material.
-
-**Settled, 2026-08-25:**
-
-- **The three shape checks of §3.4 fold into the existing tiers** rather than forming tiers of
-  their own: reported at 5 years, gated at 35.
-- **The w\* profile gate is set on the normalised shape**, with the absolute per-level values
-  advisory, and the height-uniformity of the grid error is assumed rather than measured. The
-  measurement that would settle it is cheap and needs no new data: recompute CESM's own w̄* on
-  a coarse level set and compare per level against the native answer. Until then a
-  profile-shape failure is a reason to check the vertical grid first.
-
-**Still open:**
-
-1. **Tier 1 gates on individual years only**, with the 5-year mean advisory. The brief
-   specified individual years; the mean check was added here and can be dropped or promoted
-   to a gate.
-2. **SSW count, mechanism slopes and trends are reported at tier 2** although the brief
-   specified mean and variance. They are part of the existing target set and become
-   resolvable at this length, so they are included and flagged rather than omitted.
-3. **The seasonal cycle is scored through the annual harmonic only.** Both upwelling
-   diagnostics carry a strong semi-annual component that the annual harmonic does not
-   describe — w̄*'s harmonic peaks in December while its 12-point curve peaks in March. Adding
-   the semi-annual amplitude as a fourth shape quantity would capture it; it is not done here.
-4. **The daily distribution is scored on the NH vortex only.** The SH daily series is not
-   persisted, so p5–p95 exists for u at 60°N and not at 60°S.
+- C takes calendar-month means of the daily zonal means. jcm-strat `teq_score.py` averages
+  the 6-hourly frames by timestamp; jcm-strat `daily_zm.py` builds each day from 06Z, 12Z,
+  18Z and 00Z of the next day. Each month therefore loses the 00Z frame that opens it and
+  gains the one that opens the next month (one frame in about 120); the ERA5 side is the
+  same in both.
+- Effect against jcm-strat (port check): C2 differs by ≤ 0.022 K, jets by ≤ 0.37 %; the
+  shift estimated from the daily series reproduces every C2 difference within jcm-strat's
+  0.01 K rounding. In one case (L0, 2006–2010) it moves the NH 50 hPa jet latitude by one
+  grid row (45.70°N vs 47.56°N; the two rows differ by 0.0004 m s⁻¹).
+- Open: keep daily-mean input for C (any model can supply it), or require 6-hourly input to
+  match jcm-strat exactly.
 
 ---
 
-## Appendix A · Where `0.5σ` and `1.96σ/√n` come from
+## 9. How to evaluate a model
 
-No number in this appendix is transcribed from `output/`. It is the derivation of the rule,
-not a result; the σ values it is applied to are in sections 1 and 3.
+1. **Write the contract fields** (§3) for 2006-01-01 to 2019-12-31 to netCDF.
+2. **Register one result set**: `AIDE-atmosphere/sources/<set>.json`
 
-**σ is CESM's own interannual scatter** — the year-to-year variation in its DJF vortex or its
-70 hPa mass flux under unchanged forcing. It is not an error bar on the model and not an
-observational uncertainty. It is the unit every bias tolerance is measured in.
+   ```json
+   {
+     "description": "MYMODEL v1, free running, 2006-2019 daily zonal means",
+     "reader": "netcdf",
+     "window": [2006, 2019],
+     "runs": {"MYMODEL": "/path/to/mymodel_*.nc"},
+     "notes": {"MYMODEL": "one line on the configuration (optional)"}
+   }
+   ```
 
-`max(0.5σ, 1.96σ/√n)` combines two statements that answer different questions:
+   - `runs` maps a run name to a path, a glob, or a list of them (one continuous record).
+     Several runs on one window can share a set.
+   - `window` other than `[2006, 2019]` is scored and flagged non-standard.
+3. **Check it**: from `AIDE-atmosphere/scripts/`, `PY=../../.AIDE-eval_env/bin/python`,
+   `$PY 01_fields.py --inspect <set>`.
+4. **Evaluate**: `bash copy_era5_refs.sh` once (copies and verifies the ERA5 files), then
+   `$PY evaluate.py <set>` → `01_fields` → `02_scorecard` → `03_figures`, and both summaries
+   rewritten over every registered set. Heavy runs under the memory cap:
+   `bash /data/JCM_stripped/jcm-strat-phase29/scripts/memcap.sh -- $PY evaluate.py <set>`.
+   One 14-year single-run set takes about 25 s on CPU, peak 2.6 GB (01_fields).
+5. **Read** `validation_results/<set>/scorecard_standard.md` with §7, §8 and §11.
 
-| Branch | Question it answers | Depends on n? |
+- A free-running model is compared with the observed years climatologically; the jcm-strat
+  runs are nudged to ERA5 in the troposphere and in the tropical zonal-mean wind, so for
+  them the same-day comparison of C and D is tighter than for a free run.
+
+---
+
+## 10. Results
+
+### 10.1 AL7h, 2006–2019 (standard window)
+
+jcm-strat AL7h (T63 L95, AL7 T_eq correction at half amplitude), the continuous p25_AL7h
+chain: phase 29's 2006–2010 file and phase 31's 2011–2019 continuation read as one record.
+**Its T_eq correction was fitted on 2005-04..2008-01, inside the window.** From
+`validation_results/jcm-strat-AL7h-2006-2019/scorecard_<scoring>.json`:
+
+| | standard | extensive |
 |---|---|---|
-| `0.5σ` | What counts as an *acceptable* bias? | No |
-| `1.96σ/√n` | What bias can an n-year run *resolve*? | Yes |
+| A age of air | 0.72 | 0.93 |
+| B residual circulation | 0.95 | 0.95 |
+| C polar vortex | 0.39 | 0.36 |
+| **combined A–C** | **0.69** | **0.74** |
+| D variability | 0.12 | 1.10 |
+| passed A–C | 15 / 17 | 18 / 21 |
+| passed D | 3 / 3 | 6 / 13 |
 
-- **`0.5σ` is the scientific tolerance** — the emulator's mean must sit inside half of
-  natural variability. Rollout length does not change what CESM's variability is, so this
-  branch does not move with n.
-- **`1.96σ/√n` is the detection floor.** An n-year mean carries sampling error σ/√n, so a
-  threshold tighter than 1.96σ/√n lies inside the 95% noise band of the estimate itself: a
-  model sitting on it cannot be distinguished from an unbiased one.
+- Standard, fail: B1-100 (−69 %), B1-50 (+46 %). Every other scored metric passes; A2-WACCM
+  0.32 yr.
+- Extensive, also fail: A2 (0.65 yr), D1-N (−52 %), D1-S (−51 %), D6-N (−39 %), D6-S
+  (−42 %), D7 (−68 %); near: D2-N (−27 %), D2-S (−33 %).
 
-Taking the larger of the two demands no more accuracy than the physics requires and no more
-than the run length can resolve. The branches cross where `0.5 = 1.96/√n`, i.e. **n =
-(1.96/0.5)² = 15.4 years**: below that, detection binds; above it, tolerance binds. This is
-why tier 1's 5-year mean threshold is 0.877σ and therefore advisory (§1), and why tier 2 at
-35 years gets the full-strength 0.5σ on every diagnostic (§3.1).
+### 10.2 Seven phase-29 runs, 2006–2010 (non-standard window, 5 of 14 standard years)
 
-### Pass and fail are not symmetric below the crossover
+P20b, AL7, AL7t, L0, LAL7, QBO10d, LQBO10d (QBO30 and QBO10dL76 excluded; AL7h scored in
+§10.1). Only 2006–2010 exists for these runs.
 
-Where detection binds, the two verdicts carry different amounts of information, and
-`17_validate.py` treats them differently.
+Standard:
 
-| Below n = 15.4 | Means | Treated as |
-|---|---|---|
-| \|offset\| **>** tolerance | the discrepancy is larger than sampling noise could produce at 95%, *and* larger than 0.5σ | a real **FAIL**, counted |
-| \|offset\| **≤** tolerance | cannot separate "inside 0.5σ" from "outside 0.5σ but unresolvable at this length" | **advisory**, not counted |
+| | P20b | AL7 | AL7t | L0 | LAL7 | QBO10d | LQBO10d |
+|---|---|---|---|---|---|---|---|
+| A | 0.56 | 0.95 | 0.98 | 0.79 | 1.47 | 0.71 | 1.20 |
+| B | 1.05 | 1.00 | 1.01 | 0.98 | 1.06 | 0.86 | 0.78 |
+| C | 1.07 | 0.30 | 0.13 | 1.03 | 0.45 | 0.63 | 0.63 |
+| **combined A–C** | **0.89** | **0.75** | **0.71** | **0.93** | **0.99** | **0.73** | **0.87** |
+| D | 0.39 | 0.42 | 0.53 | 0.54 | 0.53 | 0.28 | 0.73 |
+| passed A–C | 12 / 17 | 13 / 17 | 11 / 17 | 12 / 17 | 11 / 17 | 14 / 17 | 10 / 17 |
 
-So a short run can still fail informatively; what it cannot do is pass informatively. Every
-check whose threshold comes from this rule is marked `advisory` in the JSON and printed as
-`advisory` rather than `PASS` when its n falls below the crossover **and** it would otherwise
-have passed. Advisory checks are excluded from every total in the report, and the report says
-how many were excluded, so a 5-year run cannot present itself as a 35-year validation.
+Extensive:
 
-> **Interpretation** — this is the equivalence-testing shape: the tolerance is the
-> equivalence bound, and a comparison too noisy to place the estimate relative to that bound
-> is inconclusive rather than passing. The σ-ratio windows of §3.2 are *not* covered by this
-> flag — they have their own precedent in D7, which retires the interannual ratio at n = 10
-> because its window is uselessly wide, and that is a judgement about window width rather
-> than about this crossover.
+| | P20b | AL7 | AL7t | L0 | LAL7 | QBO10d | LQBO10d |
+|---|---|---|---|---|---|---|---|
+| A | 0.58 | 1.17 | 1.21 | 0.99 | 1.70 | 0.91 | 1.44 |
+| B | 1.05 | 1.00 | 1.01 | 0.98 | 1.06 | 0.86 | 0.78 |
+| C | 1.09 | 0.26 | 0.21 | 1.02 | 0.45 | 0.79 | 0.47 |
+| **combined A–C** | **0.91** | **0.81** | **0.81** | **1.00** | **1.07** | **0.85** | **0.90** |
+| D | 1.35 | 1.28 | 1.29 | 1.17 | 1.45 | 0.93 | 1.39 |
+| passed A–C | 13 / 21 | 17 / 21 | 15 / 21 | 14 / 21 | 15 / 21 | 15 / 21 | 14 / 21 |
 
-## Appendix B · Decisions cited above
+- Standard: B1-100 fails in every run (−50 to −72 %); B1-70, B1-10, B2-100, B2-70, both
+  50 hPa jets, the SH 50 hPa jet latitude, D5-N and D5-S pass in every run.
+- AL7h on 2006–2010 alone (PR #6 results, commit 34d7d6f): standard combined 0.72,
+  extensive 0.79.
 
-Condensed from the decision record kept during derivation; the numbering is retained so the
-citations in the text resolve.
+> **Interpretation** — On the standard ranking AL7h 2006–2019 (0.69) leads, followed by AL7t
+> (0.71), QBO10d (0.73) and AL7 (0.75) on 2006–2010. The first is on 14 years and its own
+> references, the others on 5; the 0.02–0.06 gaps are within what a change of window moved
+> AL7h's own score (0.72 on 2006–2010, 0.66 on 2011–2019 in the 2026-11-11 results). The
+> lower-branch deficit (B1-100, −50 to −72 %) and the excess at 50 hPa (+32 to +63 %) are
+> common to every run.
 
-**D5 · The threshold rule is `target(n) = max(0.5σ, 1.96σ/√n)`.** Every bias tolerance is
-the larger of half of natural variability and what an n-year mean can resolve at 95%
-confidence. Derivation in appendix A.
+### 10.3 Port check
 
-**D7 · The interannual σ ratio is not usable at short n.** At n = 10 its 95% window is
-0.43–1.57 — nothing realistic fails it, so a pass is uninformative. The daily DJF series
-gives about 6.4 independent samples per winter (14-day decorrelation time) instead of one,
-which is a usable test. §3.2 is where the interannual ratio becomes usable again at n = 35.
+`scripts/checks/port_check.py` → [validation_results/port_check.md](../validation_results/port_check.md).
+Its runs and jcm-strat paths are defined in the script, independent of `sources/`.
+Agreement: model and reference value each within max(0.5 % of jcm-strat's value, jcm-strat's
+rounding); B, D4-w, D7 at the nearest level.
 
-**D8 · A target is a statement about a *specific estimator* on a *specific grid*.** The two
-standard routes to w̄* differ by 10.8% on identical data — larger than the tier-2 mass-flux
-tolerance. Model and truth must go through `aide_val_common.tem_residual`.
+| Part | Runs, window, age references | A | B | C | D |
+|---|---|---|---|---|---|
+| 1 — phase 29 | eight runs, 2006–2010, 2005–2009 | 32 / 32 | 56 / 56 | 66 / 80 | 104 / 104 |
+| 2 — phase 31 | AL7h 2006–2010, window years | 5 / 5 | 7 / 7 | 8 / 10 | 13 / 13 |
+| 2 — phase 31 | AL7h 2011–2019, window years | 5 / 5 | 7 / 7 | 9 / 10 | 13 / 13 |
 
-**D9 · The upwelling targets are period-matched, not absolute.** Setting targets on
-1996–2014 and scoring 1970–1995 fails both upwelling diagnostics: the earlier mass flux is
-4.0% lower, and the trend is +0.31 ×10⁹ kg s⁻¹/decade in 1970–1995 (p < 10⁻⁴) but
-statistically absent in 1996–2014 (p = 0.34). This is a protocol change, not a looser
-number: AIDE-WACCM's input-only forcings are TOA solar, time-of-day, year-progress and
-statics, with no GHGs, so a free rollout has no mechanism to reproduce a GHG-forced trend.
-An absolute target would fail an unbiased emulator.
-
-**D12 · A threshold CESM cannot meet on a different sample of its own output is not a
-threshold.** The rule stands and is what the archived split anchors were built to satisfy —
-the data that sets a threshold cannot also test it. The operational anchor deliberately
-forgoes it in exchange for the whole record; §2 is that trade stated explicitly, and any new
-diagnostic added here still owes the same held-out test before it is trusted.
-
-**D13 · Reference σ comes from CESM, not from observations.** The right reference for
-scoring an emulator *against this CESM run*, and the wrong one for any claim about realism —
-see appendix C.
-
-## Appendix C · Limitations that apply to every number here
-
-- **Fixed SST.** No ENSO, so the interannual σ anchoring every tolerance is smaller than the
-  real atmosphere's, and the tolerances derived from it are tighter.
-- **Volcanic years.** 1970–1995 contains El Chichón and Pinatubo, part of why its upwelling
-  variability is larger. The anchor spans them, so their variance is inside every σ here.
-- **No held-out CESM sample.** The anchor spans the whole record, so the thresholds cannot be
-  tested against CESM output that did not set them (§2, D12). Three of the anchor's own 262
-  year-checks fall outside its ±3σ band.
-- **The two segments are separate CESM runs** joined at a 1995/96 restart, not one
-  continuous integration. Some of the 4% mass-flux step could be a restart discontinuity
-  rather than a trend; the significant within-segment trend in 1970–1995 argues against
-  that, but the two have not been separated. The tier-2 anchor spans this restart (§3).
-- **SSW detection** is a local implementation of Charlton–Polvani, not a community-shared
-  catalogue. The rate is consistent with the literature, but central dates have not been
-  cross-checked independently.
-- **The w̄\* estimator is grid-dependent, and its height-dependence is unmeasured.**
-  Recomputing w̄* at 70 hPa from coarse stores against CESM's native 70-level answer, for one
-  year, gave **+2.0%** on a 20-layer grid and **+11.8%** on a 45-layer grid — the finer grid
-  worse, because w̄* is a small residual of two larger terms and is sensitive to the `dθ/dz`
-  stencil. Both figures exceed the tier-2 w̄* tolerance of 3.8%, which is why §3.4 gates the
-  normalised profile rather than the absolute one. But they are two *grids* at one *level*:
-  nothing here measures whether the error is uniform in height, which is the assumption the
-  normalisation rests on. It is also a single year, so it sizes the error without bounding its
-  year-to-year spread.
-- **The annual harmonic is not the whole annual march.** §3.4 scores the amplitude and phase
-  of the first harmonic. Where a diagnostic carries a strong semi-annual component the
-  harmonic phase sits away from the observed maximum — w̄*'s harmonic peaks in December while
-  its 12-point curve peaks in March — so a model could reproduce the harmonic and still have
-  the wrong shape between the peaks.
-- **No AIDE-WACCM emulator rollout has been scored.** The thresholds are CESM-vs-CESM; the
-  full path has been exercised end to end on one GCM rollout (§6), so the first emulator
-  score needs no new code, only a reader for its archive.
+- A, B, D: largest difference 0.008 % (CESM a, g and κ against jcm-strat's 6.371e6 m,
+  9.80665 m s⁻², 0.2857). A2-WACCM reproduces phase 31's `a2_waccm.json` to 1e-5 %.
+- C: every disagreeing cell is the one-frame-per-month shift of §8.
+- Fed the nearest-level values, the extensive group scores reproduce jcm-strat's
+  `relative_scores.json` for the eight runs except C (L0 0.98 → 1.02, others ± 0.01), same
+  cause.
+- The check runs on the two jcm-strat files AL7h is scored from, separately; the
+  2006–2019 record is their concatenation (§3).
 
 ---
 
-## See also
+## 11. Limitations
 
-- §4 — the fields, resolution and grid a model must supply to be scored
-- [../validation_results/validation_result.md](../validation_results/) —
-  a scored climate model, with the seven figures beside it
-- [../stale/README.md](../stale/README.md) — the split-anchor material §2 cites
-- Appendix A — where `0.5σ` and `1.96σ/√n` come from
-- Appendix B — the decisions cited above by number
-- Appendix C — the limitations that apply to every number here
-- [../stale/AIDE_WACCM_screening_1970-1995.pdf](../stale/AIDE_WACCM_screening_1970-1995.pdf)
-  — the figure behind the §2 table, on the anchors it was built for
-- `scripts/16_anchors_45yr.py` — every threshold on this page
-- `scripts/17_validate.py`, `scripts/18_validation_figures.py` — the scored result and its
-  figures
+- **Short windows.** D1 is a standard deviation over 4–13 winters and D3 a count of a few
+  events; their sampling error is comparable to the 25 % tolerance. The 2006–2010 set
+  carries it more than the 2006–2019 one.
+- **AL7h is not out of sample** on 2006–2019: its T_eq correction was fitted on
+  2005-04..2008-01.
+- **B is not period-matched** and uses its own estimator (§5, §7).
+- **Nearest levels** in A (55 hPa), C (50, 10 hPa) and D (10, 50, 55, 100 hPa) make those
+  metrics depend on the model's vertical grid. Jet latitudes are grid latitudes (1.87° on
+  the jcm-strat grid).
+- **References disagree with each other.** A4's range spans CLaMS 3.0 and WACCM6 2.5 yr; A1
+  takes WACCM6, A2 and A3 CLaMS; shifted CLaMS and the WACCM6 entry age differ by about
+  0.5 yr RMSE on the A2 domain, more than the 0.4 yr bound.
+- **Standard ≠ phase 31's score.** Relative scoring on phase 31's set; phase 31's
+  absolute-bound group scores are not reproduced.
+- **Cross-window ranking** (§6) compares runs against different reference years.
+
+---
+
+## 12. History
+
+- **Until 2026-11-12** the repository's protocol was a two-tier CESM-anchored evaluation
+  (tier 1, 5-year screening; tier 2, 35-year validation) with thresholds derived from
+  CESM2.1.5-WACCM6 1970–2014. Its scripts, results (CESM, ERA5, ERA-Interim, JRA-55,
+  MERRA-2, jcm-strat phase 10) and this document's previous version are archived as git tag
+  **`tier-protocol-final`** (commit 34d7d6f).
+- 2026-11-10: transport scorecard ported from jcm-strat phase 29 beside the tiers (PR #6).
+- 2026-11-11: reference years follow the window; extensive and reduced scorings; AL7h
+  2011–2019.
+- 2026-11-12: the scorecard replaces the tier protocol; "reduced" renamed **standard**;
+  standard window 2006–2019; AL7h scored 2006–2019; one JSON per result set and
+  `evaluate.py`.

@@ -75,7 +75,7 @@ GROUP_NAME = {"A": "A age of air", "B": "B residual circulation",
               "C": "C polar vortex", "D": "D variability and relations"}
 
 # Causes of the differences that remain, established in the port (see the PR and
-# docs/TRANSPORT_SCORECARD.md section 7). Printed under each group table.
+# docs/EVALUATION_PROTOCOL.md sections 8 and 10.3). Printed under each group table.
 NOTES = {
     "A": [],
     "B": ["Nearest-level values differ by -0.003 % (w*) and +0.008 % (mass flux) in every run "
