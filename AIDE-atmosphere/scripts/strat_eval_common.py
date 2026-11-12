@@ -26,6 +26,7 @@ tier-protocol-final):
 from __future__ import annotations
 
 import glob
+import json
 import os
 import warnings
 import zipfile
@@ -69,27 +70,13 @@ REFS = dict(
     # ERA5 CDS daily zonal means u, v, T, theta, v'theta', 17 levels 1-250 hPa - D1-D7
     era5_daily=os.path.join(DATA, "era5", "era5_{year}.npz"),
 )
-# Reference years follow the scored window (each source's `window`): the CLaMS and
+# Reference years follow the scored window (each result set's `window`): the CLaMS and
 # WACCM6 age references (A), ERA5 (C, D) and CLaMS (D7) are taken over the window's
 # own years. The WACCM6 TEM reference (B) is the whole 1996-2014 h6 segment, the
 # only one, whatever the window.
 WACCM_TEM_YEARS = (1996, 2014)   # all of the 1996-2014 h6 segment
-JCM_STRAT_P29_AGE_YEARS = (2005, 2009)   # jcm-strat phase 29's age reference years
-                                 # (sweep_score.CLAMS_YEARS); checks/port_check.py only
 WACCM_ILEV = slice(0, 61)        # h6 interfaces from the model top to 652 hPa: Psi* is
                                  # integrated from the top, so the top is kept
-# jcm-strat's own phase-29 result, for checks/port_check.py only
-JCM_STRAT_OUT = "/data/JCM_stripped/jcm-strat-phase29/docs/outputs/29_lqbo10d"
-JCM_STRAT_RELATIVE = os.path.join(JCM_STRAT_OUT, "relative", "relative_metrics.json")
-JCM_STRAT_SUCCESS = os.path.join(JCM_STRAT_OUT, "success_0610", "success_metrics.json")
-# jcm-strat phase 31 (AL7h 2006-2010 and 2011-2019, age references of the window's
-# years) and the phase-30 group D of AL7h 2006-2010 that phase 31 reports; port check only
-JCM_STRAT_P31 = "/data/JCM_stripped/jcm-strat-phase31/docs/outputs/31_al7h_validation"
-JCM_STRAT_P31_RUNS = {   # port source: (success_<tag> directory, group D file)
-    "AL7h": ("success_0610", "/data/JCM_stripped/jcm-strat-phase30/docs/outputs/"
-                             "30_level_thinning/variability.json"),
-    "AL7h_1119": ("success_1119", os.path.join(JCM_STRAT_P31, "variability.json")),
-}
 
 
 # --------------------------------------------------------------------- CESM h6 tape
@@ -139,57 +126,46 @@ OPTIONAL = ("T", "Wzm")
 UNITS = {"Uzm": "m/s", "Vzm": "m/s", "THzm": "K", "VTHzm": "K m/s",
          "AOA150": "yr", "T": "K", "Wzm": "m/s"}
 
-# --------------------------------------------------------------------- sources
-# The eight jcm-strat phase 29 scorecard runs (QBO30 and QBO10dL76 excluded):
-# T63 L95 stratosphere-only JCM, troposphere nudged to ERA5, daily zonal means
-# 2006-2010 reduced from 6-hourly output by jcm-strat scripts/daily_zm.py
-# (v'theta' formed within each 6-hourly snapshot). Read in place, never copied.
-JCM_CACHE = "/data/JCM_stripped/jcm-strat-phase29/cache/variability"
-JCM = dict(reader="jcm_npz", time_resolution="daily", calendar="gregorian",
-           independent=True, window=(2006, 2010))
-_RUNS = {
-    "P20b": "baseline; ERA5 nudging top 400 hPa everywhere, no T_eq correction",
-    "AL7": "P20b with the AL7 equilibrium-temperature correction (jcm-strat phase 22)",
-    "AL7h": "AL7 correction at half amplitude (phase 25)",
-    "AL7t": "AL7 correction tapered to zero at 35 deg, full from 50 deg (phase 24)",
-    "L0": "P20b with the nudging top at 150 hPa in the tropics, 400 hPa in the "
-          "extratropics (phase 23)",
-    "LAL7": "L0 nudging top with the AL7 correction (phase 23)",
-    "QBO10d": "AL7h with the QBO nudging timescale 10 d instead of 1 d (phase 27)",
-    "LQBO10d": "QBO10d with L0's nudging top (phase 29)",
-}
-SOURCES = {n: dict(JCM, path=os.path.join(JCM_CACHE, f"{n}_0610.npz"),
-                   long_name=f"jcm-strat {n} (T63 L95)", note=note)
-           for n, note in _RUNS.items()}
-# jcm-strat phase 31: the AL7h chain continued to 2019 in the same configuration.
-# 2011-2019 lies outside 2005-04..2008-01, the period its T_eq correction was fitted
-# to, so it is AL7h out of sample. Read in place, never copied.
-SOURCES["AL7h_1119"] = dict(
-    JCM, window=(2011, 2019),
-    path="/data/JCM_stripped/jcm-strat-phase31/cache/variability/AL7h_1119.npz",
-    long_name="jcm-strat AL7h (T63 L95), 2011-2019",
-    note="AL7h continued to 2019 in the same configuration (phase 31); out of sample")
+# --------------------------------------------------------------------- result sets
+# One JSON file per result set in AIDE-atmosphere/sources/<set>.json: the runs scored
+# together over one window, one scorecard each. A new model is one file with one run.
+#
+#   {"description": "...",                    what the set is
+#    "reader": "jcm_npz" | "netcdf",          READERS below
+#    "window": [Y0, Y1],                      scored years, inclusive
+#    "runs": {"NAME": "path" | ["path", ...]},  a list is read as one continuous record
+#    "notes": {"NAME": "..."}}                optional, one line per run
+SOURCES_DIR = os.path.join(_ROOT, "sources")
+SET_KEYS = ("description", "reader", "window", "runs")
 
-# Result sets: runs scored together over one window, one scorecard each (02, 03).
-SETS = {"jcm-strat-phase29-2006-2010": tuple(_RUNS),
-        "jcm-strat-phase31-AL7h-2011-2019": ("AL7h_1119",)}
-# A set compared run by run with one run of another set: AL7h out of sample
-# (2011-2019) against AL7h in sample (2006-2010).
-COMPARE = {"jcm-strat-phase31-AL7h-2011-2019": dict(
-    run="AL7h_1119", against=("jcm-strat-phase29-2006-2010", "AL7h"),
-    labels=("in sample", "out of sample"))}
+
+def set_names():
+    """Every registered result set, sorted."""
+    return sorted(os.path.splitext(f)[0] for f in os.listdir(SOURCES_DIR) if f.endswith(".json"))
+
+
+def load_set(name):
+    """One result set from sources/<name>.json, checked against the schema above."""
+    path = os.path.join(SOURCES_DIR, f"{name}.json")
+    if not os.path.exists(path):
+        raise SystemExit(f"no result set {name!r}: {path} missing; registered: {set_names()}")
+    spec = json.load(open(path))
+    missing = [k for k in SET_KEYS if k not in spec]
+    if missing:
+        raise SystemExit(f"{path}: missing {missing}")
+    if spec["reader"] not in READERS:
+        raise SystemExit(f"{path}: reader {spec['reader']!r} not in {list(READERS)}")
+    y0, y1 = spec["window"]
+    if not (isinstance(y0, int) and isinstance(y1, int) and y0 <= y1) or not spec["runs"]:
+        raise SystemExit(f"{path}: window must be [Y0, Y1], runs non-empty")
+    spec["runs"] = {n: ([p] if isinstance(p, str) else list(p)) for n, p in spec["runs"].items()}
+    spec.setdefault("notes", {})
+    spec["name"] = name
+    return spec
 
 
 def years_of(window):
     return list(range(window[0], window[1] + 1))
-
-
-def window_of(names):
-    """The common window of the named sources."""
-    w = {tuple(SOURCES[n]["window"]) for n in names}
-    if len(w) != 1:
-        raise SystemExit(f"sources {list(names)} cover different windows {sorted(w)}")
-    return w.pop()
 
 
 # jcm-strat npz names -> contract names. T is kept: C2 and D6 read it.
@@ -210,33 +186,47 @@ def orient(F):
     return F
 
 
-def read_jcm_npz(spec, years):
-    """One jcm-strat daily_zm.py npz: days, p_hpa, lat and (day, lev, lat) float32
-    u, v, T, th, vth, aoa150 [, aoa_sfc]. The clock is in days; returned in years."""
-    z = np.load(spec["path"])
-    days = z["days"].astype("datetime64[D]")
-    keep = np.isin(days.astype("datetime64[Y]").astype(int) + 1970, list(years))
-    F = {new: z[old][keep] for old, new in JCM_NAMES.items()}
+def read_jcm_npz(paths, years):
+    """jcm-strat daily_zm.py npz files: days, p_hpa, lat and (day, lev, lat) float32
+    u, v, T, th, vth, aoa150 [, aoa_sfc]. The clock is in days; returned in years.
+    Several files are one record: they must share the grid and join day to day, with
+    no gap and no overlap."""
+    parts = []
+    for path in paths:
+        z = np.load(path)
+        days = z["days"].astype("datetime64[D]")
+        keep = np.isin(days.astype("datetime64[Y]").astype(int) + 1970, list(years))
+        F = {new: z[old][keep] for old, new in JCM_NAMES.items()}
+        F.update(plev=z["p_hpa"].astype("f8"), lat=z["lat"].astype("f8"), days=days[keep])
+        parts.append(F)
+    F = parts[0]
+    for path, G in zip(paths[1:], parts[1:]):
+        if not (np.array_equal(F["plev"], G["plev"]) and np.array_equal(F["lat"], G["lat"])):
+            raise SystemExit(f"{path}: grid differs from {paths[0]}")
+        if G["days"].size and F["days"].size and G["days"][0] - F["days"][-1] != np.timedelta64(1, "D"):
+            raise SystemExit(f"{path}: starts {G['days'][0]}, the record before ends "
+                             f"{F['days'][-1]}: gap or overlap")
+        F = {k: (np.concatenate([F[k], G[k]]) if k in JCM_NAMES.values() or k == "days" else F[k])
+             for k in F}
     F["AOA150"] = F["AOA150"] / np.float32(DAYS_PER_YEAR)
-    F.update(plev=z["p_hpa"].astype("f8"), lat=z["lat"].astype("f8"), days=days[keep])
     return orient(F)
 
 
-def read_netcdf(spec, years):
-    """Any model that writes the contract names: one or more netCDF files
-    (spec["path"] is a glob), dims (time, plev, lat), plev in hPa.
+def read_netcdf(paths, years):
+    """Any model that writes the contract names: one or more netCDF files (each
+    path may be a glob), dims (time, plev, lat), plev in hPa.
 
     Any calendar: each day is labelled by its own year, month and day, so a
     noleap record simply has no 29 February. Values beyond 1e20 are masked as
     fill (the 1e35 sentinel convention). T, if absent, is THzm (p/1000)^kappa.
     """
-    files = sorted(glob.glob(spec["path"]))
+    files = sorted(f for p in paths for f in glob.glob(p))
     if not files:
-        raise SystemExit(f"no files match {spec['path']}")
+        raise SystemExit(f"no files match {paths}")
     ds = xr.concat([xr.open_dataset(f) for f in files], dim="time")
     missing = [k for k in CONTRACT if k not in ds]
     if missing:
-        raise SystemExit(f"{spec['path']}: missing contract fields {missing}")
+        raise SystemExit(f"{paths}: missing contract fields {missing}")
     yr, mo, dy = (ds.time.dt.year.values, ds.time.dt.month.values, ds.time.dt.day.values)
     keep = np.isin(yr, list(years))
     days = np.array([f"{y:04d}-{m:02d}-{d:02d}" for y, m, d in
@@ -256,10 +246,16 @@ def read_netcdf(spec, years):
 READERS = {"jcm_npz": read_jcm_npz, "netcdf": read_netcdf}
 
 
-def load_source(name, years):
-    """The contract fields of one registered source, levels and latitudes ascending."""
-    spec = SOURCES[name]
-    return READERS[spec["reader"]](spec, years)
+def load_run(spec, run):
+    """The contract fields of one run of a result set over the set's window, levels and
+    latitudes ascending. The record must cover the window from 1 January to 31 December."""
+    w = spec["window"]
+    F = READERS[spec["reader"]](spec["runs"][run], years_of(w))
+    first, last = np.datetime64(f"{w[0]}-01-01"), np.datetime64(f"{w[1]}-12-31")
+    if F["days"].size == 0 or F["days"][0] != first or F["days"][-1] != last:
+        got = f"{F['days'][0]} .. {F['days'][-1]}" if F["days"].size else "no days"
+        raise SystemExit(f"{spec['name']} / {run}: window {w[0]}-{w[1]} not covered ({got})")
+    return F
 
 
 # --------------------------------------------------------------------- scoring

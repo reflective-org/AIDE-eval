@@ -1,24 +1,23 @@
 """
-01 - Read a source's fields and compute the scorecard diagnostics.
+01 - Read the runs of a result set and compute the scorecard diagnostics.
 
-The first stage of the transport scorecard (docs/TRANSPORT_SCORECARD.md). A
-source is read through strat_eval_common.READERS into the field contract of
-section 1 of that document, then reduced to the metrics of groups A-D, each
-beside its reference. Scoring is 02's; this script only measures.
+The first stage of the scorecard (docs/EVALUATION_PROTOCOL.md). Each run of a result
+set (sources/<set>.json) is read through strat_eval_common.READERS into the field
+contract, then reduced to the metrics of groups A-D, each beside its reference.
+Scoring is 02's; this script only measures.
 
-  01_fields.py [NAME ...]                    diagnose the named sources (default:
-                                             every registered source), one at a time
-  01_fields.py --inspect NAME                shapes, units and ranges of the
-                                             contract fields, nothing written
+  01_fields.py [SET ...]          diagnose every run of the named sets (default: every
+                                  set in sources/), one run at a time
+  01_fields.py --inspect SET      shapes, units and ranges of the contract fields of
+                                  every run of the set, nothing written
 
-Each source is diagnosed over its own window (strat_eval_common.SOURCES). The
-model-independent references are computed once per window and call, over the
-window's years (CLaMS, WACCM6 entry age, ERA5), except the WACCM6 TEM reference
-of group B, which is 1996-2014 for every window, and written beside the
-per-source results.
+Every run is diagnosed over its set's window. The model-independent references are
+computed once per window and call, over the window's years (CLaMS, WACCM6 entry age,
+ERA5), except the WACCM6 TEM reference of group B, which is 1996-2014 for every
+window, and written beside the per-run results.
 
-Output: output/01_fields__references__<Y0>-<Y1>.json   one per window
-        output/01_fields__<NAME>.json                  one per source
+Output: output/<set>/references.json   the set's references
+        output/<set>/<run>.json        one per run
 """
 
 import argparse
@@ -111,7 +110,7 @@ def group_A(F, R):
 # [theta] over the window, model and WACCM6 through the same functions. Scored at
 # the exact target pressure, linear in log p; the nearest-level values jcm-strat
 # scores are kept beside them for the port check. INTERIM w* estimator, AIDE-eval
-# issue #5 (docs/TRANSPORT_SCORECARD.md).
+# issue #5 (docs/EVALUATION_PROTOCOL.md).
 W_LEVELS = (100.0, 70.0, 50.0, 30.0, 10.0)
 FLUX_LEVELS = (100.0, 70.0)
 
@@ -513,68 +512,68 @@ def public(d):
             for k, v in d.items() if not k.startswith("_")}
 
 
-def diagnose(name, R):
-    spec = SE.SOURCES[name]
-    F = SE.load_source(name, SE.years_of(spec["window"]))
+def diagnose(spec, run, R):
+    F = SE.load_run(spec, run)
     rows, prof = [], {}
     for fn, key in ((group_A, "A"), (group_B, "B"), (group_C, "C"), (group_D, "D")):
         r, p = fn(F, R[key])
         rows += r
         prof.update(p)
-    return dict(name=name, long_name=spec["long_name"], note=spec.get("note", ""),
-                reader=spec["reader"], path=spec.get("path", ""), window=list(spec["window"]),
-                independent=bool(spec["independent"]),
+    return dict(name=run, set=spec["name"], note=spec["notes"].get(run, ""),
+                reader=spec["reader"], paths=spec["runs"][run], window=list(spec["window"]),
                 days=[str(F["days"][0]), str(F["days"][-1])], n_days=int(F["days"].size),
                 n_levels=int(F["plev"].size), n_lats=int(F["lat"].size),
                 metrics=rows, profiles=prof)
 
 
-def inspect(name):
-    """Print what the reader hands the diagnostics, so a new source can be checked
+def inspect(spec):
+    """Print what the reader hands the diagnostics, so a new run can be checked
     against the contract before anything is scored."""
-    spec = SE.SOURCES[name]
-    F = SE.load_source(name, SE.years_of(spec["window"]))
-    p, lat, days = F["plev"], F["lat"], F["days"]
-    print(f"{name}: {spec['long_name']}  reader {spec['reader']}  {spec['path']}")
-    print(f"  days  {days.size}  {days[0]} .. {days[-1]}")
-    print(f"  plev  {p.size} levels  {p.min():.4g} .. {p.max():.4g} hPa, ascending "
-          f"{bool(np.all(np.diff(p) > 0))}; inside 5-150 hPa: {int(((p >= 5) & (p <= 150)).sum())}")
-    print(f"  lat   {lat.size}  {lat.min():.3f} .. {lat.max():.3f}, ascending "
-          f"{bool(np.all(np.diff(lat) > 0))}")
-    for k in SE.CONTRACT + SE.OPTIONAL:
-        if k not in F:
-            print(f"  {k:7s} absent")
-            continue
-        x = F[k]
-        print(f"  {k:7s} {str(x.shape):18s} {str(x.dtype):8s} [{SE.UNITS[k]:5s}] "
-              f"min {np.nanmin(x):11.4g}  mean {np.nanmean(x, dtype='f8'):11.4g}  "
-              f"max {np.nanmax(x):11.4g}  NaN {int(np.isnan(x).sum())}")
+    for run, paths in spec["runs"].items():
+        F = SE.load_run(spec, run)
+        p, lat, days = F["plev"], F["lat"], F["days"]
+        print(f"{spec['name']} / {run}: reader {spec['reader']}  {', '.join(paths)}")
+        print(f"  days  {days.size}  {days[0]} .. {days[-1]}")
+        print(f"  plev  {p.size} levels  {p.min():.4g} .. {p.max():.4g} hPa, ascending "
+              f"{bool(np.all(np.diff(p) > 0))}; inside 5-150 hPa: {int(((p >= 5) & (p <= 150)).sum())}")
+        print(f"  lat   {lat.size}  {lat.min():.3f} .. {lat.max():.3f}, ascending "
+              f"{bool(np.all(np.diff(lat) > 0))}")
+        for k in SE.CONTRACT + SE.OPTIONAL:
+            if k not in F:
+                print(f"  {k:7s} absent")
+                continue
+            x = F[k]
+            print(f"  {k:7s} {str(x.shape):18s} {str(x.dtype):8s} [{SE.UNITS[k]:5s}] "
+                  f"min {np.nanmin(x):11.4g}  mean {np.nanmean(x, dtype='f8'):11.4g}  "
+                  f"max {np.nanmax(x):11.4g}  NaN {int(np.isnan(x).sum())}")
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[1].strip())
-    ap.add_argument("names", nargs="*", help="sources to diagnose (default: all)")
-    ap.add_argument("--inspect", metavar="NAME", help="print the contract fields of a source")
+    ap.add_argument("sets", nargs="*", help="result sets to diagnose (default: all)")
+    ap.add_argument("--inspect", metavar="SET", help="print the contract fields of a set's runs")
     a = ap.parse_args()
     if a.inspect:
-        inspect(a.inspect)
+        inspect(SE.load_set(a.inspect))
         return
-    names = a.names or list(SE.SOURCES)
-    unknown = [n for n in names if n not in SE.SOURCES]
-    if unknown:
-        raise SystemExit(f"unknown source(s) {unknown}; registered: {list(SE.SOURCES)}")
-    os.makedirs(SE.OUTDIR, exist_ok=True)
-    for window in sorted({tuple(SE.SOURCES[n]["window"]) for n in names}):
-        R = references(window)
-        out = os.path.join(SE.OUTDIR, f"01_fields__references__{window[0]}-{window[1]}.json")
+    specs = [SE.load_set(s) for s in (a.sets or SE.set_names())]
+    refs = {}
+    for spec in specs:
+        window = tuple(spec["window"])
+        if window not in refs:
+            refs[window] = references(window)
+        R = refs[window]
+        out_dir = os.path.join(SE.OUTDIR, spec["name"])
+        os.makedirs(out_dir, exist_ok=True)
+        out = os.path.join(out_dir, "references.json")
         json.dump(dict(window=list(window), refs={k: SE.REFS[k] for k in SE.REFS},
                        **public(R)), open(out, "w"), indent=1)
         print(f"wrote {out}")
-        for n in [n for n in names if tuple(SE.SOURCES[n]["window"]) == window]:
-            res = diagnose(n, R)
-            out = os.path.join(SE.OUTDIR, f"01_fields__{n}.json")
+        for run in spec["runs"]:
+            res = diagnose(spec, run, R)
+            out = os.path.join(out_dir, f"{run}.json")
             json.dump(res, open(out, "w"), indent=1)
-            print(f"{n}: " + "  ".join(f"{m['id']} {m['model']:.3g}" for m in res["metrics"]))
+            print(f"{run}: " + "  ".join(f"{m['id']} {m['model']:.3g}" for m in res["metrics"]))
             print(f"wrote {out}")
 
 

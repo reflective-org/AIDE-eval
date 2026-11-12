@@ -15,7 +15,7 @@ stamped the same way, so the figures cannot drift from the reports:
     transport_wstar_profile    tropical (15S-15N) w* profile of each run against WACCM6
     transport_age_profile      tropical (10S-10N) entry-age profile of each run against
                                CLaMS (entry offset removed) and WACCM6 REF-D1
-  per set with a comparison (strat_eval_common.COMPARE)
+  per set with a comparison (02_scorecard.COMPARE)
     transport_window_comparison  one run in two windows, metric by metric, both
                                scorings, with the group scores
 
