@@ -1,0 +1,17 @@
+{
+  "description": "jcm-strat AL7h (T63 L95 stratosphere-only JCM, troposphere nudged to ERA5, AL7 T_eq correction at half amplitude), the continuous p25_AL7h chain 2006-2019: phase 29's 2006-2010 file and phase 31's 2011-2019 continuation, read as one record (same grid, joined day to day). Its T_eq correction was fitted on 2005-04..2008-01, inside the window. Read in place, never copied.",
+  "reader": "jcm_npz",
+  "window": [
+    2006,
+    2019
+  ],
+  "runs": {
+    "AL7h": [
+      "/data/JCM_stripped/jcm-strat-phase29/cache/variability/AL7h_0610.npz",
+      "/data/JCM_stripped/jcm-strat-phase31/cache/variability/AL7h_1119.npz"
+    ]
+  },
+  "notes": {
+    "AL7h": "AL7 correction at half amplitude (phase 25), continued to 2019 in the same configuration (phase 31)"
+  }
+}
