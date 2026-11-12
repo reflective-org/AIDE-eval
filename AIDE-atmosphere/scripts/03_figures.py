@@ -15,9 +15,6 @@ stamped the same way, so the figures cannot drift from the reports:
     transport_wstar_profile    tropical (15S-15N) w* profile of each run against WACCM6
     transport_age_profile      tropical (10S-10N) entry-age profile of each run against
                                CLaMS (entry offset removed) and WACCM6 REF-D1
-  per set with a comparison (02_scorecard.COMPARE)
-    transport_window_comparison  one run in two windows, metric by metric, both
-                               scorings, with the group scores
 
   03_figures.py [--date YYYY-MM-DD]
 """
@@ -44,11 +41,9 @@ RESULTS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 
 # Colours: one series hue (categorical slot 1) against neutral-ink references; a
 # blue - gray - red diverging ramp, lightness monotonic on each arm; status tints
-# only together with a symbol. The window comparison takes categorical slots 2
-# (in sample) and 1 (out of sample), as jcm-strat phase 31 does.
+# only together with a symbol.
 SURFACE, INK, INK2, GRID = "#fcfcfb", "#0b0b0b", "#52514e", "#dcdbd7"
 MODEL = "#2a78d6"
-IN_SAMPLE, OUT_SAMPLE = "#eb6834", "#2a78d6"
 REF1, REF2 = INK, "#8a8984"
 DIVERGING = ["#104281", "#256abf", "#6da7ec", "#b7d3f6", "#f0efec",
              "#f6c2c1", "#ec8584", "#cf4746", "#8f1f1f"]
@@ -314,120 +309,6 @@ def age_profile(res):
     save(fig, res["set_stamp"], "transport_age_profile.png")
 
 
-# --------------------------------------------------------------------- window comparison
-def window_comparison(res):
-    """One run in two windows: every metric as % off its reference (absolute metrics as a
-    fraction of their bound, bound = 25 %), which scoring scores it, and the group scores."""
-    cmp = res["comparison"]
-    ms = cmp["metrics"]
-    w_in, w_out = (f"{w[0]}-{w[1]}" for w in (cmp["windows"]["in"], cmp["windows"]["out"]))
-    lab_in, lab_out = cmp["labels"]
-    run_in, run_out = cmp["against"]["run"], cmp["run"]
-    # y positions with a gap between groups
-    y, pos, last = 0.0, [], None
-    for e in ms:
-        if last is not None and e["group"] != last:
-            y += 0.8
-        pos.append(y)
-        y += 1.0
-        last = e["group"]
-    pos = np.array(pos)
-    W, H = 12.6, 15.0
-    fig = plt.figure(figsize=(W, H))
-    top = title(fig, f"{run_in}: in sample ({w_in}) against out of sample ({w_out}, {run_out}), "
-                "every metric, % off its reference for the window's own years "
-                "(B: WACCM6 1996-2014 for both)", W)
-    LBL, MARK, PLOT = 4.4, 0.9, 4.3
-    tb_h = 2.3
-    y0 = (0.55 + tb_h + 0.45) / H
-    hgt = 1 - y0 - (top + 0.75) / H
-    ax = fig.add_axes([(LBL + MARK) / W, y0, PLOT / W, hgt])
-    ax.set_ylim(pos[-1] + 0.7, -0.7)
-    ax.set_xlim(-100, 100)
-    ax.axvspan(-37.5, 37.5, color=GRID, alpha=0.35, lw=0, zorder=0)
-    ax.axvspan(-25, 25, color=GRID, alpha=0.75, lw=0, zorder=0)
-    ax.axvline(0, color=INK2, lw=0.8, zorder=1)
-    for e, yy in zip(ms, pos):
-        a, b = (x_scaled(e["id"], e[k]["value"]) for k in ("in", "out"))
-        ax.plot([np.clip(a, -98, 98), np.clip(b, -98, 98)], [yy, yy], color=REF2, lw=1.0, zorder=2)
-        for v, col, k in ((a, IN_SAMPLE, "in"), (b, OUT_SAMPLE, "out")):
-            mk = "o" if abs(v) <= 98 else (">" if v > 0 else "<")
-            ax.plot(np.clip(v, -98, 98), yy, mk, ms=7, color=col, mec=SURFACE, mew=1.2, zorder=3,
-                    label=f"{run_in if k == 'in' else run_out}, {w_in if k == 'in' else w_out} "
-                          f"({lab_in if k == 'in' else lab_out})" if e is ms[0] else None)
-    ax.set_yticks([])
-    ax.set_xticks([-100, -75, -50, -25, 0, 25, 50, 75, 100])
-    ax.tick_params(axis="x", length=0)
-    ax.grid(axis="x", zorder=0)
-    for s in ("left", "right"):
-        ax.spines[s].set_visible(False)
-    ax.set_xlabel("% off the reference (absolute metrics [abs]: bound = 25 %); band: ±25 % "
-                  "pass, ±37.5 % near", fontsize=8, color=INK2)
-    # metric labels, scored marks and values: text columns in axes-fraction x
-    tr = ax.get_yaxis_transform()
-    fx = lambda inch: (inch - LBL - MARK) / PLOT
-    ax.text(fx(LBL + 0.2), -0.9, "ext", ha="center", va="bottom", fontsize=8, transform=tr,
-            fontweight="bold")
-    ax.text(fx(LBL + 0.6), -0.9, "red", ha="center", va="bottom", fontsize=8, transform=tr,
-            fontweight="bold")
-    ax.text(0.5, -0.9, "% off the reference", ha="center", va="bottom", fontsize=8,
-            transform=tr, fontweight="bold")
-    ax.text(fx(LBL + MARK + PLOT + 0.3), -0.9, f"{w_in}  →  {w_out}", ha="left", va="bottom",
-            fontsize=8, transform=tr, fontweight="bold")
-    for e, yy in zip(ms, pos):
-        lab = f"{e['id']}  {e['label']}"
-        if e["id"] in SE.ABS_BOUND:
-            lab += " [abs]"
-        ax.text(fx(0.1), yy, lab if len(lab) < 64 else lab[:61] + "…", ha="left", va="center",
-                fontsize=7.5, transform=tr, clip_on=False)
-        for xi, s in ((0.2, "extensive"), (0.6, "reduced")):
-            mark = ("✓" if e["scored"][s] else
-                    ("–" if e["id"] in SE.SCORINGS[s]["hidden"] else "◦"))
-            ax.text(fx(LBL + xi), yy, mark, ha="center", va="center", fontsize=8.5, transform=tr,
-                    color=INK if e["scored"][s] else INK2)
-        nd = 1 if e["unit"] == "%" else 2
-        u = "%" if e["unit"] == "%" else f" {e['unit']}"
-        vals = []
-        for k in ("in", "out"):
-            v = e[k]["value"]
-            vals.append(f"{v:+.{nd}f}{u} {STATUS[e[k]['status']][1]}")
-        ax.text(fx(LBL + MARK + PLOT + 0.3), yy, f"{vals[0]:>14s}  →  {vals[1]}", ha="left",
-                va="center", fontsize=7.5, transform=tr, family="DejaVu Sans Mono", color=INK)
-    ax.legend(loc="upper left", bbox_to_anchor=(-(LBL + MARK) / PLOT, 1 + 0.72 / (hgt * H)),
-              ncol=2, frameon=False, fontsize=8.5, handletextpad=0.3, columnspacing=1.5)
-    # group scores: a text table under the plot
-    G = cmp["groups"]
-    tb = fig.add_axes([0.01, 0.5 / H, 0.98, tb_h / H])
-    tb.axis("off")
-    tb.set_xlim(0, W)
-    tb.set_ylim(7.6, -0.6)
-    cols = [("extensive", "in"), ("extensive", "out"), ("reduced", "in"), ("reduced", "out")]
-    cx = [4.6, 6.0, 7.6, 9.0]
-    tb.text(0.1, -0.35, "Group scores (mean err of the scored metrics)", fontweight="bold", va="center")
-    for x, (s, k) in zip(cx, cols):
-        tb.text(x, 0.55, f"{s}\n{w_in if k == 'in' else w_out}", ha="center", va="center",
-                fontsize=8, color=IN_SAMPLE if k == "in" else OUT_SAMPLE, fontweight="bold")
-    rows = GROUP_ROWS + [("passed", "passed A-C"), ("D_passed", "passed D")]
-    for i, (key, lab) in enumerate(rows):
-        yy = 1.6 + i * 0.85
-        tb.text(0.1, yy, lab, va="center", fontweight="bold" if key == "combined" else "normal")
-        for x, (s, k) in zip(cx, cols):
-            g = G[s][k]
-            if key in ("passed", "D_passed"):
-                tot = g["total"] if key == "passed" else g["D_total"]
-                tb.text(x, yy, f"{g[key]} / {tot}", ha="center", va="center", color=INK2)
-                continue
-            col, sym = STATUS[SE.status(g[key])]
-            tb.add_patch(plt.Rectangle((x - 0.6, yy - 0.38), 1.2, 0.76, color=col, alpha=0.22, lw=0))
-            tb.text(x, yy, f"{g[key]:.2f} {sym}", ha="center", va="center",
-                    fontweight="bold" if key == "combined" else "normal")
-    tb.text(10.1, 1.25, "ext / red: ✓ scored, ◦ listed\nbut not scored, – not part of\nthe "
-            "scoring\n\n✓ pass (err ≤ 1)\n~ near (≤ 1.5)   ✗ fail (> 1.5)\n\n"
-            "triangles at the axis edge:\nbeyond ±100 %", va="top", fontsize=7.5, color=INK2)
-    footer(fig, res)
-    save(fig, res["set_stamp"], "transport_window_comparison.png")
-
-
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[1].strip())
     ap.add_argument("--date", help="production date of the scorecards to draw (default: the newest)")
@@ -448,8 +329,6 @@ def main():
         drawn.add(res["set_stamp"])
         wstar_profile(res)
         age_profile(res)
-        if res.get("comparison"):
-            window_comparison(res)
 
 
 if __name__ == "__main__":

@@ -16,8 +16,6 @@ Every result set (sources/<set>.json) is scored twice (strat_eval_common.SCORING
   extensive  the 34 metrics of the phase-29 scorecard
   reduced    jcm-strat phase 31's scored set: A2-WACCM for A2, 14 metrics shown but
              not scored
-A set listed in COMPARE below also gets a run-by-run comparison with
-one run of another set (AL7h 2011-2019 against AL7h 2006-2010), both scorings.
 
   02_scorecard.py [SET ...] [--scoring extensive|reduced]
                                          default: every set, both scorings
@@ -64,13 +62,6 @@ FIGURES = [
     ("transport_age_profile.png", "set", "tropical entry-age profiles against CLaMS and WACCM6"),
 ]
 SUMMARY = {"extensive": "SCORING_EXTENSIVE.md", "reduced": "SCORING_REDUCED.md"}
-# A set compared run by run with one run of another set: AL7h out of sample
-# (2011-2019) against AL7h in sample (2006-2010).
-COMPARE = {"jcm-strat-phase31-AL7h-2011-2019": dict(
-    run="AL7h_1119", against=("jcm-strat-phase29-2006-2010", "AL7h"),
-    labels=("in sample", "out of sample"))}
-COMPARE_FIGURE = ("transport_window_comparison.png", "set",
-                  "AL7h metric by metric, in sample against out of sample, both scorings")
 
 
 def stamp_for(*parts):
@@ -132,31 +123,6 @@ def score_all(P, names, scoring):
     return rows, scores
 
 
-def comparison(set_name, P):
-    """One run of this set against one run of another set, every metric of either
-    scoring, and the group scores of both runs under both scorings."""
-    cfg = COMPARE[set_name]
-    other_set, other = cfg["against"]
-    pair = {"in": other, "out": cfg["run"]}
-    Q = {k: P[n] for k, n in pair.items()}
-    metrics = []
-    for m0 in Q["out"]["metrics"]:
-        mid = m0["id"]
-        e = dict(id=mid, group=m0["group"], label=m0["label"],
-                 unit=SE.ABS_UNIT.get(mid, "deg") if mid in SE.ABS_BOUND else "%",
-                 scored={s: mid not in d["hidden"] and mid not in d["unscored"]
-                         for s, d in SE.SCORINGS.items()})
-        for k in pair:
-            m = next(x for x in Q[k]["metrics"] if x["id"] == mid)
-            val, err = SE.score(mid, m["model"], m["ref"])
-            e[k] = dict(model=m["model"], ref=m["ref"], value=val, err=err, status=SE.status(err))
-        metrics.append(e)
-    groups = {s: {k: score_all({pair[k]: Q[k]}, [pair[k]], s)[1][0] for k in pair}
-              for s in SE.SCORINGS}
-    return dict(run=cfg["run"], against=dict(set=other_set, run=other), labels=list(cfg["labels"]),
-                windows={k: Q[k]["window"] for k in pair}, metrics=metrics, groups=groups)
-
-
 def fmt_value(c, unit):
     if not np.isfinite(c["value"]):
         return f"{SYMBOL[c['status']]} n/a"
@@ -172,40 +138,6 @@ def metric_table(rows, names, scored):
             continue
         L.append(f"| **{r['id']}** {r['label']} | {r['reference']} | {r['basis']} | " + " | ".join(
             fmt_value(r["runs"][n], r["unit"]) for n in names) + " |")
-    return L
-
-
-def comparison_md(cmp):
-    lab_in, lab_out = cmp["labels"]
-    w_in, w_out = (f"{w[0]}-{w[1]}" for w in (cmp["windows"]["in"], cmp["windows"]["out"]))
-    run_in, run_out = cmp["against"]["run"], cmp["run"]
-    L = ["", f"## {run_in} {w_in} ({lab_in}) against {run_out} {w_out} ({lab_out})", "",
-         f"`{run_in}` is scored in the set `{cmp['against']['set']}`; references follow each "
-         "window (B: WACCM6 1996–2014 for both). Group scores under both scorings:", "",
-         f"| | extensive {w_in} | extensive {w_out} | reduced {w_in} | reduced {w_out} |",
-         "|---|---|---|---|---|"]
-    G = cmp["groups"]
-    for k, lab in GROUPS:
-        cells = [G[s][w][k] for s in ("extensive", "reduced") for w in ("in", "out")]
-        L.append(f"| {lab} | " + " | ".join(
-            (f"**{c:.2f}**" if k == "combined" else f"{c:.2f}") for c in cells) + " |")
-    for k, tot, lab in (("passed", "total", "passed A-C"), ("D_passed", "D_total", "passed D")):
-        L.append(f"| {lab} | " + " | ".join(f"{G[s][w][k]} / {G[s][w][tot]}"
-                                            for s in ("extensive", "reduced") for w in ("in", "out")) + " |")
-    L += ["", "Metric by metric: % off the reference (absolute metrics in their own unit). "
-          "Scored: ✓ in the scoring's group scores, ◦ listed but not scored, – not part of it. "
-          "Change: out of sample − in sample, in % points (or the unit).", "",
-          f"| metric | extensive | reduced | reference {w_in} | {w_in} | reference {w_out} | {w_out} | change |",
-          "|---|---|---|---|---|---|---|---|"]
-    for e in cmp["metrics"]:
-        mark = {s: ("✓" if e["scored"][s] else ("–" if e["id"] in SE.SCORINGS[s]["hidden"] else "◦"))
-                for s in SE.SCORINGS}
-        d = e["out"]["value"] - e["in"]["value"]
-        nd = 1 if e["unit"] == "%" else 2
-        L.append(f"| **{e['id']}** {e['label']} | {mark['extensive']} | {mark['reduced']} | "
-                 f"{ref_text(e['in']['ref'])} | {fmt_value(e['in'], e['unit'])} | "
-                 f"{ref_text(e['out']['ref'])} | {fmt_value(e['out'], e['unit'])} | "
-                 f"{d:+.{nd}f} |")
     return L
 
 
@@ -261,10 +193,8 @@ def markdown(res, P, R):
           "- **C1, C2** ERA5 monthly zonal means of the same months, on each model's grid",
           f"- **D1–D6** ERA5 CDS daily zonal means {D['years'][0]}–{D['years'][-1]}; **D7** CLaMS "
           "v3.1 monthly age at 55 hPa, same years"]
-    if res.get("comparison"):
-        L += comparison_md(res["comparison"])
     L += ["", "## Figures", ""]
-    figs = FIGURES + ([COMPARE_FIGURE] if res.get("comparison") else [])
+    figs = FIGURES
     L += [f"- `{stamped(f, res['stamp'] if kind == 'scoring' else res['set_stamp'])}` — {d}"
           for f, kind, d in figs]
     L += ["", "Method, contract and decisions: `docs/TRANSPORT_SCORECARD.md`. Agreement with "
@@ -278,7 +208,7 @@ def link(name):
 
 def summary_md(scoring, results):
     """One page per scoring over every result set: what is scored, the group scores,
-    the metrics that pass or fail in every run, the AL7h window comparison, links."""
+    the metrics that pass or fail in every run, links."""
     first = next(iter(results.values()))
     rows0 = first["rows"]
     L = [f"# Transport scorecard — {scoring} scoring", "",
@@ -324,23 +254,6 @@ def summary_md(scoring, results):
         L.append(f"- Report: {link(stamped('transport_scorecard.md', res['stamp']))}; figures "
                  f"{link(stamped('transport_score_table.png', res['stamp']))}, "
                  f"{link(stamped('transport_heatmap.png', res['stamp']))}")
-        cmp = res.get("comparison")
-        if cmp:
-            G = cmp["groups"][scoring]
-            (lab_in, lab_out), wi, wo = cmp["labels"], cmp["windows"]["in"], cmp["windows"]["out"]
-            L += ["", f"### {cmp['run']} against {cmp['against']['run']}: {lab_in} "
-                  f"{wi[0]}–{wi[1]} vs {lab_out} {wo[0]}–{wo[1]}", "",
-                  f"| | {wi[0]}–{wi[1]} | {wo[0]}–{wo[1]} |", "|---|---|---|"]
-            for k, lab in GROUPS:
-                f = (lambda x: f"**{x:.2f}**") if k == "combined" else (lambda x: f"{x:.2f}")
-                L.append(f"| {lab} | {f(G['in'][k])} | {f(G['out'][k])} |")
-            L.append(f"| passed A-C | {G['in']['passed']} / {G['in']['total']} | "
-                     f"{G['out']['passed']} / {G['out']['total']} |")
-            changed = [e["id"] for e in cmp["metrics"] if e["scored"][scoring]
-                       and e["in"]["status"] != e["out"]["status"]]
-            L += ["", f"- Scored metrics changing status: {', '.join(changed) if changed else 'none'}",
-                  f"- Metric by metric: {link(stamped('transport_scorecard.md', res['stamp']))}; figure "
-                  f"{link(stamped(COMPARE_FIGURE[0], res['set_stamp']))}"]
     return "\n".join(L) + "\n"
 
 
@@ -357,13 +270,8 @@ def main():
     for set_name in sets:
         spec = SE.load_set(set_name)
         names, window = list(spec["runs"]), spec["window"]
-        run_json = lambda s, n: json.load(open(os.path.join(SE.OUTDIR, s, f"{n}.json")))
-        P = {n: run_json(set_name, n) for n in names}
-        if set_name in COMPARE:
-            other_set, other = COMPARE[set_name]["against"]
-            P[other] = run_json(other_set, other)
+        P = {n: json.load(open(os.path.join(SE.OUTDIR, set_name, f"{n}.json"))) for n in names}
         R = json.load(open(os.path.join(SE.OUTDIR, set_name, "references.json")))
-        cmp = comparison(set_name, P) if set_name in COMPARE else None
         for scoring in scorings:
             rows, scores = score_all(P, names, scoring)
             res = dict(name=set_name, scoring=scoring, produced=produced,
@@ -373,7 +281,7 @@ def main():
                        scoring_definition={k: list(v) for k, v in SE.SCORINGS[scoring].items()},
                        wstar_estimator="jcm-strat Psi* route, log-p interpolated; interim "
                                        "(AIDE-eval issue #5)",
-                       rows=rows, scores=scores, comparison=cmp,
+                       rows=rows, scores=scores,
                        profiles={n: P[n]["profiles"] for n in names},
                        references=R)
             out_j = os.path.join(RESULTS, stamped("transport_scorecard.json", res["stamp"]))
