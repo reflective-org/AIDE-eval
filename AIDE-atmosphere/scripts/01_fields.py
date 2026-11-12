@@ -566,7 +566,7 @@ def main():
         out_dir = os.path.join(SE.OUTDIR, spec["name"])
         os.makedirs(out_dir, exist_ok=True)
         out = os.path.join(out_dir, "references.json")
-        json.dump(dict(window=list(window), refs={k: SE.REFS[k] for k in SE.REFS},
+        json.dump(dict(window=list(window), refs={k: SE.portable(v) for k, v in SE.REFS.items()},
                        **public(R)), open(out, "w"), indent=1)
         print(f"wrote {out}")
         for run in spec["runs"]:

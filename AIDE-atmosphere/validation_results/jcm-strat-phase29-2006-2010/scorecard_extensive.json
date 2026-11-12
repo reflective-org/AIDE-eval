@@ -5058,8 +5058,8 @@
    "clams_member": "clams_v3.1_era5_zm_lat_press_{year}.nc",
    "waccm_aoa": "/data/CESM2_REFD1_AOA/AoA_waccm6_refd1.04_AOA1mf_1970-2019_ba_0_100.0_ck_0_50.0.nc",
    "waccm_tem_segment": "1996-2014",
-   "era5_zm_monthly": "/data/AIDE-eval-strat-transport/AIDE-atmosphere/data/era5/era5_zm_monthly_{year}.nc",
-   "era5_daily": "/data/AIDE-eval-strat-transport/AIDE-atmosphere/data/era5/era5_{year}.npz"
+   "era5_zm_monthly": "AIDE-atmosphere/data/era5/era5_zm_monthly_{year}.nc",
+   "era5_daily": "AIDE-atmosphere/data/era5/era5_{year}.npz"
   },
   "A": {
    "years": [

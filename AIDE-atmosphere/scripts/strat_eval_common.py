@@ -49,6 +49,13 @@ FILL_SENTINEL = 1e20     # anything larger is the 1e35 below-surface sentinel
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUTDIR = os.path.join(_ROOT, "output")
 
+
+def portable(path):
+    """A path inside this repository relative to the repository root, so that JSON written
+    from any checkout is identical; any other path unchanged."""
+    repo = os.path.dirname(_ROOT)
+    return os.path.relpath(path, repo) if path.startswith(repo + os.sep) else path
+
 DAYS_PER_YEAR = 365.25          # the jcm-strat clocks count days; the contract asks years
 
 # --------------------------------------------------------------------- references
