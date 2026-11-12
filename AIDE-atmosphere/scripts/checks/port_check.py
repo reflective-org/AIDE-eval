@@ -1,8 +1,8 @@
 """
-22b - Check the ported transport diagnostics against jcm-strat's own numbers.
+port_check - Check the ported diagnostics against jcm-strat's own numbers.
 
-Evidence, not a pipeline stage (like 01b-01d): it feeds nothing. It reads the
-per-run output of 22 and jcm-strat's phase-29 and phase-31 results, and writes the
+Evidence, not a pipeline stage: it feeds nothing. It reads the
+per-run output of 01 and jcm-strat's phase-29 and phase-31 results, and writes the
 difference tables validation_results/transport/port_check.md:
 
   1. phase 29: the eight runs, 2006-2010, group A at phase 29's 2005-2009 age years
@@ -12,7 +12,7 @@ difference tables validation_results/transport/port_check.md:
   3. what the age-reference switch 2005-2009 -> 2006-2010 changes in the eight runs'
      A metrics and group scores, both scorings
 
-  22b_transport_port_check.py [NAME ...]     default: the phase-29 set of strat_eval_common.SETS
+  checks/port_check.py [NAME ...]     default: the phase-29 set of strat_eval_common.SETS
 
 Two jcm-strat files are compared against:
   relative_metrics.json  the scored value (% off the reference, or the absolute
@@ -42,10 +42,11 @@ import sys
 
 import numpy as np
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # scripts/
+sys.path.insert(0, HERE)
 import strat_eval_common as SE
 
-RESULTS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+RESULTS = os.path.join(os.path.dirname(HERE),
                        "validation_results", "transport")
 REL_LIMIT = 0.005
 ROUNDING = {"C1": 0.05, "C2": 0.005}          # half the last digit teq_score.py keeps
@@ -97,7 +98,7 @@ def fmt(x, nd=2):
 
 
 def load(names):
-    P = {n: json.load(open(os.path.join(SE.OUTDIR, f"22_transport__{n}.json"))) for n in names}
+    P = {n: json.load(open(os.path.join(SE.OUTDIR, f"01_fields__{n}.json"))) for n in names}
     S = json.load(open(SE.JCM_STRAT_SUCCESS))
     R = {r["id"]: r for r in json.load(open(SE.JCM_STRAT_RELATIVE))["rows"]}
     J = {n: {m["id"]: m for m in S[n]["metrics"] + S[n].get("D_metrics", [])} for n in names}
@@ -180,23 +181,23 @@ def interpolation_table(g, names, P):
 
 def module(name):
     spec = importlib.util.spec_from_file_location(
-        name[:3], os.path.join(os.path.dirname(os.path.abspath(__file__)), name))
+        "m" + name[:2], os.path.join(HERE, name))
     m = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(m)
     return m
 
 
-def module_22():
-    return module("22_transport_fields.py")
+def module_01():
+    return module("01_fields.py")
 
 
 def phase29_age(names, P):
     """Replace each run's group A by A against the 2005-2009 age references."""
-    m22 = module_22()
-    R = m22.references_A(SE.years_of(SE.JCM_STRAT_P29_AGE_YEARS))
+    m01 = module_01()
+    R = m01.references_A(SE.years_of(SE.JCM_STRAT_P29_AGE_YEARS))
     for n in names:
         F = SE.load_source(n, SE.years_of(SE.SOURCES[n]["window"]))
-        rows, _ = m22.group_A(F, R)
+        rows, _ = m01.group_A(F, R)
         P[n]["metrics"] = rows + [m for m in P[n]["metrics"] if m["group"] != "A"]
     return R
 
@@ -269,7 +270,7 @@ def phase31(P):
 def switch(names, P_old, P_new, off_old):
     """Part 3: A metrics and group scores of each run with the age references of
     2005-2009 (jcm-strat phase 29) against those of 2006-2010 (the scorecard)."""
-    m23 = module("23_transport_scorecard.py")
+    m02 = module("02_scorecard.py")
     y0, y1 = SE.JCM_STRAT_P29_AGE_YEARS
     w = P_new[names[0]]["window"]
     L = ["", f"## Part 3 - age references {y0}-{y1} → {w[0]}-{w[1]}", "",
@@ -280,7 +281,7 @@ def switch(names, P_old, P_new, off_old):
     L += ["| metric | " + f"{y0}-{y1} | {w[0]}-{w[1]} |", "|---|---|---|"]
     for mid in ("A1", "A3", "A4"):
         L.append(f"| {mid} | {ref(P_old, mid):.4g} | {ref(P_new, mid):.4g} |")
-    w_refs = json.load(open(os.path.join(SE.OUTDIR, f"22_transport__references__{w[0]}-{w[1]}.json")))
+    w_refs = json.load(open(os.path.join(SE.OUTDIR, f"01_fields__references__{w[0]}-{w[1]}.json")))
     L.append(f"| A2: CLaMS 10S-10N age at 150 hPa, subtracted [yr] | {off_old:.4f} | "
              f"{w_refs['A']['clams_offset_150']:.4f} |")
     L.append("| A2, A2-WACCM: 2-D CLaMS / WACCM6 fields | mean of the years | mean of the years |")
@@ -299,7 +300,7 @@ def switch(names, P_old, P_new, off_old):
     L += ["", "Group A and combined A-C score per run, both scorings:", "",
           "| run | A extensive | combined extensive | A reduced | combined reduced |",
           "|---|---|---|---|---|"]
-    S = {(s, k): {x["run"]: x for x in m23.score_all(Q, names, s)[1]}
+    S = {(s, k): {x["run"]: x for x in m02.score_all(Q, names, s)[1]}
          for s in SE.SCORINGS for k, Q in (("old", P_old), ("new", P_new))}
     big = 0.0
     for n in names:
@@ -328,7 +329,7 @@ def c_frame_shift(names, P, J):
     The month's mean changes by (x[00Z, day 1 of next month] - x[00Z, day 1]) / n_frames.
     The 00Z frames are not in the daily files; the mean of the two daily values either
     side of each stands in for it (the first and last day of the record at the edges)."""
-    m22 = module_22()
+    m01 = module_01()
     L = ["", "Expected effect of the one-frame-per-month shift on C2 against the observed "
          "difference (port - jcm-strat; jcm-strat rounds C2 to 0.01 K, so the observed value "
          "carries +-0.005 K) [K]:", "",
@@ -343,7 +344,7 @@ def c_frame_shift(names, P, J):
         keys = np.unique(ym)
         mon = np.array([int(str(k)[5:7]) for k in keys])
         cells = []
-        for h, (months, sign) in m22.WINTER.items():
+        for h, (months, sign) in m01.WINTER.items():
             cap = sign * lat >= 60
             w = np.cos(np.deg2rad(lat[cap]))
             tc = (F["T"][:, k50][:, cap] * w).sum(1, dtype="f8") / w.sum()
@@ -356,7 +357,7 @@ def c_frame_shift(names, P, J):
             obs = next(x for x in P[n]["metrics"] if x["id"] == f"C2-{h}")["model"] - J[n][f"C2-{h}"]["model"]
             cells += [f"{obs:+.3f}", f"{np.mean(sh):+.3f}"]
         L.append(f"| {n} | " + " | ".join(cells) + " |")
-        keys_m, U = m22.monthly(F["Uzm"], days)
+        keys_m, U = m01.monthly(F["Uzm"], days)
         sel = np.array([k[1] for k in keys_m])
         for mid in [x["id"] for x in P[n]["metrics"] if x["id"].startswith("C1") and x["id"].endswith("-lat")]:
             pm = next(x for x in P[n]["metrics"] if x["id"] == mid)["model"]
@@ -364,7 +365,7 @@ def c_frame_shift(names, P, J):
             if agrees(mid, pm, jm):
                 continue
             lev, h = mid[6:8], mid[9]
-            months, _ = m22.WINTER[h]
+            months, _ = m01.WINTER[h]
             um = U[np.isin(sel, months)].mean(0)[SE.nearest_level(p, float(lev))]
             jj = int(np.argmin(np.abs(lat - jm)))
             jp = int(np.argmin(np.abs(lat - pm)))
@@ -388,8 +389,8 @@ def main():
     R29 = phase29_age(names, P)                   # group A against 2005-2009
     groups = [g for g in "ABCD" if any(m["group"] == g for m in P[names[0]]["metrics"])]
     L = ["# Port check: transport diagnostics against jcm-strat phases 29 and 31", "",
-         f"Generated by `scripts/22b_transport_port_check.py` on {datetime.date.today()} from "
-         "`output/22_transport__<run>.json`. Do not edit by hand.", "",
+         f"Generated by `scripts/checks/port_check.py` on {datetime.date.today()} from "
+         "`output/01_fields__<run>.json`. Do not edit by hand.", "",
          f"- jcm-strat: `{SE.JCM_STRAT_RELATIVE}` and `{SE.JCM_STRAT_SUCCESS}`",
          f"- Runs: {', '.join(names)}; window {window[0]}-{window[1]}",
          f"- Group A against CLaMS and WACCM6 age references of {SE.JCM_STRAT_P29_AGE_YEARS[0]}-"
@@ -408,7 +409,7 @@ def main():
         if NOTES[g]:
             L += ["", "Causes of the remaining differences:", ""] + [f"- {x}" for x in NOTES[g]]
         L.append("")
-    P31 = {n: json.load(open(os.path.join(SE.OUTDIR, f"22_transport__{n}.json")))
+    P31 = {n: json.load(open(os.path.join(SE.OUTDIR, f"01_fields__{n}.json")))
            for n in SE.JCM_STRAT_P31_RUNS}
     L += phase31(P31)
     L += switch(names, P, P_window, R29["clams_offset_150"])

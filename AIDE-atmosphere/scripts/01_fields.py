@@ -1,14 +1,14 @@
 """
-22 - Read a source's transport fields and compute the transport diagnostics.
+01 - Read a source's fields and compute the scorecard diagnostics.
 
 The first stage of the transport scorecard (docs/TRANSPORT_SCORECARD.md). A
 source is read through strat_eval_common.READERS into the field contract of
 section 1 of that document, then reduced to the metrics of groups A-D, each
-beside its reference. Scoring is 23's; this script only measures.
+beside its reference. Scoring is 02's; this script only measures.
 
-  22_transport_fields.py [NAME ...]          diagnose the named sources (default:
+  01_fields.py [NAME ...]                    diagnose the named sources (default:
                                              every registered source), one at a time
-  22_transport_fields.py --inspect NAME      shapes, units and ranges of the
+  01_fields.py --inspect NAME                shapes, units and ranges of the
                                              contract fields, nothing written
 
 Each source is diagnosed over its own window (strat_eval_common.SOURCES). The
@@ -17,8 +17,8 @@ window's years (CLaMS, WACCM6 entry age, ERA5), except the WACCM6 TEM reference
 of group B, which is 1996-2014 for every window, and written beside the
 per-source results.
 
-Output: output/22_transport__references__<Y0>-<Y1>.json   one per window
-        output/22_transport__<NAME>.json                  one per source
+Output: output/01_fields__references__<Y0>-<Y1>.json   one per window
+        output/01_fields__<NAME>.json                  one per source
 """
 
 import argparse
@@ -566,13 +566,13 @@ def main():
     os.makedirs(SE.OUTDIR, exist_ok=True)
     for window in sorted({tuple(SE.SOURCES[n]["window"]) for n in names}):
         R = references(window)
-        out = os.path.join(SE.OUTDIR, f"22_transport__references__{window[0]}-{window[1]}.json")
+        out = os.path.join(SE.OUTDIR, f"01_fields__references__{window[0]}-{window[1]}.json")
         json.dump(dict(window=list(window), refs={k: SE.REFS[k] for k in SE.REFS},
                        **public(R)), open(out, "w"), indent=1)
         print(f"wrote {out}")
         for n in [n for n in names if tuple(SE.SOURCES[n]["window"]) == window]:
             res = diagnose(n, R)
-            out = os.path.join(SE.OUTDIR, f"22_transport__{n}.json")
+            out = os.path.join(SE.OUTDIR, f"01_fields__{n}.json")
             json.dump(res, open(out, "w"), indent=1)
             print(f"{n}: " + "  ".join(f"{m['id']} {m['model']:.3g}" for m in res["metrics"]))
             print(f"wrote {out}")

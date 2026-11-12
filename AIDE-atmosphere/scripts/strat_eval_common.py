@@ -75,15 +75,15 @@ REFS = dict(
 # only one, whatever the window.
 WACCM_TEM_YEARS = (1996, 2014)   # all of the 1996-2014 h6 segment
 JCM_STRAT_P29_AGE_YEARS = (2005, 2009)   # jcm-strat phase 29's age reference years
-                                 # (sweep_score.CLAMS_YEARS); 22b only, for the port check
+                                 # (sweep_score.CLAMS_YEARS); checks/port_check.py only
 WACCM_ILEV = slice(0, 61)        # h6 interfaces from the model top to 652 hPa: Psi* is
                                  # integrated from the top, so the top is kept
-# jcm-strat's own phase-29 result, for the port check only (22b)
+# jcm-strat's own phase-29 result, for checks/port_check.py only
 JCM_STRAT_OUT = "/data/JCM_stripped/jcm-strat-phase29/docs/outputs/29_lqbo10d"
 JCM_STRAT_RELATIVE = os.path.join(JCM_STRAT_OUT, "relative", "relative_metrics.json")
 JCM_STRAT_SUCCESS = os.path.join(JCM_STRAT_OUT, "success_0610", "success_metrics.json")
 # jcm-strat phase 31 (AL7h 2006-2010 and 2011-2019, age references of the window's
-# years) and the phase-30 group D of AL7h 2006-2010 that phase 31 reports; 22b only
+# years) and the phase-30 group D of AL7h 2006-2010 that phase 31 reports; port check only
 JCM_STRAT_P31 = "/data/JCM_stripped/jcm-strat-phase31/docs/outputs/31_al7h_validation"
 JCM_STRAT_P31_RUNS = {   # port source: (success_<tag> directory, group D file)
     "AL7h": ("success_0610", "/data/JCM_stripped/jcm-strat-phase30/docs/outputs/"
@@ -170,7 +170,7 @@ SOURCES["AL7h_1119"] = dict(
     long_name="jcm-strat AL7h (T63 L95), 2011-2019",
     note="AL7h continued to 2019 in the same configuration (phase 31); out of sample")
 
-# Result sets: runs scored together over one window, one scorecard each (23, 24).
+# Result sets: runs scored together over one window, one scorecard each (02, 03).
 SETS = {"jcm-strat-phase29-2006-2010": tuple(_RUNS),
         "jcm-strat-phase31-AL7h-2011-2019": ("AL7h_1119",)}
 # A set compared run by run with one run of another set: AL7h out of sample

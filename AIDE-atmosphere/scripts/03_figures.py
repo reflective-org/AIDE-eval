@@ -1,5 +1,5 @@
 """
-24 - Figures of the transport scorecard.
+03 - Figures of the scorecard.
 
 Reads the transport_scorecard__<set>__<scoring>__<date>.json files of one production
 date (the newest, or the one named with --date) and writes the PNGs beside them,
@@ -19,7 +19,7 @@ stamped the same way, so the figures cannot drift from the reports:
     transport_window_comparison  one run in two windows, metric by metric, both
                                scorings, with the group scores
 
-  24_transport_figures.py [--date YYYY-MM-DD]
+  03_figures.py [--date YYYY-MM-DD]
 """
 
 import argparse
@@ -77,7 +77,7 @@ def window_text(res):
 def footer(fig, res):
     """Source line at the bottom, broken at its separators if the figure is narrow."""
     parts = [f"transport_scorecard__{res['stamp']}.json", "w* interim (AIDE-eval issue #5)",
-             "scripts/24_transport_figures.py"]
+             "scripts/03_figures.py"]
     width = int(fig.get_figwidth() * 72 / (0.55 * 7))
     lines = [parts[0]]
     for q in parts[1:]:
@@ -436,7 +436,7 @@ def main():
     dates = sorted({re.search(r"__(\d{4}-\d{2}-\d{2})\.json$", f).group(1) for f in found})
     if not dates:
         raise SystemExit(f"no transport_scorecard__<set>__<scoring>__<date>.json in {RESULTS}; "
-                         "run 23_transport_scorecard.py first")
+                         "run 02_scorecard.py first")
     date = a.date or dates[-1]
     drawn = set()
     for f in [f for f in found if f.endswith(f"__{date}.json")]:
