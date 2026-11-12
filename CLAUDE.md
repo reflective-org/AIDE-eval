@@ -56,144 +56,99 @@ For multi-step tasks, state a brief plan:
 
 ## What this repo is
 
-A derivation suite for the **two-tier evaluation protocol**, not a model. It measures
-CESM2.1.5-WACCM6 fixed-SST output and produces the thresholds an AIDE-WACCM emulator
-rollout must meet for tropical upwelling and the polar vortex. The thresholds are
-CESM-vs-CESM. Scored against them so far: four reanalyses (monthly, four diagnostics) and the
-`jcm-strat` phase-10 rollout 1990–2019 (daily, every diagnostic), each in its own folder
-under `validation_results/`. No AIDE-WACCM emulator rollout has been scored yet.
+The **standard evaluation of stratospheric dynamics** for AIDE models: one scorecard of age
+of air (A), residual circulation (B), polar vortex (C) and variability (D), each metric
+scored as its relative deviation from CLaMS, WACCM6 or ERA5 for the same years. It is the
+jcm-strat relative scorecard (phase 29) with phase 31's scored set as the headline,
+ported here; the diagnostics are recomputed from daily zonal means.
 
-Authoritative outputs: `output/16_anchors_45yr.json` (the thresholds, both tiers anchored on
-CESM 1970–2014) and `output/17_validation__<stamp>.json` (a scored climate model).
-The protocol is `docs/EVALUATION_PROTOCOL.md`, and it is self-contained — thresholds,
-derivation (appendix A), decisions (appendix B) and limitations (appendix C) in one file.
-`validation_results/` holds a scored climate model as `validation_result__<stamp>.md` plus seven figures,
-all generated from the same JSON, so they cannot drift apart. One subfolder per non-CESM
-source (`ERA5/`, `ERA-Interim/`, `JRA-55/`, `MERRA-2/`), written by the same `17`/`18`.
-
-The repo was trimmed to this protocol on 2026-08-19. Removed and **not retained**: the
-target table and CSV, the observability and mechanism diagnostics, the explainer and 10-year
-scorecard PDFs, and the separate decision/concepts/tolerance/deferred documents. Do not
-re-derive any of it without asking.
-
-Superseded but **kept**, in `stale/`: the split-anchor threshold scripts `14` and `15`, the
-screening figure, and the 23 pp technical report. `14` and `15` still run
-(`PYTHONPATH=../scripts`) and are cited by §2 of the protocol as the out-of-sample evidence
-the 45-year anchor cannot re-earn. Do not treat any number in `stale/` as current, and do not
-resurrect either script into the pipeline without asking.
-
-Two things were restored after the trim:
-
-- **`scripts/01*`** — the convention evidence (below). Runnable: they read only the tape.
-- **`stale/AIDE_WACCM_validation_targets.pdf`** — the 23 pp technical report, the first PDF
-  the project produced. **Frozen, not regenerable**: the script that built it needed JSON
-  from five diagnostics no longer in the repo. It is a historical record of the 10/20-year
-  target suite, not a live artefact, and its thresholds are superseded by the tier protocol.
-  Do not cite its numbers as current; do not hand-edit it; this is the one artefact in the
-  repo that does not match code that can rebuild it.
+- Protocol: `docs/EVALUATION_PROTOCOL.md` (window, contract, metrics, references, scoring,
+  open issues, how to evaluate a model, results, limitations).
+- Code and data flow: `docs/ARCHITECTURE.md`. Decisions: `docs/DECISIONS.md` (settled and
+  unconfirmed). Deferred and open: `docs/DEFERRED.md`. Status: `docs/PROGRESS.md`.
+- **Standard window 2006–2019.** Any other window is scored against references of its own
+  years and flagged "non-standard window (N of 14 standard years)".
+- **Two scorings**: **standard** (= jcm-strat phase 31's set, the former "reduced"; the
+  headline and ranking) and **extensive** (the 34 phase-29 metrics, the full listing).
+- Scored: `jcm-strat-AL7h-2006-2019` (standard window) and `jcm-strat-phase29-2006-2010`
+  (seven runs, non-standard). No AIDE-WACCM emulator rollout scored yet.
+- The two-tier CESM-anchored protocol this repo held until 2026-11-12 is superseded; do not
+  re-derive or cite its thresholds.
 
 ## Repository layout
 
 Only `README.md`, `CLAUDE.md`, `LICENSE`, `requirements.txt`, `.gitignore` and the
-gitignored `.AIDE-eval_env/` sit at the repo root. Everything else — `scripts/`, `docs/`,
-`output/`, `logs/`, `stale/`, `validation_results/` — is under **`AIDE-atmosphere/`**, and
-every bare path in this file is relative to it.
+gitignored `.AIDE-eval_env/` sit at the repo root. Everything else is under
+**`AIDE-atmosphere/`**; bare paths below are relative to it.
+
+| Path | Content |
+|---|---|
+| `sources/<set>.json` | one result set: description, reader, window, runs (path or list of paths), optional notes |
+| `scripts/strat_eval_common.py` | shared constants, `REFS`, h6 loader, contract, set registry, readers, scoring, TEM math |
+| `scripts/01_fields.py`, `02_scorecard.py`, `03_figures.py` | measure → score → draw; `evaluate.py <set> [...]` runs all three |
+| `scripts/checks/port_check.py` | evidence against jcm-strat phases 29 and 31; outside the chain |
+| `scripts/copy_era5_refs.sh`, `era5_refs.sha256` | ERA5 copies into `data/era5/` (gitignored) and their manifest |
+| `output/<set>/` | per-run and reference JSON — generated, gitignored |
+| `validation_results/` | `SCORING_STANDARD.md`, `SCORING_EXTENSIVE.md`, `port_check.md`, `<set>/` — generated, committed |
 
 ## Data and environment
 
 | | |
 |---|---|
-| Data root | `/data/cesm2.1.5_output/histSST` (read-only input; never write here) |
-| Stream | `cam.h6`, daily zonal-mean TEM tape: `Uzm Vzm Wzm THzm VTHzm UVzm UWzm` |
-| Segments | 1970–1995 and 1996–2014 — two **separate runs** joined at a restart, not one integration |
-| Interpreter | `.AIDE-eval_env/bin/python` at the repo root, built from `requirements.txt` (Python 3.10.12) |
-| Output dir | `C.OUTDIR` in `scripts/aide_val_common.py`, derived from `__file__` as `<AIDE-atmosphere>/output`; `output/` and `logs/` are gitignored |
+| Interpreter | `.AIDE-eval_env/bin/python` at the repo root, from `requirements.txt` (Python 3.10.12) |
+| Model input | paths in `sources/<set>.json`, read in place (jcm-strat files under `/data/JCM_stripped/jcm-strat-phase29`, `-phase31`; never modify them) |
+| References | CLaMS `/data/CLaMS/CLaMS_v3/clams_v3.1_era5_zm_lat.zip`; WACCM6 entry age `/data/CESM2_REFD1_AOA/`; CESM2.1.5-WACCM6 h6 `/data/cesm2.1.5_output/histSST` (read-only); ERA5 copies in `data/era5/` |
+| Memory | wrap heavy runs in `/data/JCM_stripped/jcm-strat-phase29/scripts/memcap.sh` (96 G per job); one 14-year run peaks at 2.6 GB |
 
-Reproduce in order (from `AIDE-atmosphere/scripts/`, `PY=../../.AIDE-eval_env/bin/python`, ~5 min total;
-verified to rebuild every JSON, the report and all seven PNGs bit-for-bit from the tape):
+Reproduce (from `scripts/`, `PY=../../.AIDE-eval_env/bin/python`, about 80 s):
 
 ```bash
-$PY 02_reference_stats.py && $PY 02b_trends.py && $PY 07_period_split.py \
-  && $PY 16_anchors_45yr.py && $PY 17_validate.py 1996 2014 \
-  && $PY 18_validation_figures.py
+bash copy_era5_refs.sh
+$PY evaluate.py && $PY checks/port_check.py
 ```
-
-`16`, `17` and `18` read only existing JSON and take seconds — iterate on a threshold, or
-score another climate model, without re-reading the tape. `17` takes `--climate-model NAME`
-and the period as arguments and stamps every artefact `__<climate model>__<production date>`;
-its `climate_model_series` is the seam to replace for a model rollout. `01`, `01b`, `01c` and `01d` are evidence, not pipeline stages: they
-feed nothing and are run standalone to re-confirm the conventions below.
 
 ## Data conventions that are already settled — do not re-derive, do not violate
 
-Each was established against the files and each silently changes the answer by
-10–1000% if assumed wrong. `aide_val_common.py` relies on all four. Evidence is in
-`scripts/01*` and `logs/01*`; all four were re-run on 2026-08-19 and reproduce the numbers
-quoted here.
+Established against the CESM h6 files; each changes the answer by 10–1000 % if assumed
+wrong. Evidence: scripts `01*` and their logs, archived with the tier protocol as git tag
+`tier-protocol-final`.
 
-1. **`VTHzm` is already the eddy flux `v'θ'`.** Do NOT subtract `Vzm·THzm`.
-   Verified against raw 3-D h7 fields: 15% median error as-is, 1087% if subtracted.
-   Subtracting it makes tropical w* come out downward. Same for `UVzm`, `UWzm`.
+1. **`VTHzm` is already the eddy flux `v'θ'`.** Do NOT subtract `Vzm·THzm`. Verified against
+   raw 3-D h7 fields: 15 % median error as-is, 1087 % if subtracted. Same for `UVzm`, `UWzm`.
+   The field contract requires the eddy flux from every model.
 2. **`Wzm` is the log-pressure vertical velocity** `w = −Hω/p`, H = 7 km — not geometric.
-   Continuity regression slope 1.011, r = 1.000. Getting this wrong is 11% on all upwelling.
-3. **Below-surface points are the sentinel `1e35` with no `_FillValue`.** xarray will not
-   mask them; an unguarded `.mean()` returns ~1e33. Mask with `abs(x) < 1e20`.
+3. **Below-surface points are the sentinel `1e35` with no `_FillValue`.** Mask with
+   `abs(x) < 1e20` (`load_h6`, the `netcdf` reader).
 4. **`MSKtem` is not a 0/1 mask.** It is a `(time, lat, lon)` fractional count of
    above-surface interfaces and cannot be applied to the zonal-mean fields.
 
-## Scientific protocol rules that constrain any new diagnostic
+## Scientific rules that constrain any change
 
-- **Pin the estimator.** The two standard routes to w̄* differ by **10.8%** on the same
-  data — larger than the 1.1% tier-2 mass-flux tolerance. A target is a statement about a
-  *specific estimator*, valid only when model and truth go through the identical code
-  path: `aide_val_common.tem_residual`.
-- **Score on the emulator's own grid**, with truth reduced onto that grid.
-- **The upwelling targets are period-matched, not absolute.** They fail out of sample
-  because the BDC trend is concentrated in 1970–1995. Compare a rollout against the CESM
-  years it actually covers, or detrend both sides.
-- **A target CESM itself cannot meet on a different sample of its own output is not a
-  target.** Any new target gets the same train/test treatment as `07_period_split.py`.
-- **The anchor has no held-out sample.** It spans 1970–2014, so no CESM output remains to
-  test a new threshold against (D12). Any new diagnostic still owes that test — the archived
-  split anchors in `stale/` are the template.
-- **State the rollout length.** Thresholds are `max(0.5σ, 1.96σ/√n)`; the two branches
-  cross at n = 15.4 yr. The interannual σ ratio and the forced BDC trend are **not
-  testable** below ~15 yr — they are why tier 2 is 35 years, and they must not be reported
-  as passes at tier-1 length.
-
-## Transport scorecard
-
-A separate scorecard beside the tiers; [docs/TRANSPORT_SCORECARD.md](AIDE-atmosphere/docs/TRANSPORT_SCORECARD.md)
-is its reference (contract, metrics, references, decisions, deferred list).
-
-- Scripts: `transport_common.py` (sources, readers, every reference path in `REFS`),
-  `22_transport_fields.py` -> `23_transport_scorecard.py` -> `24_transport_figures.py`;
-  `22b_transport_port_check.py` is evidence against jcm-strat, outside the chain.
-- `AIDE-atmosphere/data/era5/` holds ERA5 copies made by `scripts/copy_era5_refs.sh` and checked
-  against `scripts/era5_refs.sha256`; gitignored. The jcm-strat model files are read in place.
-- Its w* (jcm-strat Ψ* route, log-p interpolated) is **interim**, AIDE-eval issue #5, and is not
-  the tier estimator `tem_residual`: never read a transport B number against a tier threshold.
-- Scored: every result set of `transport_common.SETS` (phase-29 runs 2006–2010, AL7h 2011–2019)
-  under both scorings of `transport_common.SCORINGS` (extensive: 34 metrics; reduced: phase 31's
-  20, A2-WACCM for A2). References follow the scored window, except B (WACCM6 h6 1996–2014).
-- `validation_results/transport/` is generated and committed, like the other results.
+- **One estimator for model and reference.** Every w* and Ψ* — model, WACCM6 and ERA5 — goes
+  through `tem_streamfunction` / `residual_w` with log-p interpolation. This estimator is
+  **interim** (issue #5); do not mix it with another route.
+- **Reference years follow the scored window** (A, C, D). B is WACCM6 h6 1996–2014 for every
+  window and is not period-matched; say so with any B number.
+- **State the window and its flag with every score.** Short windows make D1 and D3 sampling
+  errors comparable to the 25 % tolerance.
+- **Changing a metric, tolerance, reference or scoring changes what a score means**: record it
+  in `docs/DECISIONS.md`, regenerate every set, and update the protocol in the same commit.
+- **Group C input is daily means** (issue #7); do not compare C2 with jcm-strat below 0.02 K.
+- The port check must keep reproducing jcm-strat (`validation_results/port_check.md`); a code
+  change that moves its agreement counts is a regression unless explained.
 
 ## Working rules specific to this repo
 
-- `output/` and `logs/` are **generated**. Never hand-edit a JSON, CSV or PDF —
-  change the script and re-run it, so the artefact always matches the code that made it.
-- The dependency pins in `requirements.txt` are part of the result. All 15 artefacts were
-  verified bit-for-bit under them, and the same check was run against the older
-  `/home/ubuntu/.../paradis_venv` interpreter — identical output. Changing a pin means
-  re-running that check, not assuming it still holds.
-- The report and figures are built from the JSON. If a number changes, re-run `17` and `18`
-  in the same pass, or the tables and the figures disagree.
-- Numbers in `docs/EVALUATION_PROTOCOL.md` §1 and §3 are transcribed from
-  `output/16_anchors_45yr.json`. If a script changes a number, update the markdown in the
-  same commit — and check the transcription, not just the prose.
-- `validation_results/` is **generated and committed**, unlike `output/`. Never hand-edit the
-  report or a figure; re-run `17` and `18`.
-- Known limitations are in `docs/EVALUATION_PROTOCOL.md` appendix C — read it before
-  treating any figure as fixed (fixed SST means no ENSO; the tier-2 anchor spans the
-  1995/96 restart; SSW detection is a local Charlton–Polvani implementation, not a shared
-  catalogue).
+- `output/` is **generated** and gitignored; `validation_results/` is **generated and
+  committed**. Never hand-edit a JSON, report or figure — change the script and re-run
+  `evaluate.py` (and `checks/port_check.py`), so the artefact matches the code that made it.
+- The dependency pins in `requirements.txt` are part of the result. The chain reproduces all
+  23 committed artefacts bit for bit under them (checked 2026-11-12, two runs). Changing a
+  pin means re-running that check.
+- Numbers in `docs/EVALUATION_PROTOCOL.md` §4 and §10 are transcribed from
+  `output/<set>/references.json` and `validation_results/<set>/scorecard_<scoring>.json`. If a
+  script changes a number, update the markdown in the same commit and check the
+  transcription.
+- A new model is one `sources/<set>.json` and `evaluate.py <set>`; no code change.
+- Known limitations are in `docs/EVALUATION_PROTOCOL.md` §11 — read them before treating a
+  score as fixed.

@@ -5,96 +5,60 @@ This repository validates single parts and the fully interactive version of the 
 
 ## 1. AIDE-atmosphere validation
 
-The **two-tier evaluation protocol** an AIDE-WACCM emulator rollout is scored against for
-tropical upwelling (Brewer–Dobson circulation) and the stratospheric polar vortex,
-measured from CESM2.1.5-WACCM6 fixed-SST output.
+The **standard evaluation of stratospheric dynamics**: one scorecard of age of air,
+residual circulation, polar vortex and variability, each metric scored as its relative
+deviation from CLaMS, WACCM6 or ERA5 over the same years (tolerance ±25 %). Ported from the
+jcm-strat relative scorecard; the diagnostics are recomputed here from daily zonal means
+and reproduce jcm-strat's values (port check).
 
-This repository derives thresholds and scores climate models against them. It is not a
-model. The thresholds are CESM-vs-CESM, including the dry run of both tiers against CESM's
-own earlier output. Scored so far: four reanalyses (monthly zonal means, so only the four
-vortex and polar-cap diagnostics), and one full rollout, the stratosphere-only JCM
-configuration `jcm-strat` phase 10 over 1990–2019, which carries daily u, v, ω, T and v'T'
-and so scores every diagnostic. No AIDE-WACCM emulator rollout has been scored yet.
+- **Standard window 2006–2019**, daily. Other windows are scored and flagged
+  "non-standard window (N of 14 standard years)".
+- **standard** scoring (jcm-strat phase 31's set, 20 metrics) is the headline score and
+  ranking; **extensive** (34 metrics) is the full listing.
+- Scored: jcm-strat AL7h 2006–2019 (standard combined A–C 0.69) and seven jcm-strat phase-29
+  runs 2006–2010 (0.71–0.99, non-standard window). No AIDE-WACCM emulator rollout yet.
+- Open: the w* estimator is interim (AIDE-eval #5); group C reads daily means (AIDE-eval #7).
 
 ## Start here
 
 | If you want | Read |
 |---|---|
-| The protocol — both tiers, every threshold, the reasoning | [docs/EVALUATION_PROTOCOL.md](AIDE-atmosphere/docs/EVALUATION_PROTOCOL.md) |
-| A scored climate model, with figures | [validation_results/](AIDE-atmosphere/validation_results/) |
-| How to score your own model | [docs/EVALUATION_PROTOCOL.md](AIDE-atmosphere/docs/EVALUATION_PROTOCOL.md) §3.5, and §4 for the inputs |
-| Where the tolerances come from | [docs/EVALUATION_PROTOCOL.md](AIDE-atmosphere/docs/EVALUATION_PROTOCOL.md) appendix A |
-| Why a choice was made | [docs/EVALUATION_PROTOCOL.md](AIDE-atmosphere/docs/EVALUATION_PROTOCOL.md) appendix B |
-| What is knowingly not covered | [docs/EVALUATION_PROTOCOL.md](AIDE-atmosphere/docs/EVALUATION_PROTOCOL.md) appendix C, §7 |
-| The transport scorecard — age of air, residual circulation, vortex, variability | [docs/TRANSPORT_SCORECARD.md](AIDE-atmosphere/docs/TRANSPORT_SCORECARD.md) |
-| How to score a new model on it | [docs/TRANSPORT_SCORECARD.md](AIDE-atmosphere/docs/TRANSPORT_SCORECARD.md) §10 |
+| The protocol: window, inputs, metrics, references, scoring, limitations | [docs/EVALUATION_PROTOCOL.md](AIDE-atmosphere/docs/EVALUATION_PROTOCOL.md) |
+| The scores and ranking | [validation_results/SCORING_STANDARD.md](AIDE-atmosphere/validation_results/SCORING_STANDARD.md), [SCORING_EXTENSIVE.md](AIDE-atmosphere/validation_results/SCORING_EXTENSIVE.md) |
+| One set's report and figures | `AIDE-atmosphere/validation_results/<set>/` |
+| How to evaluate your model | [docs/EVALUATION_PROTOCOL.md](AIDE-atmosphere/docs/EVALUATION_PROTOCOL.md) §3 (inputs) and §9 |
+| How the code fits together | [docs/ARCHITECTURE.md](AIDE-atmosphere/docs/ARCHITECTURE.md) |
+| Why a choice was made | [docs/DECISIONS.md](AIDE-atmosphere/docs/DECISIONS.md) |
+| What is not done yet | [docs/DEFERRED.md](AIDE-atmosphere/docs/DEFERRED.md) |
+| What is scored, when, in which PR | [docs/PROGRESS.md](AIDE-atmosphere/docs/PROGRESS.md) |
+| Agreement with jcm-strat | [validation_results/port_check.md](AIDE-atmosphere/validation_results/port_check.md) |
 | Settled data conventions and working rules | [CLAUDE.md](CLAUDE.md) |
-| The evidence for those conventions | `scripts/01*`, `logs/01*` |
-| Superseded material, kept | [stale/](AIDE-atmosphere/stale/README.md) |
 
-The protocol document is self-contained: every threshold, its derivation, the decisions
-behind it and the limitations on it are in that one file, and every number in it is
-transcribed from `output/16_anchors_45yr.json`.
+## Evaluate a model
 
-## The two tiers
+1. Write daily zonal means for 2006-01-01 … 2019-12-31 on pressure levels to netCDF:
+   `Uzm`, `Vzm`, `THzm`, `VTHzm` (eddy flux, formed before time averaging), `AOA150`
+   (entry age in years, reset below 150 hPa); `T` optional; dims `(time, plev, lat)`.
+2. Add `AIDE-atmosphere/sources/<set>.json`:
 
-Both tiers are anchored on **CESM 1970–2014, the whole record** — 44 annual years, 42 DJF
-and 45 JJA seasons — so the thresholds are fixed and model-agnostic rather than matched to a
-CESM sub-period.
+   ```json
+   {"description": "MYMODEL v1, 2006-2019", "reader": "netcdf", "window": [2006, 2019],
+    "runs": {"MYMODEL": "/path/to/mymodel_*.nc"}}
+   ```
 
-**Tier 1 — 5-year screening.** Every individual year against a ±3σ band on the anchor mean,
-six diagnostics, plus an SSW count of 0–7 over 5 winters. A regression test: fast, quiet on
-a healthy model, loud on a broken one.
+3. From `AIDE-atmosphere/scripts/`:
 
-**Tier 2 — 35-year validation.** The rollout mean to ±0.5σ, the interannual σ ratio to
-0.68–1.32 and the daily DJF σ ratio to 0.88–1.12, plus the SSW count, the two mechanism
-slopes and the upwelling trend. This is the scientific claim.
+   ```bash
+   PY=../../.AIDE-eval_env/bin/python
+   bash copy_era5_refs.sh                    # once: ERA5 copies, checked against the manifest
+   $PY 01_fields.py --inspect <set>          # check the fields against the contract
+   $PY evaluate.py <set>                     # 01 -> 02 -> 03, summaries rewritten
+   ```
 
-**What the anchor gives up.** Spanning the whole record leaves no CESM output held back to
-test the thresholds against, so §2 of the protocol cites the archived split-anchor runs in
-[stale/](AIDE-atmosphere/stale/README.md) instead: on anchors that did not include the scored period, 28 of
-30 tier-1 block verdicts and 4 of 6 tier-2 mean tests pass, the failures being the upwelling
-pair and the forced BDC trend behind them. The method carries over; the numbers do not.
+4. Read `validation_results/<set>/scorecard_standard.md` and the ranking in
+   `validation_results/SCORING_STANDARD.md`.
 
-## The transport scorecard
-
-A separate scorecard beside the two tiers, ported from `jcm-strat` phase 29: age of air,
-residual circulation, polar vortex and variability, each metric scored as its relative
-deviation from CLaMS, WACCM6 or ERA5 (tolerance ±25 %). It changes no tier threshold. Scored so
-far: the eight jcm-strat phase-29 runs over 2006–2010 and AL7h over 2011–2019 (jcm-strat phase
-31, out of sample), each under two scorings — extensive (34 metrics) and reduced (phase 31's
-20) — with references of the scored years, in
-[validation_results/transport/](AIDE-atmosphere/validation_results/transport/). Its w*
-estimator is interim (AIDE-eval issue #5). Method, field contract and decisions:
-[docs/TRANSPORT_SCORECARD.md](AIDE-atmosphere/docs/TRANSPORT_SCORECARD.md).
-One-page summary per scoring:
-[SCORING_EXTENSIVE.md](AIDE-atmosphere/validation_results/transport/SCORING_EXTENSIVE.md),
-[SCORING_REDUCED.md](AIDE-atmosphere/validation_results/transport/SCORING_REDUCED.md).
-
-## Input requirements
-
-What a model has to supply to be scored against the thresholds above. Everything in this
-section is what `scripts/aide_val_common.py` reads and what the diagnostics consume. The
-CESM values quoted throughout are the reference implementation, not a constraint on the
-climate model's own grid (§5, rule 2).
-
-**Tier 1 needs 5 years, tier 2 needs 35 years.** Both need the same fields, at the same
-resolution, on the same grid. Two forms of the request, depending on what the archive holds:
-
-| | **A zonal-mean TEM tape** | **A standard pressure-level archive** |
-|---|---|---|
-| Fields | ū, v̄, w̄ (log-pressure), θ̄, v'θ' | `ua`, `va`, `wap`, `ta` (CF/CMIP names) |
-| Shape | (time, level, lat), already zonally averaged | (time, level, lat, lon) daily 3-D — or zonal means **plus** 3-D `va` and `ta` |
-| Temporal | daily means | daily means |
-| Levels | pressure levels bracketing 10, 50, 70 and 100 hPa, with one level beyond each end | same |
-| Latitude | global, −90° to +90° | same |
-| Derivation | none | w̄ from `wap`, θ̄ from `ta`, v'θ' from 3-D `va` and `ta` (§4.6) |
-
-
-## Running it
-
-Inputs are read-only CESM history files under `/data/cesm2.1.5_output/histSST`
-(daily zonal-mean TEM tape `cam.h6`, 1970–2014).
+## Running everything
 
 Set the environment up once, from the repo root:
 
@@ -103,65 +67,47 @@ python3 -m venv .AIDE-eval_env
 .AIDE-eval_env/bin/pip install -r requirements.txt
 ```
 
-Then:
+Then, from `AIDE-atmosphere/scripts/` (about 80 s on CPU; wrap in
+`/data/JCM_stripped/jcm-strat-phase29/scripts/memcap.sh --` on shared nodes):
 
 ```bash
-cd AIDE-atmosphere/scripts
 PY=../../.AIDE-eval_env/bin/python
-$PY 02_reference_stats.py && $PY 02b_trends.py && $PY 07_period_split.py \
-  && $PY 16_anchors_45yr.py && $PY 17_validate.py 1996 2014 \
-  && $PY 18_validation_figures.py
+bash copy_era5_refs.sh
+$PY evaluate.py                # every set in sources/
+$PY checks/port_check.py       # evidence: agreement with jcm-strat
 ```
 
-About five minutes in total. Order matters — later scripts read earlier JSON. `16`, `17` and
-`18` read only existing JSON and take seconds, so iterating on a threshold or scoring another
-climate model does not mean re-reading the tape.
-
-`17_validate.py` takes `--climate-model NAME` and the period as arguments, and stamps every
-artefact it writes `__<climate model>__<production date>`. Climate-model data enters through
-one function, `climate_model_series`, which is what gets replaced when the model is a
-rollout rather than a window of CESM's own record.
-
-`01_check_conventions.py`, `01b`, `01c` and `01d` sit outside the pipeline. They establish
-the four data conventions in [CLAUDE.md](CLAUDE.md) — that `VTHzm` is already an eddy flux,
-that `Wzm` is log-pressure, the `1e35` sentinel, and `MSKtem` — each worth 10–1000% if
-assumed wrong, and each silent. Run them standalone against the tape whenever a convention
-is in doubt; they feed nothing downstream.
-
-`requirements.txt` pins numpy, scipy, xarray, matplotlib, cftime and netCDF4 to the
-versions that produced every committed number, on Python 3.10.12. No LaTeX and no reportlab —
-the figures are matplotlib. A change to those pins is a change to the results: the whole
-pipeline reproduces all 15 artefacts bit-for-bit under them, and a new environment should be
-checked the same way before its numbers are trusted.
+- Model files and the CLaMS, WACCM6 and CESM references are read in place under `/data`;
+  the ERA5 files are copied into the gitignored `AIDE-atmosphere/data/era5/`.
+- `requirements.txt` pins numpy, scipy, xarray, matplotlib, cftime and netCDF4 on Python
+  3.10.12. Two runs from an empty `output/` reproduce all 23 committed artefacts bit for bit
+  under them.
 
 ## Repository layout
 
 ```
 README.md              this file
-CLAUDE.md              working rules, settled data conventions, protocol constraints
+CLAUDE.md              working rules, settled data conventions, scientific rules
 LICENSE
 requirements.txt       pinned dependencies
 .gitignore
-.AIDE-eval_env/        the virtual environment — gitignored, 425 MB, rebuild from the above
+.AIDE-eval_env/        the virtual environment — gitignored, rebuild from the above
 
-AIDE-atmosphere/       everything else lives here
-  scripts/             02, 02b, 07, 16, 17, 18 + aide_val_common.py, report_layout.py
-                       01, 01b, 01c, 01d — convention evidence, outside the pipeline
-                       22, 22b, 23, 24 + transport_common.py, copy_era5_refs.sh — transport scorecard
-  docs/                the protocol; TRANSPORT_SCORECARD.md
-  validation_results/  a scored climate model: validation_result__<stamp>.md and seven figures
-                       ERA5/, ERA-Interim/, JRA-55/, MERRA-2/ — one folder per source
-                       transport/ — the transport scorecard and its port check
-  stale/               superseded material, kept — see stale/README.md
-  output/              JSON results            — generated, gitignored
-  logs/                stdout of every run     — generated, gitignored
-  data/                ERA5 reference copies   — copy_era5_refs.sh, gitignored
+AIDE-atmosphere/
+  sources/             one JSON per result set
+  scripts/             strat_eval_common.py; 01_fields, 02_scorecard, 03_figures, evaluate.py;
+                       checks/port_check.py; copy_era5_refs.sh + era5_refs.sha256
+  docs/                EVALUATION_PROTOCOL, ARCHITECTURE, DECISIONS, DEFERRED, PROGRESS
+  validation_results/  SCORING_STANDARD.md, SCORING_EXTENSIVE.md, port_check.md, <set>/
+  output/              per-run JSON          — generated, gitignored
+  data/                ERA5 reference copies — copy_era5_refs.sh, gitignored
 ```
 
-Paths written bare below — `scripts/`, `output/`, `docs/` — are relative to
-`AIDE-atmosphere/`.
+`validation_results/` is generated and committed; `output/` is generated and not. Never
+hand-edit either — change the script and re-run.
 
-`output/` and `logs/` are not in version control: they are reproducible from the scripts
-and `/data`, and JSON diffs would dominate the history. Never hand-edit a generated
-artefact — change the script and re-run, so the result always matches the code that
-made it.
+## History
+
+Until 2026-11-12 this repository held a two-tier CESM-anchored protocol (5-year screening,
+35-year validation) and its results for CESM, four reanalyses and jcm-strat phase 10. It is
+archived as git tag `tier-protocol-final`.
