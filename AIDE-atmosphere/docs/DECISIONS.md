@@ -3,7 +3,7 @@
 Every decision behind the evaluation, with who took it. **Settled** = decided by Susanne.
 **Unconfirmed** = taken during implementation because the brief did not settle it; listed in
 the PR for review and open until confirmed or rejected. Numbers 1–34 are PR #6's, 35 onward
-those of the `strat-eval-standard` PR ([PROGRESS.md](PROGRESS.md)).
+those of PR #8 `strat-eval-standard` ([PROGRESS.md](PROGRESS.md)).
 
 ---
 
@@ -125,7 +125,7 @@ Status after this PR in italics.
 
 ---
 
-## Unconfirmed — this PR (35–)
+## Unconfirmed — PR #8 (35–)
 
 35. **Tag.** `tier-protocol-final` on 34d7d6f, annotated "Last state with the two-tier CESM
     evaluation protocol, its scripts (01-21, report_layout.py, stale/) and results …
@@ -176,3 +176,18 @@ Status after this PR in italics.
     refers to the tier protocol (DECISIONS records the decisions about it).
 55. **AL7h per-window numbers** (2006–2010 alone, 2011–2019 alone) are no longer result sets;
     they are cited from PR #6 in the protocol, and the port check still checks both files.
+56. **Branch in the main checkout.** git refuses one branch in two worktrees, so the
+    worktree's HEAD was detached at the same commit before the main checkout switched to
+    `strat-eval-standard`.
+57. **Worktree logs kept.** The worktree's gitignored `logs/` (18 logs of PR #6's port and
+    reader checks, no other copy) moved to `AIDE-atmosphere/logs/strat-transport-scoring/`
+    in the main checkout before the worktree was removed; its `output/` was discarded
+    (regenerated).
+58. **Repo-relative paths in result JSON** (`strat_eval_common.portable`, commit 910765a):
+    the references block carried the checkout's absolute ERA5 path, so the committed JSON
+    differed between checkouts; found while reproducing from the main checkout.
+59. **`AIDE-atmosphere/era5_env/` in the main checkout** (120 MB, the tier-only ERA5 download
+    environment) is left in place and now shows as untracked, since its ignore line is
+    removed (36). Delete it, or restore the ignore line.
+60. **ERA5 move verified** with the manifest check of `copy_era5_refs.sh` run directly
+    (`sha256sum -c`), not by re-running the copy.
