@@ -9,10 +9,12 @@ The **two-tier evaluation protocol** an AIDE-WACCM emulator rollout is scored ag
 tropical upwelling (Brewer–Dobson circulation) and the stratospheric polar vortex,
 measured from CESM2.1.5-WACCM6 fixed-SST output.
 
-This repository derives thresholds. It is not a model, and it does not score one:
-every number in it is CESM-vs-CESM, including the dry run of both tiers against CESM's own
-earlier output. Scoring an actual emulator rollout is the next piece of work and has never
-been done.
+This repository derives thresholds and scores climate models against them. It is not a
+model. The thresholds are CESM-vs-CESM, including the dry run of both tiers against CESM's
+own earlier output. Scored so far: four reanalyses (monthly zonal means, so only the four
+vortex and polar-cap diagnostics), and one full rollout, the stratosphere-only JCM
+configuration `jcm-strat` phase 10 over 1990–2019, which carries daily u, v, ω, T and v'T'
+and so scores every diagnostic. No AIDE-WACCM emulator rollout has been scored yet.
 
 ## Start here
 

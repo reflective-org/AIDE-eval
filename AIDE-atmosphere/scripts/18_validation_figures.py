@@ -342,7 +342,7 @@ def fig_seasonal(A, res):
 
 
 # ------------------------------------------------------- shape: daily distribution
-def fig_daily_distribution(A, res, S, segs):
+def fig_daily_distribution(A, res, S, segs, model_daily=None):
     a = A["daily_DJF_u60N"]
     m = res["tier2_variance"]["daily_DJF_u60N"]
     lo, hi = res["climate_model_period"]
@@ -352,7 +352,9 @@ def fig_daily_distribution(A, res, S, segs):
     # be subset when the window covers whole segments. 17 has already decided that,
     # so follow its verdict rather than re-deriving it.
     model = None
-    if m.get("available", True):
+    if model_daily is not None:
+        model = np.asarray(model_daily, float)
+    elif m.get("available", True):
         model = np.array(sum((S[s]["_u60n_djf_daily"] for s in segs
                               if np.asarray(S[s]["_annual_years"], float).min() >= lo
                               and np.asarray(S[s]["_annual_years"], float).max() <= hi),
@@ -369,7 +371,7 @@ def fig_daily_distribution(A, res, S, segs):
     ax = style(fig.add_subplot(111), None,
                f"σ ratio {m['ratio']:.2f} · window {m['window'][0]:.2f}–"
                f"{m['window'][1]:.2f} · "
-               f"{'PASS' if m.get('passes') else 'n/a'}"
+               f"{'PASS' if m['passes'] else 'FAIL'}"
                if m.get("available", True) else
                "climate-model days unavailable: window is not segment-aligned")
 
@@ -497,7 +499,13 @@ def main():
     if res["shape_seasonal"]:
         fig_seasonal(A, res)
     if res["shape_daily_distribution"]:
-        fig_daily_distribution(A, res, S, segs)
+        # a source scored through 20 carries its own daily series; the CESM
+        # window takes them from 07
+        model_daily = None
+        if SUBDIR:
+            src = json.load(open(os.path.join(C.OUTDIR, f"20_series__{SUBDIR}.json")))
+            model_daily = src["series"].get("_u60n_djf_daily")
+        fig_daily_distribution(A, res, S, segs, model_daily)
     if res["shape_w_star_profile"]["levels"]:
         fig_w_star_profile(A, res)
 

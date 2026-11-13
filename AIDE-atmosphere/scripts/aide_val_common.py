@@ -519,3 +519,127 @@ def _max_run(boolarr):
         cur = cur + 1 if b else 0
         best = max(best, cur)
     return best
+
+
+# ----------------------------------------------------------------------------
+# Per-year series from the five TEM fields
+# ----------------------------------------------------------------------------
+# The reduction from (time, lev, lat) fields to the scalar series the tiers score
+# lives here so that every source - the CESM h6 tape in 07, a model rollout or a
+# reanalysis in 20 - travels the identical code path (protocol section 5, rule 1).
+
+def monthly_by_year(daily, yr, mo, min_days=20):
+    """Per-year 12-month means of each daily series.
+
+    A threshold on the seasonal cycle needs an interannual sigma, so the
+    climatology has to be resolved per year rather than pooled across the record.
+    Years with a month thinner than min_days are dropped whole.
+    """
+    years = np.array([int(y) for y in np.unique(yr)
+                      if min(np.sum((yr == y) & (mo == k)) for k in range(1, 13))
+                      >= min_days])
+    rows = {k: np.array([[np.nanmean(x[(yr == y) & (mo == m)]) for m in range(1, 13)]
+                         for y in years])
+            for k, x in daily.items()}
+    return years, rows
+
+
+def profile_by_year(wstar, p, lat, yr):
+    """Tropical 10S-10N w* at each profile level, calendar-year means, mm/s."""
+    years = np.array([int(y) for y in np.unique(yr) if np.sum(yr == y) >= 350])
+    out = {}
+    for pl in PROFILE_LEVELS:
+        b = band_mean(interp_level(wstar, p, pl, axis=1), lat, -10, 10, axis=-1) * 1e3
+        out[f"{pl:g}"] = np.array([np.nanmean(b[yr == y]) for y in years])
+    return years, out
+
+
+def winter_percentiles(x, yr, mo, min_days=81):
+    """Per-winter DJF percentiles of a daily series.
+
+    Computed within each winter rather than over the pooled days, because winters
+    are independent: the D5 rule then applies with n = winters and the 14-day
+    decorrelation time of the daily series never enters.
+    """
+    sel = djf_mask(mo)
+    lab = season_year(yr, mo)
+    years, rows = [], []
+    for y in np.unique(lab[sel]):
+        s = sel & (lab == y)
+        if s.sum() >= min_days:
+            years.append(int(y))
+            rows.append([float(np.nanpercentile(x[s], q)) for q in DJF_PCTL])
+    return np.array(years), np.array(rows)
+
+
+def series_from_tem_fields(U, V, W, TH, VTH, p, lat, yr, mo, dy):
+    """Every scalar series the validation suite needs, from daily zonal-mean fields.
+
+    U, V, W, TH, VTH: (time, lev, lat) float64 - zonal wind, meridional wind,
+    log-pressure vertical velocity, potential temperature and the eddy heat flux
+    v'theta', all on the same pressure levels p (hPa, ascending) and latitudes
+    lat (deg, ascending). yr, mo, dy label each daily value. Section 4 of the
+    protocol defines the five fields; this is the one place they are reduced.
+    """
+    _, wstar, _ = tem_residual(V, W, TH, VTH, p, lat)
+
+    w70 = band_mean(interp_level(wstar, p, 70.0, axis=1), lat, -10, 10, axis=-1)
+    mflux = tropical_upward_mass_flux(wstar, p, lat, 70.0) * 1e-9
+
+    u10 = interp_level(U, p, 10.0, axis=1)
+    u60n = interp_lat(u10, lat, 60.0, axis=-1)
+    u60s = -interp_lat(u10, lat, -60.0, axis=-1)      # westerly positive
+
+    ksel = (p >= 10.0) & (p <= 50.0)
+    tz = TH[:, ksel, :] * (p[ksel][None, :, None] / P_REF_HPA) ** KAPPA
+    wgt = np.gradient(np.log(p[ksel])); wgt /= wgt.sum()
+    tlev = np.tensordot(tz, wgt, axes=([1], [0]))
+    tcapN = band_mean(tlev, lat, 60.0, 90.0, axis=-1)
+    tcapS = band_mean(tlev, lat, -90.0, -60.0, axis=-1)
+
+    vpt100 = band_mean(interp_level(VTH, p, 100.0, axis=1), lat, 45.0, 75.0, axis=-1)
+
+    # annual and seasonal reductions
+    out = {}
+    yrs, out["mass_flux"] = annual_means(mflux, yr)
+    _, out["w_star"] = annual_means(w70 * 1e3, yr)
+    out["_annual_years"] = yrs
+
+    sN, out["vortex_NH"] = seasonal_means(u60n, yr, mo, [12, 1, 2], season_year)
+    _, out["polar_cap_T_NH"] = seasonal_means(tcapN, yr, mo, [12, 1, 2], season_year)
+    _, out["heat_flux_100"] = seasonal_means(vpt100, yr, mo, [12, 1, 2], season_year)
+    out["_djf_years"] = sN
+
+    sS, out["vortex_SH"] = seasonal_means(u60s, yr, mo, [6, 7, 8])
+    _, out["polar_cap_T_SH"] = seasonal_means(tcapS, yr, mo, [6, 7, 8])
+    out["_jja_years"] = sS
+
+    # daily DJF vortex, for the daily sigma and the percentiles
+    djf = djf_mask(mo)
+    out["_u60n_djf_daily"] = u60n[djf]
+
+    # shape checks - the per-year series a threshold on the seasonal cycle, the
+    # daily distribution and the tropical w* profile needs.
+    daily = {"mass_flux": mflux, "w_star": w70 * 1e3, "vortex_NH": u60n,
+             "vortex_SH": u60s, "polar_cap_T_NH": tcapN, "polar_cap_T_SH": tcapS}
+    my, mrows = monthly_by_year(daily, yr, mo)
+    out["_monthly_years"] = my
+    for k, v in mrows.items():
+        out[f"_monthly_{k}"] = v
+
+    py, prof = profile_by_year(wstar, p, lat, yr)
+    out["_profile_years"] = py
+    for k, v in prof.items():
+        out[f"_profile_{k}"] = v
+
+    wy, pct = winter_percentiles(u60n, yr, mo)
+    out["_djf_pctl_years"] = wy
+    out["_djf_pctl"] = pct
+
+    # SSW
+    ssw = detect_ssw_cp07(u60n, yr, mo, dy, "NH")
+    nwin = len(np.unique(season_year(yr, mo)[np.isin(mo, [11, 12, 1, 2, 3])])) - 1
+    out["_ssw_count"] = len(ssw)
+    out["_ssw_winters"] = nwin
+    out["_ssw_seasons"] = [e["season"] for e in ssw]
+    return out

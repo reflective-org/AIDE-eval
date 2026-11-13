@@ -12,14 +12,15 @@ script reports what it could not compute rather than omitting it silently:
 
     supplied u, T           -> vortex NH/SH, polar cap T NH/SH, and their
                                12-month climatologies (the seasonal shape check)
-    supplied v, w/omega     -> would additionally give the TEM residual
-                               circulation. Not implemented: none of the sources
-                               on this machine carry omega above 50 hPa, so it
-                               would be untested code. The place it belongs is
-                               marked in series_from_fields.
-    supplied at daily res.  -> would additionally give the SSW count and the
-                               daily DJF percentiles. A monthly source cannot
-                               reach them at all: both need the day the wind
+    supplied v, omega, v'T' -> additionally the TEM residual circulation: mass
+       at daily resolution     flux, w*, the w* profile, the 100 hPa heat flux,
+                               and with daily u the SSW count and the DJF
+                               percentiles. This is the full CESM set, reduced by
+                               the same aide_val_common.series_from_tem_fields
+                               that 07 uses on the h6 tape. v'T' must be formed
+                               from the 3-D fields before time averaging; a
+                               monthly source cannot reach any of these, since
+                               SSW and the percentiles need the day the wind
                                reverses.
 
 WHY MONTHLY MEANS ARE EXACT FOR THE FOUR THAT SURVIVE, not approximate. Each is
@@ -50,8 +51,12 @@ import subprocess
 import sys
 import zipfile
 
+import glob
+import re
+
 import numpy as np
 import netCDF4
+import xarray as xr
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import aide_val_common as C
@@ -72,7 +77,26 @@ CLAMS = dict(
     note="ERA5-family fields regridded onto the CLaMS 1-degree zonal-mean grid, "
          "so lightly smoothed relative to the raw reanalysis")
 
+# jcm-strat phase 10: the stripped JCM stratosphere (Dinosaur semi-Lagrangian dycore,
+# Polvani-Kushner relaxation in place of radiation, troposphere and the tropical
+# zonal-mean wind nudged to ERA5), 30 chained one-year segments 1990-2019 at
+# T63 strat63, written 6-hourly. Read from the zonal-mean cache that
+# /data/jcm30_validation/build_zm_cache.py reduced from the 2.7 TB of chunk files:
+# [u] [v] [T] [omega] and the products [vT] etc., so v'T' = [vT] - [v][T] is
+# formed at the 6 h output cadence, before any time averaging (protocol 4.6).
+# Pressure is the hybrid coordinate times 1000 hPa: exact where hybrid_b = 0
+# (above 80 hPa) and within 0.7 hPa of the true pressure at 100 hPa.
+JCM = dict(
+    reader="jcm_zmcache", cache="/data/jcm30_validation/zmcache",
+    p0_hpa=1000.0, time_resolution="daily", calendar="gregorian",
+    independent=True,
+    note="stratosphere-only JCM on the Dinosaur dycore; troposphere (p > 150 hPa) "
+         "and the tropical zonal-mean wind (QBO) nudged to ERA5, stratospheric "
+         "temperature relaxed to a seasonal Polvani-Kushner equilibrium; daily means "
+         "of 6-hourly instantaneous output, v'T' formed at 6 h")
+
 SOURCES = {
+    "JCM-strat-p10": dict(JCM, long_name="jcm-strat phase 10 (T63 strat63) 1990-2019"),
     "ERA5": dict(CLAMS, archive="/data/CLaMS/CLaMS_v3/clams_v3.1_era5_zm_lat.zip",
                  member="clams_v3.1_era5_zm_lat_press_{year}.nc",
                  long_name="ERA5 (CLaMS v3.1 zonal mean)"),
@@ -115,8 +139,8 @@ def read_clams_zip(spec, years):
         d.close()
     if not U:
         raise SystemExit("no members matched the requested years")
-    return (np.concatenate(U), np.concatenate(T), lev, lat,
-            np.concatenate(yr), np.concatenate(mo))
+    return dict(U=np.concatenate(U), T=np.concatenate(T), lev=lev, lat=lat,
+                yr=np.concatenate(yr), mo=np.concatenate(mo))
 
 
 def read_netcdf(spec, years):
@@ -133,20 +157,64 @@ def read_netcdf(spec, years):
         yr = np.asarray(d.variables["year"][:], dtype=int)
         mo = np.asarray(d.variables["month"][:], dtype=int)
     m = np.isin(yr, years)
-    return U[m], T[m], lev, lat, yr[m], mo[m]
+    return dict(U=U[m], T=T[m], lev=lev, lat=lat, yr=yr[m], mo=mo[m])
 
 
-READERS = {"clams_zip": read_clams_zip, "netcdf": read_netcdf}
+def read_jcm_zmcache(spec, years):
+    """The jcm30_validation zonal-mean cache: one file per 10-day chunk holding
+    6-hourly [u] [v] [T] [omega] [vT] on (time, level, lat), one directory per
+    calendar year.
+
+    Every chunk of every requested year is concatenated before the daily mean is
+    taken, so the 00:00 frame that ends one year lands in the first day of the
+    next together with that day's own frames - the segments are one chained
+    integration, not thirty separate runs. Days are labelled by the calendar day
+    of their frames; a chunk's last frame is stamped 00:00 of the following day.
+    """
+    files = []
+    for y in years:
+        fs = glob.glob(os.path.join(spec["cache"], str(y), "longrun_day*.nc"))
+        files += sorted(fs, key=lambda f: int(re.search(r"_day(\d+)\.nc$", f).group(1)))
+    if not files:
+        raise SystemExit(f"no cache files under {spec['cache']} for the requested years")
+    parts = []
+    for f in files:
+        with xr.open_dataset(f) as d:
+            d = d[["u", "v", "T", "omega", "vT"]].load()
+        d["vpTp"] = d["vT"] - d["v"] * d["T"]          # eddy flux at the output cadence
+        parts.append(d.drop_vars("vT"))
+    six = xr.concat(parts, dim="time").sortby("time")
+    day = six.resample(time="1D").mean()
+    t = day.time.values
+    yr = t.astype("datetime64[Y]").astype(int) + 1970
+    # empty bins, if any, and the lone 00:00 frame that closes the last year
+    have = ~np.isnan(day["u"].isel(level=0, lat=0).values) & np.isin(yr, list(years))
+    day = day.isel(time=have); t, yr = t[have], yr[have]
+    mo = t.astype("datetime64[M]").astype(int) % 12 + 1
+    dy = (t - t.astype("datetime64[M]")).astype("timedelta64[D]").astype(int) + 1
+    f64 = lambda v: day[v].values.astype("f8")
+    return dict(U=f64("u"), V=f64("v"), T=f64("T"), OMEGA=f64("omega"),
+                VPTP=f64("vpTp"), lev=day.level.values.astype("f8") * spec["p0_hpa"],
+                lat=day.lat.values.astype("f8"), yr=yr, mo=mo, dy=dy)
+
+
+READERS = {"clams_zip": read_clams_zip, "netcdf": read_netcdf,
+           "jcm_zmcache": read_jcm_zmcache}
 
 
 # ----------------------------------------------------------------------- core
-def orient(U, T, lev, lat):
+FIELDS = ("U", "T", "V", "OMEGA", "VPTP")
+
+
+def orient(F):
     """Put levels and latitudes ascending, as interp_level and band_mean assume."""
-    if lev[0] > lev[-1]:
-        lev, U, T = lev[::-1], U[:, ::-1, :], T[:, ::-1, :]
-    if lat[0] > lat[-1]:
-        lat, U, T = lat[::-1], U[:, :, ::-1], T[:, :, ::-1]
-    return U, T, lev, lat
+    if F["lev"][0] > F["lev"][-1]:
+        F["lev"] = F["lev"][::-1]
+        F.update({k: F[k][:, ::-1, :] for k in FIELDS if k in F})
+    if F["lat"][0] > F["lat"][-1]:
+        F["lat"] = F["lat"][::-1]
+        F.update({k: F[k][:, :, ::-1] for k in FIELDS if k in F})
+    return F
 
 
 def expand_to_days(x, yr, mo, cal):
@@ -163,6 +231,25 @@ def expand_to_days(x, yr, mo, cal):
         reps = np.array([calendar.monthrange(int(y), int(m))[1]
                          for y, m in zip(yr, mo)])
     return np.repeat(x, reps, axis=0), np.repeat(yr, reps), np.repeat(mo, reps)
+
+
+def series_from_tem(F, spec):
+    """The full CESM series from a daily source carrying u, v, omega, T and v'T'.
+
+    The three derivations of protocol section 4.6, then the same reduction 07
+    applies to the h6 tape: w = -H omega / p, theta = T (1000/p)^kappa, and
+    v'theta' = v'T' (1000/p)^kappa - exact on a pressure surface because the
+    factor is constant along it.
+    """
+    lev, lat = F["lev"], F["lat"]
+    fac = (C.P_REF_HPA / lev)[None, :, None] ** C.KAPPA
+    W = -C.H_SCALE * F["OMEGA"] / (lev[None, :, None] * 100.0)
+    out = C.series_from_tem_fields(F["U"], F["V"], W, F["T"] * fac, F["VPTP"] * fac,
+                                   lev, lat, F["yr"], F["mo"], F["dy"])
+    supports = ["mass_flux", "w_star", "vortex_NH", "vortex_SH",
+                "polar_cap_T_NH", "polar_cap_T_SH", "heat_flux_100",
+                "w_star_profile", "ssw_NH", "daily_distribution", "daily_sigma"]
+    return out, supports, {}
 
 
 def series_from_fields(U, T, lev, lat, yr, mo, spec):
@@ -188,10 +275,8 @@ def series_from_fields(U, T, lev, lat, yr, mo, spec):
     tcapN = C.band_mean(tlev, lat, CAP_LAT, 90.0, axis=-1)
     tcapS = C.band_mean(tlev, lat, -90.0, -CAP_LAT, axis=-1)
 
-    # A source carrying v and omega would derive the TEM residual circulation
-    # here, via C.tem_residual, giving mass_flux, w_star and the w* profile.
-    # Not implemented: nothing on this machine supplies omega above 50 hPa, so
-    # it would be code no test could reach.
+    # A source carrying v, omega and v'T' at daily resolution takes
+    # series_from_tem instead and scores the full set.
 
     daily = spec["time_resolution"] == "monthly"
     cal = spec.get("calendar", "gregorian")
@@ -258,12 +343,15 @@ def main():
     spec = SOURCES[a.name]
     years = (range(a.years[0], a.years[1] + 1) if len(a.years) > 1
              else range(1900, 2101))
-    U, T, lev, lat, yr, mo = READERS[spec["reader"]](spec, years)
-    U, T, lev, lat = orient(U, T, lev, lat)
+    F = orient(READERS[spec["reader"]](spec, years))
+    U, T, lev, lat, yr, mo = (F[k] for k in ("U", "T", "lev", "lat", "yr", "mo"))
     print(f"{a.name}: {U.shape[0]} times {yr.min()}-{yr.max()}, "
           f"{lev.size} levels {lev.min():g}-{lev.max():g} hPa, {lat.size} lats")
 
-    series, supports, not_evaluable = series_from_fields(U, T, lev, lat, yr, mo, spec)
+    full = all(k in F for k in ("V", "OMEGA", "VPTP", "dy")) \
+        and spec["time_resolution"] == "daily"
+    series, supports, not_evaluable = (series_from_tem(F, spec) if full else
+                                       series_from_fields(U, T, lev, lat, yr, mo, spec))
     res = {
         "name": a.name, "long_name": spec["long_name"],
         "independent": bool(spec["independent"]),
@@ -279,9 +367,13 @@ def main():
     with open(out, "w") as f:
         json.dump(res, f, indent=2)
     for k in supports:
-        v = np.asarray(series[k], float)
-        print(f"  {k:16s} n={v.size:3d}  mean {v.mean():9.3f}")
-    print(f"  not evaluable: {', '.join(sorted(not_evaluable))}")
+        if k in series:
+            v = np.asarray(series[k], float)
+            print(f"  {k:16s} n={v.size:3d}  mean {v.mean():9.3f}")
+    if "_ssw_count" in series:
+        print(f"  {'ssw_NH':16s} {series['_ssw_count']} events in "
+              f"{series['_ssw_winters']} winters")
+    print(f"  not evaluable: {', '.join(sorted(not_evaluable)) or 'nothing'}")
     print(f"wrote {out}")
 
 
