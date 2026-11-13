@@ -9,6 +9,11 @@ those of PR #8 `strat-eval-standard` ([PROGRESS.md](PROGRESS.md)).
 
 ## Settled
 
+### 2026-11-12 (review of PR #8)
+
+- `AIDE-atmosphere/era5_env/` (decision 59) deleted from the main checkout; the `.gitignore`
+  line stays removed (decision 36).
+
 ### 2026-11-12 (brief 3)
 
 - The transport scorecard **replaces** the two-tier CESM protocol and is the repository's
@@ -186,8 +191,8 @@ Status after this PR in italics.
 58. **Repo-relative paths in result JSON** (`strat_eval_common.portable`, commit 910765a):
     the references block carried the checkout's absolute ERA5 path, so the committed JSON
     differed between checkouts; found while reproducing from the main checkout.
-59. **`AIDE-atmosphere/era5_env/` in the main checkout** (120 MB, the tier-only ERA5 download
-    environment) is left in place and now shows as untracked, since its ignore line is
-    removed (36). Delete it, or restore the ignore line.
+59. **`AIDE-atmosphere/era5_env/` in the main checkout** (106 MB, the tier-only ERA5 download
+    environment) was left in place and showed as untracked, since its ignore line is
+    removed (36). **Settled 2026-11-12: deleted.**
 60. **ERA5 move verified** with the manifest check of `copy_era5_refs.sh` run directly
     (`sha256sum -c`), not by re-running the copy.
