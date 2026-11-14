@@ -161,6 +161,23 @@ quoted here.
   testable** below ~15 yr — they are why tier 2 is 35 years, and they must not be reported
   as passes at tier-1 length.
 
+## Transport scorecard
+
+A separate scorecard beside the tiers; [docs/TRANSPORT_SCORECARD.md](AIDE-atmosphere/docs/TRANSPORT_SCORECARD.md)
+is its reference (contract, metrics, references, decisions, deferred list).
+
+- Scripts: `transport_common.py` (sources, readers, every reference path in `REFS`),
+  `22_transport_fields.py` -> `23_transport_scorecard.py` -> `24_transport_figures.py`;
+  `22b_transport_port_check.py` is evidence against jcm-strat, outside the chain.
+- `AIDE-atmosphere/data/era5/` holds ERA5 copies made by `scripts/copy_era5_refs.sh` and checked
+  against `scripts/era5_refs.sha256`; gitignored. The jcm-strat model files are read in place.
+- Its w* (jcm-strat Ψ* route, log-p interpolated) is **interim**, AIDE-eval issue #5, and is not
+  the tier estimator `tem_residual`: never read a transport B number against a tier threshold.
+- Scored: every result set of `transport_common.SETS` (phase-29 runs 2006–2010, AL7h 2011–2019)
+  under both scorings of `transport_common.SCORINGS` (extensive: 34 metrics; reduced: phase 31's
+  20, A2-WACCM for A2). References follow the scored window, except B (WACCM6 h6 1996–2014).
+- `validation_results/transport/` is generated and committed, like the other results.
+
 ## Working rules specific to this repo
 
 - `output/` and `logs/` are **generated**. Never hand-edit a JSON, CSV or PDF —
