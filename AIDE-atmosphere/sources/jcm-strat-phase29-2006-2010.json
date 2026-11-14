@@ -1,0 +1,26 @@
+{
+  "description": "jcm-strat phase 29 scorecard runs except AL7h (scored 2006-2019 in jcm-strat-AL7h-2006-2019); QBO30 and QBO10dL76 excluded. T63 L95 stratosphere-only JCM, troposphere nudged to ERA5, daily zonal means reduced from 6-hourly output by jcm-strat scripts/daily_zm.py (v'theta' formed within each 6-hourly snapshot). 2006-2010 is all these runs cover, so the set is on a non-standard window. Read in place, never copied.",
+  "reader": "jcm_npz",
+  "window": [
+    2006,
+    2010
+  ],
+  "runs": {
+    "P20b": "/data/JCM_stripped/jcm-strat-phase29/cache/variability/P20b_0610.npz",
+    "AL7": "/data/JCM_stripped/jcm-strat-phase29/cache/variability/AL7_0610.npz",
+    "AL7t": "/data/JCM_stripped/jcm-strat-phase29/cache/variability/AL7t_0610.npz",
+    "L0": "/data/JCM_stripped/jcm-strat-phase29/cache/variability/L0_0610.npz",
+    "LAL7": "/data/JCM_stripped/jcm-strat-phase29/cache/variability/LAL7_0610.npz",
+    "QBO10d": "/data/JCM_stripped/jcm-strat-phase29/cache/variability/QBO10d_0610.npz",
+    "LQBO10d": "/data/JCM_stripped/jcm-strat-phase29/cache/variability/LQBO10d_0610.npz"
+  },
+  "notes": {
+    "P20b": "baseline; ERA5 nudging top 400 hPa everywhere, no T_eq correction",
+    "AL7": "P20b with the AL7 equilibrium-temperature correction (jcm-strat phase 22)",
+    "AL7t": "AL7 correction tapered to zero at 35 deg, full from 50 deg (phase 24)",
+    "L0": "P20b with the nudging top at 150 hPa in the tropics, 400 hPa in the extratropics (phase 23)",
+    "LAL7": "L0 nudging top with the AL7 correction (phase 23)",
+    "QBO10d": "AL7h with the QBO nudging timescale 10 d instead of 1 d (phase 27)",
+    "LQBO10d": "QBO10d with L0's nudging top (phase 29)"
+  }
+}
