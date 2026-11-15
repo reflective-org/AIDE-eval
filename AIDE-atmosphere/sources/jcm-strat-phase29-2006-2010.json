@@ -6,13 +6,13 @@
     2010
   ],
   "runs": {
-    "P20b": "/data/JCM_stripped/jcm-strat-phase29/cache/variability/P20b_0610.npz",
-    "AL7": "/data/JCM_stripped/jcm-strat-phase29/cache/variability/AL7_0610.npz",
-    "AL7t": "/data/JCM_stripped/jcm-strat-phase29/cache/variability/AL7t_0610.npz",
-    "L0": "/data/JCM_stripped/jcm-strat-phase29/cache/variability/L0_0610.npz",
-    "LAL7": "/data/JCM_stripped/jcm-strat-phase29/cache/variability/LAL7_0610.npz",
-    "QBO10d": "/data/JCM_stripped/jcm-strat-phase29/cache/variability/QBO10d_0610.npz",
-    "LQBO10d": "/data/JCM_stripped/jcm-strat-phase29/cache/variability/LQBO10d_0610.npz"
+    "P20b": "/data/JCM_stripped/jcm-strat/cache/variability/P20b_0610.npz",
+    "AL7": "/data/JCM_stripped/jcm-strat/cache/variability/AL7_0610.npz",
+    "AL7t": "/data/JCM_stripped/jcm-strat/cache/variability/AL7t_0610.npz",
+    "L0": "/data/JCM_stripped/jcm-strat/cache/variability/L0_0610.npz",
+    "LAL7": "/data/JCM_stripped/jcm-strat/cache/variability/LAL7_0610.npz",
+    "QBO10d": "/data/JCM_stripped/jcm-strat/cache/variability/QBO10d_0610.npz",
+    "LQBO10d": "/data/JCM_stripped/jcm-strat/cache/variability/LQBO10d_0610.npz"
   },
   "notes": {
     "P20b": "baseline; ERA5 nudging top 400 hPa everywhere, no T_eq correction",

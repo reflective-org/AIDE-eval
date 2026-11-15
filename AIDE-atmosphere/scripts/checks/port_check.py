@@ -52,21 +52,21 @@ RESULTS = os.path.join(os.path.dirname(HERE), "validation_results")
 # jcm-strat's own results and the runs they were computed from. Model files are read
 # in place.
 JCM = "/data/JCM_stripped"
-P29_OUT = f"{JCM}/jcm-strat-phase29/docs/outputs/29_lqbo10d"
+P29_OUT = f"{JCM}/jcm-strat/docs/outputs/29_lqbo10d"
 P29_RELATIVE = os.path.join(P29_OUT, "relative", "relative_metrics.json")
 P29_SUCCESS = os.path.join(P29_OUT, "success_0610", "success_metrics.json")
 P29_AGE_YEARS = (2005, 2009)      # phase 29's age reference years (sweep_score.CLAMS_YEARS)
 P29_RUNS = dict(name="jcm-strat-phase29", reader="jcm_npz", window=[2006, 2010], notes={},
-                runs={n: [f"{JCM}/jcm-strat-phase29/cache/variability/{n}_0610.npz"]
+                runs={n: [f"{JCM}/jcm-strat/cache/variability/{n}_0610.npz"]
                       for n in ("P20b", "AL7", "AL7h", "AL7t", "L0", "LAL7", "QBO10d", "LQBO10d")})
 # phase 31: AL7h 2006-2010 and 2011-2019, age references of the window's years, and the
 # phase-30 group D of AL7h 2006-2010 that phase 31 reports.
 # port source: (window, model file, success_<tag> directory, group D file)
 P31_OUT = f"{JCM}/jcm-strat-phase31/docs/outputs/31_al7h_validation"
 P31_RUNS = {
-    "AL7h": ([2006, 2010], f"{JCM}/jcm-strat-phase29/cache/variability/AL7h_0610.npz", "success_0610",
+    "AL7h": ([2006, 2010], f"{JCM}/jcm-strat/cache/variability/AL7h_0610.npz", "success_0610",
              f"{JCM}/jcm-strat-phase30/docs/outputs/30_level_thinning/variability.json"),
-    "AL7h_1119": ([2011, 2019], f"{JCM}/jcm-strat-phase31/cache/variability/AL7h_1119.npz",
+    "AL7h_1119": ([2011, 2019], f"{JCM}/jcm-strat/cache/variability/AL7h_1119.npz",
                   "success_1119", os.path.join(P31_OUT, "variability.json")),
 }
 REL_LIMIT = 0.005

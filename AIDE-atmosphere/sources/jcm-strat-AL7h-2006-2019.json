@@ -7,8 +7,8 @@
   ],
   "runs": {
     "AL7h": [
-      "/data/JCM_stripped/jcm-strat-phase29/cache/variability/AL7h_0610.npz",
-      "/data/JCM_stripped/jcm-strat-phase31/cache/variability/AL7h_1119.npz"
+      "/data/JCM_stripped/jcm-strat/cache/variability/AL7h_0610.npz",
+      "/data/JCM_stripped/jcm-strat/cache/variability/AL7h_1119.npz"
     ]
   },
   "notes": {
