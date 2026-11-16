@@ -45,7 +45,7 @@ What is scored, when, and through which PR. Repository `reflective-org/AIDE-eval
 - The chain (ERA5 manifest check, `evaluate.py`, `checks/port_check.py`) run twice from an
   empty `output/` and `validation_results/` on 2026-11-12: all 23 committed artefacts and
   the 10 output JSON identical (sha256). About 80 s on CPU.
-- 2026-11-12, after consolidating into one checkout (`/data/AIDE-atmosphere_validation`, the
+- 2026-11-12, after consolidating into one checkout (`/data/AIDE-eval`, the
   worktree `/data/AIDE-eval-strat-transport` removed): two more runs from the main checkout
   reproduce every committed artefact bit for bit; result JSON carry repo-relative paths, so
   they no longer depend on the checkout location.
