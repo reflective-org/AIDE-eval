@@ -3,10 +3,10 @@
 | | |
 |---|---|
 | Scored | AL7h |
-| Read by | reader `jcm_npz`; /data/JCM_stripped/jcm-strat-phase29/cache/variability; /data/JCM_stripped/jcm-strat-phase31/cache/variability |
+| Read by | reader `jcm_npz`; /data/JCM_stripped/jcm-strat/cache/variability |
 | Window | 2006-01-01 – 2019-12-31 (5113 days) |
 | Reference years | A, D, D7: 2006–2019 (the window); B: WACCM6 h6 1996–2014, the only h6 segment |
-| Produced | 2026-11-12 |
+| Produced | 2026-11-16 |
 | Scoring | **extensive** (the full listing): the 34 metrics of the phase-29 scorecard, every one scored |
 | Score | rel = model / ref − 1, err = \|rel\| / 0.25; pass err ≤ 1, near ≤ 1.5, fail above; A2, A2-WACCM, C1 latitudes, C2 and D4 final warming keep absolute bounds |
 | Combined | mean of the A, B and C group scores (each the mean err of its scored metrics); D reported separately |

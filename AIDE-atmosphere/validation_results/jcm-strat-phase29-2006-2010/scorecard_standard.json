@@ -2,7 +2,7 @@
  "name": "jcm-strat-phase29-2006-2010",
  "description": "jcm-strat phase 29 scorecard runs except AL7h (scored 2006-2019 in jcm-strat-AL7h-2006-2019); QBO30 and QBO10dL76 excluded. T63 L95 stratosphere-only JCM, troposphere nudged to ERA5, daily zonal means reduced from 6-hourly output by jcm-strat scripts/daily_zm.py (v'theta' formed within each 6-hourly snapshot). 2006-2010 is all these runs cover, so the set is on a non-standard window. Read in place, never copied.",
  "scoring": "standard",
- "produced": "2026-11-12",
+ "produced": "2026-11-16",
  "runs": [
   "P20b",
   "AL7",
