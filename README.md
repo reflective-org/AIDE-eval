@@ -68,7 +68,7 @@ python3 -m venv .AIDE-eval_env
 ```
 
 Then, from `AIDE-atmosphere/scripts/` (about 80 s on CPU; wrap in
-`/data/JCM_stripped/jcm-strat-phase29/scripts/memcap.sh --` on shared nodes):
+`/data/JCM_stripped/jcm-strat/scripts/memcap.sh --` on shared nodes):
 
 ```bash
 PY=../../.AIDE-eval_env/bin/python

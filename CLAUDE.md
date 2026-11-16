@@ -96,9 +96,9 @@ gitignored `.AIDE-eval_env/` sit at the repo root. Everything else is under
 | | |
 |---|---|
 | Interpreter | `.AIDE-eval_env/bin/python` at the repo root, from `requirements.txt` (Python 3.10.12) |
-| Model input | paths in `sources/<set>.json`, read in place (jcm-strat files under `/data/JCM_stripped/jcm-strat-phase29`, `-phase31`; never modify them) |
+| Model input | paths in `sources/<set>.json`, read in place (jcm-strat files under `/data/JCM_stripped/jcm-strat`; never modify them) |
 | References | CLaMS `/data/CLaMS/CLaMS_v3/clams_v3.1_era5_zm_lat.zip`; WACCM6 entry age `/data/CESM2_REFD1_AOA/`; CESM2.1.5-WACCM6 h6 `/data/cesm2.1.5_output/histSST` (read-only); ERA5 copies in `data/era5/` |
-| Memory | wrap heavy runs in `/data/JCM_stripped/jcm-strat-phase29/scripts/memcap.sh` (96 G per job); one 14-year run peaks at 2.6 GB |
+| Memory | wrap heavy runs in `/data/JCM_stripped/jcm-strat/scripts/memcap.sh` (96 G per job); one 14-year run peaks at 2.6 GB |
 
 Reproduce (from `scripts/`, `PY=../../.AIDE-eval_env/bin/python`, about 80 s):
 

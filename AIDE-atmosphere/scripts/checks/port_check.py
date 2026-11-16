@@ -62,10 +62,10 @@ P29_RUNS = dict(name="jcm-strat-phase29", reader="jcm_npz", window=[2006, 2010],
 # phase 31: AL7h 2006-2010 and 2011-2019, age references of the window's years, and the
 # phase-30 group D of AL7h 2006-2010 that phase 31 reports.
 # port source: (window, model file, success_<tag> directory, group D file)
-P31_OUT = f"{JCM}/jcm-strat-phase31/docs/outputs/31_al7h_validation"
+P31_OUT = f"{JCM}/jcm-strat/docs/outputs/31_al7h_validation"
 P31_RUNS = {
     "AL7h": ([2006, 2010], f"{JCM}/jcm-strat/cache/variability/AL7h_0610.npz", "success_0610",
-             f"{JCM}/jcm-strat-phase30/docs/outputs/30_level_thinning/variability.json"),
+             f"{JCM}/jcm-strat/docs/outputs/30_level_thinning/variability.json"),
     "AL7h_1119": ([2011, 2019], f"{JCM}/jcm-strat/cache/variability/AL7h_1119.npz",
                   "success_1119", os.path.join(P31_OUT, "variability.json")),
 }

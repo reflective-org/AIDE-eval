@@ -260,7 +260,7 @@ What interpolation changes against the nearest level (phase-29 runs, 2006–2010
 4. **Evaluate**: `bash copy_era5_refs.sh` once (copies and verifies the ERA5 files), then
    `$PY evaluate.py <set>` → `01_fields` → `02_scorecard` → `03_figures`, and both summaries
    rewritten over every registered set. Heavy runs under the memory cap:
-   `bash /data/JCM_stripped/jcm-strat-phase29/scripts/memcap.sh -- $PY evaluate.py <set>`.
+   `bash /data/JCM_stripped/jcm-strat/scripts/memcap.sh -- $PY evaluate.py <set>`.
    One 14-year single-run set takes about 25 s on CPU, peak 2.6 GB (01_fields).
 5. **Read** `validation_results/<set>/scorecard_standard.md` with §7, §8 and §11.
 
