@@ -52,7 +52,7 @@ For multi-step tasks, state a brief plan:
 
 ---
 
-# Project context — AIDE-atmosphere_validation
+# Project context — AIDE-eval
 
 ## What this repo is
 

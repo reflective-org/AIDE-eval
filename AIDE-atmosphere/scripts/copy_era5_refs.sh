@@ -15,7 +15,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DATA="$HERE/../data"; DEST="$DATA/era5"; MANIFEST="$HERE/era5_refs.sha256"
 SRC_ZM=/data/JCM_stripped/jcm-strat/cache/era5_ref
 SRC_DAILY=/data/JCM_stripped/jcm-strat/cache/variability_cds/full
-# jcm-strat-phase31/cache/{era5_ref,variability_cds} are symlinks to these two directories
+# jcm-strat phase 31 read its ERA5 references from these two directories
 mkdir -p "$DEST"
 for y in $(seq 2006 2019); do
   cp --preserve=timestamps "$SRC_ZM/era5_zm_monthly_$y.nc" "$DEST/"
