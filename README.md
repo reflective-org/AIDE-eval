@@ -1,7 +1,7 @@
 # AIDE-SAI validation
 This repository validates single parts and the fully interactive version of the AIDE-SAI framework. If you want to run the fully interactive version or it's subparts go to:
-- [Links to GitHub repos]
-- [Links to GitHub repos]
+- Interactive version: https://github.com/reflective-org/AIDE-SAI-link
+- Atmosphere dycore: https://github.com/reflective-org/jcm-strat
 
 ## 1. AIDE-atmosphere validation
 
