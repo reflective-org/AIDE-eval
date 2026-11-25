@@ -49,7 +49,7 @@ copy_era5_refs.sh        =  setup: ERA5 copies into data/era5/, checked against 
 |---|---|---|
 | Model daily zonal means | `READERS[reader](paths, years)` via `load_run` | paths in `sources/<set>.json` (read in place) |
 | CLaMS v3.1 zonal-mean age | `clams_member`, `clams_age`, `01.clams_monthly_age` | `/data/CLaMS/CLaMS_v3/clams_v3.1_era5_zm_lat.zip` (read from the zip in memory) |
-| WACCM6 REF-D1 entry age | `waccm_age` | `/data/CESM2_REFD1_AOA/…_1970-2019_….nc` |
+| WACCM6 REF-D1 entry age | `waccm_age` | `/data/cesm2.1.5_output/CESM2_REFD1_AOA/…_1970-2019_….nc` |
 | CESM2.1.5-WACCM6 h6 `Vzm`, `VTHzm`, `THzm` | `load_h6("1996-2014", …)` | `/data/cesm2.1.5_output/histSST/…` |
 | ERA5 monthly zonal means | `01.era5_monthly` | `AIDE-atmosphere/data/era5/era5_zm_monthly_<y>.nc` |
 | ERA5 CDS daily zonal means | `01.Daily.era5` | `AIDE-atmosphere/data/era5/era5_<y>.npz` |

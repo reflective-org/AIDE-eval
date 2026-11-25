@@ -135,7 +135,7 @@ are on the jcm-strat grid).
 | Reference | Location | Years | Metrics |
 |---|---|---|---|
 | CLaMS v3.1 driven by ERA5, zonal-mean AGE | `/data/CLaMS/CLaMS_v3/clams_v3.1_era5_zm_lat.zip` (2004–2023), read in memory | scored window | A2–A4, D7 |
-| WACCM6 REF-D1 entry age (base 0.47°N, 103 hPa) | `/data/CESM2_REFD1_AOA/AoA_waccm6_refd1.04_AOA1mf_1970-2019_ba_0_100.0_ck_0_50.0.nc` | scored window | A1, A2-WACCM |
+| WACCM6 REF-D1 entry age (base 0.47°N, 103 hPa) | `/data/cesm2.1.5_output/CESM2_REFD1_AOA/AoA_waccm6_refd1.04_AOA1mf_1970-2019_ba_0_100.0_ck_0_50.0.nc` | scored window | A1, A2-WACCM |
 | CESM2.1.5-WACCM6 histSST h6 (`Vzm`, `VTHzm`, `THzm`) | `/data/cesm2.1.5_output/histSST`, through `strat_eval_common.load_h6` | **1996–2014 for every window** (6935 days, 61 interfaces from 4.5 × 10⁻⁶ hPa) | B1, B2 |
 | ERA5 monthly zonal means (`uzm`, `tzm`, 25 levels) | `AIDE-atmosphere/data/era5/era5_zm_monthly_<y>.nc` | scored window | C1, C2 |
 | ERA5 CDS daily zonal means (u, v, T, θ, v'θ', 17 levels 1–250 hPa) | `AIDE-atmosphere/data/era5/era5_<y>.npz` | scored window | D1–D7 |

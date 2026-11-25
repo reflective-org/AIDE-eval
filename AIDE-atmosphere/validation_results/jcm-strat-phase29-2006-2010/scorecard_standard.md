@@ -8,7 +8,7 @@
 | Read by | reader `jcm_npz`; /data/JCM_stripped/jcm-strat/cache/variability |
 | Window | 2006-01-01 – 2010-12-31 (1826 days) — **non-standard window (5 of 14 standard years)** |
 | Reference years | A, D, D7: 2006–2010 (the window); B: WACCM6 h6 1996–2014, the only h6 segment |
-| Produced | 2026-11-16 |
+| Produced | 2026-11-25 |
 | Scoring | **standard** (the headline score and ranking): jcm-strat phase 31's scored set, the former "reduced" scoring — A2-WACCM replaces A2; A2 and C1-jet10_N, C1-jet10_N-lat, C1-jet10_S, C1-jet10_S-lat, D1-N, D1-S, D2-N, D2-S, D3, D4-fwN, D4-fwS, D6-N, D6-S, D7 are listed but not scored. Phase 31 scored with absolute bounds; here the relative scoring applies to that set |
 | Score | rel = model / ref − 1, err = \|rel\| / 0.25; pass err ≤ 1, near ≤ 1.5, fail above; A2, A2-WACCM, C1 latitudes, C2 and D4 final warming keep absolute bounds |
 | Combined | mean of the A, B and C group scores (each the mean err of its scored metrics); D reported separately |
