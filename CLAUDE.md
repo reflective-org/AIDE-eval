@@ -78,8 +78,10 @@ ported here; the diagnostics are recomputed from daily zonal means.
 ## Repository layout
 
 Only `README.md`, `CLAUDE.md`, `LICENSE`, `requirements.txt`, `.gitignore` and the
-gitignored `.AIDE-eval_env/` sit at the repo root. Everything else is under
-**`AIDE-atmosphere/`**; bare paths below are relative to it.
+gitignored `.AIDE-eval_env/` sit at the repo root. The stratospheric-dynamics scorecard is
+under **`AIDE-atmosphere/`**; bare paths below are relative to it. The validation of
+AIDE-SAI against CCMI-2022 SAI is under **`AIDE-SAI/`** (`docs/VALIDATION_PLAN.md`); it shares
+only the environment, and the same rules on generated artefacts apply to it.
 
 | Path | Content |
 |---|---|
