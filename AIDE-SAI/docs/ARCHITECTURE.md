@@ -21,7 +21,9 @@ acp-25-6001-2025-f02-web.png ──fetch (sha256)──▶ data/tilmes2025/
         └─ digitize_tilmes2025_fig2b.py ──▶ validation_results/injection_rates/tilmes2025_fig2b.{csv,png}
                                               │ copied by hand (2030–2034 totals)
                                               ▼
-            AIDE-SAI repo: inputs/injection/ccmi2022_sai_30NS_2030-2034.csv ──▶ runs/ccmi2030_{inj,ctrl}
+  AIDE-SAI repo: inputs/injection/ccmi2022_sai_30NS_2030-2034.csv          ──▶ runs/ccmi2030_inj_tick
+                 inputs/injection/ccmi2022_sai_30NS_2030-2034_yearmean.csv ──▶ runs/ccmi2030_inj (superseded reading)
+                 (no injection)                                            ──▶ runs/ccmi2030_ctrl
 ```
 
 Planned (Tasks 2 and 4): CCMI reader and REMAP → `output/` → comparison with the AIDE-SAI
