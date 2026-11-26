@@ -24,8 +24,9 @@ and reproduce jcm-strat's values (port check).
 Out-of-sample check of the AIDE-SAI aerosol against the CCMI-2022 SAI aerosol distribution
 produced by fully coupled CESM2-WACCM6 and prescribed into WACCM6 with fixed SSTs (Tilmes et al. 2025). Report only, no pass/fail.
 
-- Step 1 (running): CESM linking, 30°N/S injection at 75 hPa with the 2030–2032 rates read
-  off Tilmes et al. (2025) Fig. 2b (3.81, 4.72, 5.60 Tg SO2/yr), 3-year runs.
+- Step 1 (running): CESM linking, 30°N/S injection at 75 hPa with the rates read off
+  Tilmes et al. (2025) Fig. 2b; one run 2027–2032 (2027–2029 spin-up, 2.13–2.72 Tg SO2/yr;
+  2030–2032 compared, 3.81, 4.72, 5.60 Tg SO2/yr).
 - Plan and limits: [AIDE-SAI/docs/VALIDATION_PLAN.md](AIDE-SAI/docs/VALIDATION_PLAN.md); status:
   [PROGRESS.md](AIDE-SAI/docs/PROGRESS.md); decisions: [DECISIONS.md](AIDE-SAI/docs/DECISIONS.md).
 - Injection rates: [validation_results/injection_rates/](AIDE-SAI/validation_results/injection_rates/).

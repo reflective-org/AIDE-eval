@@ -98,7 +98,8 @@ def main():
                     yerr=[[series[k][y][0] - series[k][y][1] for y in yrs],
                           [series[k][y][2] - series[k][y][0] for y in yrs]],
                     fmt="o", ms=3, color=c, mec="w", mew=0.5, label=k)
-    ax.axvspan(2029.5, 2032.5, color="tab:blue", alpha=0.08, label="AIDE-SAI run years 2030-2032")
+    ax.axvspan(2026.5, 2029.5, color="tab:gray", alpha=0.10, label="AIDE-SAI spin-up 2027-2029")
+    ax.axvspan(2029.5, 2032.5, color="tab:blue", alpha=0.10, label="AIDE-SAI compared 2030-2032")
     ax.set(xlim=(2019, 2046), ylim=(0, 25), xlabel="year", ylabel="Tg SO2 / yr",
            title="Tilmes et al. (2025) Fig. 2b, digitised at the integer-year ticks")
     ax.legend(fontsize=8, loc="upper left")

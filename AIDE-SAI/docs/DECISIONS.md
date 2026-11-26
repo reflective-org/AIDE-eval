@@ -26,10 +26,15 @@ the PR for review and open until confirmed or rejected.
 ### 2026-11-25 (review of the Fig. 2b reading)
 - Fig. 2b is read at the integer-year vertex (one vertex per year), not averaged over [Y, Y+1);
   the first reading was 0.3–0.5 Tg/yr (~10 %) high.
-- Corrected schedule in AIDE-SAI (PR #12) and a new run `ccmi2030_inj_tick` with it; the
-  running `ccmi2030_inj` (first reading) is kept as a +10 % rate-sensitivity case.
+- Corrected schedule in AIDE-SAI (PR #12).
 - The moved WACCM6 entry-age path is fixed in this PR.
-- The resume seam in `ccmi2030_ctrl` (step 2165) is recorded in PROGRESS only; the control is kept.
+
+### 2026-11-26 (spin-up)
+- The AIDE-SAI run starts in 2027 with the Fig. 2b rates for 2027–2029 as spin-up, so that its
+  2030 aerosol includes the earlier injection as in CCMI. 2030–2032 are compared.
+- The `ccmi2030_inj`, `ccmi2030_inj_tick` and `ccmi2030_ctrl` runs (no spin-up) are not useful;
+  stopped and their data deleted. Supersedes the 2026-11-25 run choices (corrected run, +10 %
+  rate case, control kept with its resume seam).
 
 ## Unconfirmed — PR 1 (this PR)
 
@@ -42,7 +47,7 @@ the PR for review and open until confirmed or rejected.
    columns bracketing x(Y); lo/hi = member spread there (zero where the members overlap).
 4. **Figure not committed**; fetched from the journal with a sha256 manifest (CC BY 4.0 would
    allow committing it).
-5. **Run year 0 treated as spin-up** in the comparison (AIDE-SAI starts without the pre-2030
-   aerosol that CCMI 2030 carries: ≤ 0.4 Tg/yr about 2020.5–2022.7, rising from 2024).
+5. **The ~3 % pre-2027 contribution is not modelled.** Estimate from a 1-year e-folding; the
+   AIDE-SAI decay time is measured from `ccmi2027_inj` and the estimate updated.
 6. **Digitiser reads the PNG with `matplotlib.pyplot.imread`** (no new pin; Pillow comes in
    through matplotlib).
