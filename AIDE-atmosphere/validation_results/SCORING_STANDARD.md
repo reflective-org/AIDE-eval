@@ -44,7 +44,7 @@ Every run of every set by its combined A–C score (lower is better). Runs on di
 
 - Fail: B1-100, B1-50
 - Near: none
-- Produced 2026-11-16. Report: [`jcm-strat-AL7h-2006-2019/scorecard_standard.md`](jcm-strat-AL7h-2006-2019/scorecard_standard.md); figures [`jcm-strat-AL7h-2006-2019/score_table_standard.png`](jcm-strat-AL7h-2006-2019/score_table_standard.png), [`jcm-strat-AL7h-2006-2019/heatmap_standard.png`](jcm-strat-AL7h-2006-2019/heatmap_standard.png)
+- Produced 2026-11-25. Report: [`jcm-strat-AL7h-2006-2019/scorecard_standard.md`](jcm-strat-AL7h-2006-2019/scorecard_standard.md); figures [`jcm-strat-AL7h-2006-2019/score_table_standard.png`](jcm-strat-AL7h-2006-2019/score_table_standard.png), [`jcm-strat-AL7h-2006-2019/heatmap_standard.png`](jcm-strat-AL7h-2006-2019/heatmap_standard.png)
 
 ## jcm-strat-phase29-2006-2010 (2006–2010) — **non-standard window (5 of 14 standard years)**
 
@@ -60,4 +60,4 @@ Every run of every set by its combined A–C score (lower is better). Runs on di
 
 - Fail in every run: B1-100
 - Pass in every run: B1-70, B1-10, B2-100, B2-70, C1-jet50_N, C1-jet50_S, C1-jet50_S-lat, D5-N, D5-S
-- Produced 2026-11-16. Report: [`jcm-strat-phase29-2006-2010/scorecard_standard.md`](jcm-strat-phase29-2006-2010/scorecard_standard.md); figures [`jcm-strat-phase29-2006-2010/score_table_standard.png`](jcm-strat-phase29-2006-2010/score_table_standard.png), [`jcm-strat-phase29-2006-2010/heatmap_standard.png`](jcm-strat-phase29-2006-2010/heatmap_standard.png)
+- Produced 2026-11-25. Report: [`jcm-strat-phase29-2006-2010/scorecard_standard.md`](jcm-strat-phase29-2006-2010/scorecard_standard.md); figures [`jcm-strat-phase29-2006-2010/score_table_standard.png`](jcm-strat-phase29-2006-2010/score_table_standard.png), [`jcm-strat-phase29-2006-2010/heatmap_standard.png`](jcm-strat-phase29-2006-2010/heatmap_standard.png)

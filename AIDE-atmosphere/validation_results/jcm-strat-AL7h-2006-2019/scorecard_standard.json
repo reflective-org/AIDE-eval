@@ -2,7 +2,7 @@
  "name": "jcm-strat-AL7h-2006-2019",
  "description": "jcm-strat AL7h (T63 L95 stratosphere-only JCM, troposphere nudged to ERA5, AL7 T_eq correction at half amplitude), the continuous p25_AL7h chain 2006-2019: phase 29's 2006-2010 file and phase 31's 2011-2019 continuation, read as one record (same grid, joined day to day). Its T_eq correction was fitted on 2005-04..2008-01, inside the window. Read in place, never copied.",
  "scoring": "standard",
- "produced": "2026-11-16",
+ "produced": "2026-11-25",
  "runs": [
   "AL7h"
  ],
@@ -1116,7 +1116,7 @@
   "refs": {
    "clams_zip": "/data/CLaMS/CLaMS_v3/clams_v3.1_era5_zm_lat.zip",
    "clams_member": "clams_v3.1_era5_zm_lat_press_{year}.nc",
-   "waccm_aoa": "/data/CESM2_REFD1_AOA/AoA_waccm6_refd1.04_AOA1mf_1970-2019_ba_0_100.0_ck_0_50.0.nc",
+   "waccm_aoa": "/data/cesm2.1.5_output/CESM2_REFD1_AOA/AoA_waccm6_refd1.04_AOA1mf_1970-2019_ba_0_100.0_ck_0_50.0.nc",
    "waccm_tem_segment": "1996-2014",
    "era5_zm_monthly": "AIDE-atmosphere/data/era5/era5_zm_monthly_{year}.nc",
    "era5_daily": "AIDE-atmosphere/data/era5/era5_{year}.npz"

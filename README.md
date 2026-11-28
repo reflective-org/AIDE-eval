@@ -19,7 +19,19 @@ and reproduce jcm-strat's values (port check).
   runs 2006–2010 (0.71–0.99, non-standard window). No AIDE-WACCM emulator rollout yet.
 - Open: the w* estimator is interim (AIDE-eval #5); group C reads daily means (AIDE-eval #7).
 
-## Start here
+## 2. AIDE-SAI validation
+
+Out-of-sample check of the AIDE-SAI aerosol against the CCMI-2022 SAI aerosol distribution
+produced by fully coupled CESM2-WACCM6 and prescribed into WACCM6 with fixed SSTs (Tilmes et al. 2025). Report only, no pass/fail.
+
+- Step 1 (running): CESM linking, 30°N/S injection at 75 hPa with the rates read off
+  Tilmes et al. (2025) Fig. 2b; one run 2027–2032 (2027–2029 spin-up, 2.13–2.72 Tg SO2/yr;
+  2030–2032 compared, 3.81, 4.72, 5.60 Tg SO2/yr).
+- Plan and limits: [AIDE-SAI/docs/VALIDATION_PLAN.md](AIDE-SAI/docs/VALIDATION_PLAN.md); status:
+  [PROGRESS.md](AIDE-SAI/docs/PROGRESS.md); decisions: [DECISIONS.md](AIDE-SAI/docs/DECISIONS.md).
+- Injection rates: [validation_results/injection_rates/](AIDE-SAI/validation_results/injection_rates/).
+
+## Start here (AIDE-atmosphere)
 
 | If you want | Read |
 |---|---|
@@ -101,6 +113,13 @@ AIDE-atmosphere/
   validation_results/  SCORING_STANDARD.md, SCORING_EXTENSIVE.md, port_check.md, <set>/
   output/              per-run JSON          — generated, gitignored
   data/                ERA5 reference copies — copy_era5_refs.sh, gitignored
+
+AIDE-SAI/
+  scripts/             fetch_tilmes2025_fig2.sh + sha256; digitize_tilmes2025_fig2b.py
+  docs/                VALIDATION_PLAN, ARCHITECTURE, DECISIONS, DEFERRED, PROGRESS
+  validation_results/  injection_rates/
+  data/                downloaded references — fetch scripts, gitignored
+  output/              intermediate output — generated, gitignored
 ```
 
 `validation_results/` is generated and committed; `output/` is generated and not. Never

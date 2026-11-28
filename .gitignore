@@ -11,3 +11,7 @@ __pycache__/
 
 # ERA5 reference copies for the transport scorecard - scripts/copy_era5_refs.sh, checked by scripts/era5_refs.sha256
 AIDE-atmosphere/data/
+
+# AIDE-SAI validation: downloaded references (fetch scripts + sha256 manifests) and intermediate output
+AIDE-SAI/data/
+AIDE-SAI/output/

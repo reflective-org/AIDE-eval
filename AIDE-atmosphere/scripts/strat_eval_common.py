@@ -69,7 +69,7 @@ REFS = dict(
     clams_zip="/data/CLaMS/CLaMS_v3/clams_v3.1_era5_zm_lat.zip",
     clams_member="clams_v3.1_era5_zm_lat_press_{year}.nc",
     # WACCM6 REF-D1 entry age [yr], base point 0.47N 103 hPa - A1
-    waccm_aoa="/data/CESM2_REFD1_AOA/AoA_waccm6_refd1.04_AOA1mf_1970-2019_ba_0_100.0_ck_0_50.0.nc",
+    waccm_aoa="/data/cesm2.1.5_output/CESM2_REFD1_AOA/AoA_waccm6_refd1.04_AOA1mf_1970-2019_ba_0_100.0_ck_0_50.0.nc",
     # CESM2.1.5-WACCM6 histSST h6 tape (Vzm, VTHzm, THzm) through load_h6 - B1, B2
     waccm_tem_segment="1996-2014",
     # ERA5 monthly zonal means of u and T, 25 levels - C1, C2

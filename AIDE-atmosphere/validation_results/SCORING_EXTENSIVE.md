@@ -30,7 +30,7 @@ Ranking: the standard scoring ([SCORING_STANDARD.md](SCORING_STANDARD.md)).
 
 - Fail: A2, B1-100, B1-50, D1-N, D1-S, D6-N, D6-S, D7
 - Near: D2-N, D2-S
-- Produced 2026-11-16. Report: [`jcm-strat-AL7h-2006-2019/scorecard_extensive.md`](jcm-strat-AL7h-2006-2019/scorecard_extensive.md); figures [`jcm-strat-AL7h-2006-2019/score_table_extensive.png`](jcm-strat-AL7h-2006-2019/score_table_extensive.png), [`jcm-strat-AL7h-2006-2019/heatmap_extensive.png`](jcm-strat-AL7h-2006-2019/heatmap_extensive.png)
+- Produced 2026-11-25. Report: [`jcm-strat-AL7h-2006-2019/scorecard_extensive.md`](jcm-strat-AL7h-2006-2019/scorecard_extensive.md); figures [`jcm-strat-AL7h-2006-2019/score_table_extensive.png`](jcm-strat-AL7h-2006-2019/score_table_extensive.png), [`jcm-strat-AL7h-2006-2019/heatmap_extensive.png`](jcm-strat-AL7h-2006-2019/heatmap_extensive.png)
 
 ## jcm-strat-phase29-2006-2010 (2006–2010) — **non-standard window (5 of 14 standard years)**
 
@@ -46,4 +46,4 @@ Ranking: the standard scoring ([SCORING_STANDARD.md](SCORING_STANDARD.md)).
 
 - Fail in every run: B1-100, D7
 - Pass in every run: B1-70, B1-10, B2-100, B2-70, C1-jet50_N, C1-jet50_S, C1-jet50_S-lat, C1-jet10_S, C1-jet10_S-lat, D5-N, D5-S
-- Produced 2026-11-16. Report: [`jcm-strat-phase29-2006-2010/scorecard_extensive.md`](jcm-strat-phase29-2006-2010/scorecard_extensive.md); figures [`jcm-strat-phase29-2006-2010/score_table_extensive.png`](jcm-strat-phase29-2006-2010/score_table_extensive.png), [`jcm-strat-phase29-2006-2010/heatmap_extensive.png`](jcm-strat-phase29-2006-2010/heatmap_extensive.png)
+- Produced 2026-11-25. Report: [`jcm-strat-phase29-2006-2010/scorecard_extensive.md`](jcm-strat-phase29-2006-2010/scorecard_extensive.md); figures [`jcm-strat-phase29-2006-2010/score_table_extensive.png`](jcm-strat-phase29-2006-2010/score_table_extensive.png), [`jcm-strat-phase29-2006-2010/heatmap_extensive.png`](jcm-strat-phase29-2006-2010/heatmap_extensive.png)
